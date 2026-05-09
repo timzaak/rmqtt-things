@@ -1,0 +1,28 @@
+{
+  "name": "rmqtt-things-demo-tests",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint e2e/"
+  },
+  "dependencies": {
+    "playwright-unified-logger": "^0.1.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "eslint": "^9.18.0",
+    "mqtt": "^5.15.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.0"
+  }
+}

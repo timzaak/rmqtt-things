@@ -1,0 +1,43 @@
+[database]
+url = "postgres://rmqtt_user:CHANGE_ME_STRONG_PASSWORD@rmqtt-things-postgres:5432/rmqtt_things"
+
+[cache]
+cache_type = "redis"
+redis_url = "redis://rmqtt-things-redis:6379"
+
+[mqtt]
+url = "http://rmqtt-things-rmqtt:6060/api/v1"
+
+[mqtt.publish.response]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+
+[mqtt.property_command.publish]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+topic = "${productId}/$clientid/thing/service/property/set"
+retries = 2
+
+[mqtt.access.auth]
+suffix = "CHANGE_ME_SUFFIX"
+
+[api]
+openapi_enabled = false
+serve_web_path = "/app/web"
+
+[ca]
+ca_dir = "conf"
+name = "RMQTT Things Production CA"
+valid_days = 3650
+domain = "*.your-domain.com"
+
+[s3]
+endpoint = "https://s3.amazonaws.com"
+region = "us-east-1"
+access_key = "CHANGE_ME"
+secret_key = "CHANGE_ME"
+bucket = "rmqtt-things"
+directories = ["${productId}/${deviceId}/*", "public/*"]
+expired_seconds = 600

@@ -1,0 +1,9 @@
+mod cert_scenarios;
+mod mqtt_device_flow_scenarios;
+mod mqtt_integration;
+mod mqtt_test_context;
+mod ota_tests;
+mod product_tests;
+mod s3_tests;
+mod simple_tests;
+mod validator_tests;

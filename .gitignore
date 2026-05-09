@@ -1,0 +1,45 @@
+# Rust
+/target
+/backend/target
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+config.local.toml
+
+# Logs
+*.log
+/log/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Node / frontend / demo
+node_modules/
+dist/
+dist-ssr/
+coverage/
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Database
+*.db
+*.sqlite
+
+
+config.toml
+spec.md
+conf/*.key
+conf/*.pem
+.ai

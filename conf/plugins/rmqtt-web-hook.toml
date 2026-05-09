@@ -1,0 +1,44 @@
+##--------------------------------------------------------------------
+## rmqtt-web-hook
+##--------------------------------------------------------------------
+
+# Set the number of worker threads for the webhook's Tokio runtime.
+worker_threads = 4
+# Maximum number of tasks that can be queued before new tasks are rejected.
+queue_capacity = 300_000
+# Maximum number of tasks that can be executed concurrently.
+concurrency_limit = 128
+
+## Http config
+http_timeout = "8s"
+# If it fails, try again after approximately 2, 4, 7, 11, 18, or 42 seconds
+retry_max_elapsed_time = "60s"
+retry_multiplier = 2.5
+
+## Hook rules config
+# By default, no events are forwarded.
+# The following are some examples, please modify them according to your needs.
+
+# Client connection/disconnection events
+rule.client_connected = [{action = "client_connected", urls = ["http://host.docker.internal:8080/api/device/connect"]}]
+rule.client_disconnected = [{action = "client_disconnected", urls = ["http://host.docker.internal:8080/api/device/disconnect"]}]
+
+# Message publishing rules
+rule.message_publish = [
+    {action = "message_publish", topics=["+/+/thing/event/property/post"], urls = ["http://host.docker.internal:8080/api/thing/property/post"]},
+    {action = "message_publish", topics=["+/+/thing/event/test/post"], urls = ["http://host.docker.internal:8080/api/thing/event/post"]},
+    {action = "message_publish", topics=["+/+/thing/service/property/set_reply"], urls = ["http://host.docker.internal:8080/api/thing/property/set_reply"]},
+    {action = "message_publish", topics=["+/+/thing/file/upload"], urls = ["http://host.docker.internal:8080/api/thing/file/upload"]},
+    {action = "message_publish", topics=["+/+/ota/version"], urls = ["http://host.docker.internal:8080/api/ota/version"]}
+]
+
+rule.client_subscribe = [
+    {action = "client_subscribe", topics=["+/+/thing/service/property/set"], urls = ["http://host.docker.internal:8080/api/thing/property/set_subscribe"]}
+]
+
+# You can also enable other events as needed, for example:
+# rule.client_connect = [{action = "client_connect", urls = ["http://things-service:8080/thing/event/post"]}]
+# rule.client_connack = [{action = "client_connack", urls = ["http://things-service:8080/thing/event/post"]}]
+# rule.message_delivered = [{action = "message_delivered", topics=["#"], urls = ["http://things-service:8080/thing/event/post"]}]
+# rule.message_acked = [{action = "message_acked", topics=["#"], urls = ["http://things-service:8080/thing/event/post"]}]
+# rule.message_dropped = [{action = "message_dropped", urls = ["http://things-service:8080/thing/event/post"]}]

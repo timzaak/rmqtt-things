@@ -1,0 +1,44 @@
+[database]
+url = "postgres://rmqtt_user:rmqtt_pass@localhost:5432/rmqtt_things"
+
+[mqtt]
+url = "http://127.0.0.1:6060/api/v1"
+
+[mqtt.publish.response]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+
+[mqtt.property_command.publish]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+topic = "productId/$clientid/thing/service/property/set"
+
+[otel]
+# log = ""
+# trace = "http://localhost:4317"  # gRPC endpoint
+# trace = "http://localhost:4318/v1/traces"  # HTTP endpoint
+# metrics = ""
+
+[api]
+openapi_enabled = true
+#serve_web_path = "./frontend/dist"
+
+[mqtt.access.auth]
+suffix = "suffix_go"
+
+[s3]
+endpoint = "http://localhost:9000"
+region = "us-east-1"
+access_key = "minioadmin"
+secret_key = "minioadmin"
+bucket = "rmqtt-things"
+directories = ["${productId}/${deviceId}/*", "public/*"]
+expired_seconds = 600
+
+[ca]
+ca_dir = "conf"
+name = "RMQTT Thing CA"
+valid_days = 36503 # 100 years
+domain = "*.fornetcode.com"

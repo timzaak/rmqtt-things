@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm .claude/agents/miniapp-accept.md .claude/agents/miniapp-dev.md .claude/agents/miniapp-test.md)",
+      "Bash(rm -r .claude/guides/miniapp/)",
+      "Bash(git diff *)",
+      "Bash(npx tsc *)",
+      "Bash(cargo check *)"
+    ]
+  }
+}

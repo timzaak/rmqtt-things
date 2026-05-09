@@ -1,0 +1,34 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+DEPLOYMENT.md
+spec.md
+
+# Development files
+.env.example
+test_*.http
+test_*.ps1
+test_*.json
+
+# Build artifacts
+target/
+# Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+
+# CI/CD
+.github/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Scripts
+start.bat
+Makefile
+log

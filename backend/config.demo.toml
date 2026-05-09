@@ -1,0 +1,45 @@
+[database]
+url = "postgres://postgres:postgres@127.0.0.1:5432/t_demo?sslmode=disable"
+
+[cache]
+cache_type = "redis"
+redis_url = "redis://127.0.0.1:6379/"
+
+[mqtt]
+url = "http://127.0.0.1:6060/api/v1"
+
+[mqtt.publish.response]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+
+[mqtt.property_command.publish]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+topic = "${productId}/$clientid/thing/service/property/set"
+retries = 2
+
+[mqtt.access.auth]
+suffix = "suffix_go"
+
+[otel]
+
+[api]
+openapi_enabled = true
+property_schema_validator = false
+
+[ca]
+ca_dir = "../conf"
+name = "RMQTT Thing Demo CA"
+valid_days = 36503
+domain = "localhost"
+
+[s3]
+endpoint = "http://127.0.0.1:4566"
+region = "us-east-1"
+access_key = "fake_access"
+secret_key = "fake_secret"
+bucket = "rmqtt-things"
+directories = ["${productId}/${deviceId}/*", "public/*"]
+expired_seconds = 600
