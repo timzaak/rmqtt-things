@@ -59,6 +59,31 @@ cd frontend && npm install && npm run dev
 
 Swagger UI: http://localhost:8080/api/swagger-ui
 
+## Demo
+
+A live instance is deployed at:
+
+| Service | URL |
+|---|---|
+| Frontend | https://mqtt.fornetcode.com |
+| Swagger UI | https://mqtt.fornetcode.com/api/swagger-ui |
+| Health check | https://mqtt.fornetcode.com/api/health |
+| MQTT broker | `mqtt.fornetcode.com:1883` |
+
+Quick test:
+
+```shell
+# API health
+curl https://mqtt.fornetcode.com/api/health
+
+# Connect a device with mosquitto
+mosquitto_pub -h mqtt.fornetcode.com -p 1883 \
+  -t "test_device/thing/event/property/post" \
+  -m '{"temperature": 25.5}'
+```
+
+Open the frontend URL in a browser to explore the management UI. Use Swagger UI to try admin APIs directly.
+
 ## Project structure
 
 ```

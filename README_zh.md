@@ -59,6 +59,31 @@ cd frontend && npm install && npm run dev
 
 Swagger UI: http://localhost:8080/api/swagger-ui
 
+## 在线演示
+
+已部署的实例地址：
+
+| 服务 | 地址 |
+|---|---|
+| 管理界面 | https://mqtt.fornetcode.com |
+| Swagger UI | https://mqtt.fornetcode.com/api/swagger-ui |
+| 健康检查 | https://mqtt.fornetcode.com/api/health |
+| MQTT Broker | `mqtt.fornetcode.com:1883` |
+
+快速验证：
+
+```shell
+# API 健康检查
+curl https://mqtt.fornetcode.com/api/health
+
+# 用 mosquitto 模拟设备上报
+mosquitto_pub -h mqtt.fornetcode.com -p 1883 \
+  -t "test_device/thing/event/property/post" \
+  -m '{"temperature": 25.5}'
+```
+
+浏览器打开管理界面地址即可体验 UI，Swagger UI 可直接调用管理 API。
+
 ## 项目结构
 
 ```
