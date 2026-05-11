@@ -35,7 +35,7 @@ interface PropertyCommandRow {
 
 test.describe('Property Command (US-PA-016)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('[Scenario 1] sends command via UI while device is online, status becomes Sent', async ({ page, request: _request, demoLogger: _demoLogger }) => {

@@ -42,7 +42,7 @@ export async function loginAsAdmin(
 ): Promise<void> {
   const { waitNavigation = true, logger } = options
 
-  logger?.testCode.log(`[Auth] 登录管理员`) ?? console.log(`[Auth] 登录管理员`)
+  logger?.testCode.log(`[Auth] 登录管理员`) ?? console.warn(`[Auth] 登录管理员`)
 
   await clearSessionData(page)
 
@@ -51,7 +51,7 @@ export async function loginAsAdmin(
 
   // 检查是否已登录（自动跳转到管理页面）
   if (page.url().includes('/admin/dashboard') || page.url().includes('/admin/devices')) {
-    logger?.testCode.log(`[Auth] 已登录，跳过`) ?? console.log(`[Auth] 已登录，跳过`)
+    logger?.testCode.log(`[Auth] 已登录，跳过`) ?? console.warn(`[Auth] 已登录，跳过`)
     return
   }
 
@@ -80,7 +80,7 @@ export async function loginAsAdmin(
       await page.waitForURL('**/admin/**', { timeout: 10000 }).catch(() => {})
     }
 
-    logger?.testCode.log(`[Auth] 登录成功`) ?? console.log(`[Auth] 登录成功`)
+    logger?.testCode.log(`[Auth] 登录成功`) ?? console.warn(`[Auth] 登录成功`)
   } catch (error) {
     logger?.testCode.error(`[Auth] 登录失败:`, error) ?? console.error(`[Auth] 登录失败:`, error)
     throw error
@@ -91,7 +91,7 @@ export async function loginAsAdmin(
  * 登出当前用户
  */
 export async function logout(page: Page, logger?: UnifiedLogger): Promise<void> {
-  logger?.testCode.log('[Auth] 执行登出') ?? console.log('[Auth] 执行登出')
+  logger?.testCode.log('[Auth] 执行登出') ?? console.warn('[Auth] 执行登出')
 
   try {
     const logoutButton = page.locator('[data-testid="logout-button"]').first()
@@ -100,7 +100,7 @@ export async function logout(page: Page, logger?: UnifiedLogger): Promise<void> 
       await page.waitForURL('**/login', { timeout: 5000 })
     }
   } catch {
-    logger?.testCode.log('[Auth] UI 登出失败，清除会话') ?? console.log('[Auth] UI 登出失败，清除会话')
+    logger?.testCode.log('[Auth] UI 登出失败，清除会话') ?? console.warn('[Auth] UI 登出失败，清除会话')
   } finally {
     await clearSessionData(page)
     await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'networkidle' })

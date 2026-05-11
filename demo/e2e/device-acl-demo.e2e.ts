@@ -128,7 +128,7 @@ function waitForMessage(
 test.describe('[US-DV-002] Device ACL Permission Control', () => {
 
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('Scenario 1: device can subscribe to its own event topic', async ({ demoLogger }) => {

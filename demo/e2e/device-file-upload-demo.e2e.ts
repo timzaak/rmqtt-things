@@ -29,7 +29,7 @@ const RESPONSE_TIMEOUT = 15_000
 test.describe('[US-DV-007] Device File Upload', () => {
 
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('Scenario 1: device requests upload to own directory and receives response', async ({ demoLogger: _demoLogger }) => {

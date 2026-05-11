@@ -20,7 +20,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 
 test.describe('Certificate revoke/invalidate demo (US-PA-006)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('revokes a Normal certificate and status updates to Revoked (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {

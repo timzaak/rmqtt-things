@@ -33,7 +33,7 @@ function connectWithCredentials(
 test.describe('[US-DV-001] Device HMAC Authentication', () => {
 
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('Scenario 1: correct HMAC credentials authenticate successfully', async ({ demoLogger: _demoLogger }) => {

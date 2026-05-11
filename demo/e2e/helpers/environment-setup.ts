@@ -34,18 +34,18 @@ interface ValidationResult {
  * 验证测试环境状态
  */
 export async function verifyTestEnvironment(
-  _page: Page,
+  _page: Page | null,
   options: VerifyEnvironmentOptions = {}
 ): Promise<void> {
   const { skipBackendCheck = false, logger } = options
 
-  logger?.testCode.log('[Env] 验证测试环境...') ?? console.log('[Env] 验证测试环境...')
+  logger?.testCode.log('[Env] 验证测试环境...') ?? console.warn('[Env] 验证测试环境...')
 
   if (!skipBackendCheck) {
     await verifyBackendConnections(logger)
   }
 
-  logger?.testCode.log('[Env] 环境验证通过') ?? console.log('[Env] 环境验证通过')
+  logger?.testCode.log('[Env] 环境验证通过') ?? console.warn('[Env] 环境验证通过')
 }
 
 async function verifyBackendConnections(logger?: UnifiedLogger): Promise<void> {
@@ -59,7 +59,7 @@ async function verifyBackendConnections(logger?: UnifiedLogger): Promise<void> {
     throw new Error(`Backend health check failed:\n${result.errors?.join('\n') || 'Unknown error'}`)
   }
 
-  logger?.testCode.log('[Env] 后端服务连接正常') ?? console.log('[Env] 后端服务连接正常')
+  logger?.testCode.log('[Env] 后端服务连接正常') ?? console.warn('[Env] 后端服务连接正常')
 }
 
 async function validateBackendHealth(options: {
@@ -81,7 +81,7 @@ async function validateBackendHealth(options: {
       }
     } catch (error) {
       if (attempt < maxRetries - 1) {
-        logger?.testCode.log(`[Env] 健康检查失败，重试 ${attempt + 1}/${maxRetries}...`) ?? console.log(`[Env] 健康检查失败，重试 ${attempt + 1}/${maxRetries}...`)
+        logger?.testCode.log(`[Env] 健康检查失败，重试 ${attempt + 1}/${maxRetries}...`) ?? console.warn(`[Env] 健康检查失败，重试 ${attempt + 1}/${maxRetries}...`)
         await new Promise(resolve => setTimeout(resolve, retryDelay))
       } else {
         return {

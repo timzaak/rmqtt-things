@@ -19,7 +19,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 
 test.describe('Certificate detail demo (US-PA-023)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('shows certificate detail with all fields (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {

@@ -26,7 +26,7 @@ const POLL_TIMEOUT = 15_000
 
 test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('US-PA-014 S1: shows device status info in table rows', async ({ page, demoLogger: _demoLogger }) => {

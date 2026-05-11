@@ -43,7 +43,7 @@ async function readDownloadContent(download: Download): Promise<string | null> {
 
 test.describe('Certificate download demo (US-PA-024)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('shows certificate and private key content with download buttons after issue succeeds (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {
@@ -101,7 +101,7 @@ test.describe('Certificate download demo (US-PA-024)', () => {
 
 test.describe('CA certificate download demo (US-PA-025)', () => {
   test.beforeAll(async () => {
-    await verifyTestEnvironment(null as any)
+    await verifyTestEnvironment(null)
   })
 
   test('downloads CA certificate PEM file from certificates management page (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {
