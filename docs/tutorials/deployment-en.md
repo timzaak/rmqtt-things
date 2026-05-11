@@ -285,21 +285,73 @@ The dependency caching design is key: as long as `Cargo.toml` and `Cargo.lock` a
 
 The final runtime image contains only the binary, frontend static assets, and ca-certificates, keeping it small. The process runs as the `rmqtt` user, not root.
 
-Steps to release a new version:
+### Release a New Version
+
+1. Tag and push to trigger the GitHub Actions image build:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
-After GitHub Actions finishes the build, on the server:
+2. After GitHub Actions finishes, SSH into the production server, set the version and run the upgrade:
 
 ```bash
-docker pull ghcr.io/<owner>/rmqtt-things:v0.2.0
+VERSION=v0.2.1  # Replace with the target version
+
+# Pull the new image
+docker pull ghcr.io/timzaak/rmqtt-things:${VERSION}
+
+# Stop and remove the old container
 docker stop rmqtt-things-app
 docker rm rmqtt-things-app
-# Re-run the App docker run command with the new tag
+
+# Start with the new image
+docker run -d \
+    --name rmqtt-things-app \
+    --network rmqtt-things-net \
+    --restart unless-stopped \
+    -e APP_CONFIG=/app/config.toml \
+    -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
+    ghcr.io/timzaak/rmqtt-things:${VERSION}
 ```
+
+3. Verify:
+
+```bash
+# Check logs for successful startup (should see "Listening on port 8080")
+docker logs rmqtt-things-app --tail 10
+
+# Health check (no curl/wget in the container, use caddy container instead)
+docker exec caddy wget -qO- http://rmqtt-things-app:8080/api/health
+# Should return {"status":"health",...}
+```
+
+### Rollback
+
+If the new version has issues, re-run the stop and start steps with the previous tag:
+
+```bash
+docker stop rmqtt-things-app
+docker rm rmqtt-things-app
+docker run -d \
+    --name rmqtt-things-app \
+    --network rmqtt-things-net \
+    --restart unless-stopped \
+    -e APP_CONFIG=/app/config.toml \
+    -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
+    ghcr.io/timzaak/rmqtt-things:v0.2.0  # Rollback to the previous version
+```
+
+### Backup Database Before Upgrade
+
+The App runs database migrations automatically on startup (`sqlx::migrate!`). Migrations are irreversible. Back up before upgrading:
+
+```bash
+docker exec rmqtt-things-postgres pg_dump -U rmqtt_user rmqtt_things > backup_$(date +%Y%m%d).sql
+```
+
+> Only the `rmqtt-things-app` container needs to be replaced during an upgrade. Other containers are unaffected. There will be a few seconds of downtime between stop and start.
 
 ## Data Persistence
 

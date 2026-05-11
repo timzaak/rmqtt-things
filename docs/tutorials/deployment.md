@@ -285,21 +285,73 @@ Dockerfile 用多阶段构建，一共五个阶段：
 
 运行镜像最终只有二进制文件、前端静态资源和 ca-certificates，体积很小。进程以 `rmqtt` 用户运行，不是 root。
 
-发布新版本的步骤：
+### 发布新版本
+
+1. 打 tag 并推送，触发 GitHub Actions 构建镜像：
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
-等 GitHub Actions 构建完成后，在服务器上：
+2. 等 GitHub Actions 构建完成后，SSH 到生产服务器，设置版本号并执行升级：
 
 ```bash
-docker pull ghcr.io/<owner>/rmqtt-things:v0.2.0
+VERSION=v0.2.1  # 替换为目标版本
+
+# 拉取新镜像
+docker pull ghcr.io/timzaak/rmqtt-things:${VERSION}
+
+# 停止并删除旧容器
 docker stop rmqtt-things-app
 docker rm rmqtt-things-app
-# 用新 tag 重新运行 App 的 docker run 命令
+
+# 用新镜像启动
+docker run -d \
+    --name rmqtt-things-app \
+    --network rmqtt-things-net \
+    --restart unless-stopped \
+    -e APP_CONFIG=/app/config.toml \
+    -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
+    ghcr.io/timzaak/rmqtt-things:${VERSION}
 ```
+
+3. 验证：
+
+```bash
+# 检查日志，确认启动成功（应看到 "Listening on port 8080"）
+docker logs rmqtt-things-app --tail 10
+
+# 健康检查（容器内没有 curl/wget，通过 caddy 容器访问）
+docker exec caddy wget -qO- http://rmqtt-things-app:8080/api/health
+# 应返回 {"status":"health",...}
+```
+
+### 回滚
+
+如果新版本有问题，用旧版本 tag 重新执行停止和启动步骤：
+
+```bash
+docker stop rmqtt-things-app
+docker rm rmqtt-things-app
+docker run -d \
+    --name rmqtt-things-app \
+    --network rmqtt-things-net \
+    --restart unless-stopped \
+    -e APP_CONFIG=/app/config.toml \
+    -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
+    ghcr.io/timzaak/rmqtt-things:v0.2.0  # 回滚到上一个版本
+```
+
+### 升级前备份数据库
+
+App 启动时会自动运行数据库迁移（`sqlx::migrate!`），迁移不可逆。升级前建议备份：
+
+```bash
+docker exec rmqtt-things-postgres pg_dump -U rmqtt_user rmqtt_things > backup_$(date +%Y%m%d).sql
+```
+
+> 升级过程只有 `rmqtt-things-app` 容器需要替换，其他容器不需要变动。stop 到 start 之间会有几秒服务中断。
 
 ## 数据持久化
 
