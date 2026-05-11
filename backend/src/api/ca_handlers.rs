@@ -5,10 +5,10 @@ use crate::api::utils::validate_identifier;
 use crate::ca;
 use crate::db::models::{CertIssue, CertStatus};
 use axum::Json;
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::Path as StdPath;
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tokio::fs;
@@ -75,7 +75,7 @@ pub async fn issue_cert_handler(
         ));
     }
 
-    let ca_dir = Path::new(&app_state.config.ca.ca_dir);
+    let ca_dir = StdPath::new(&app_state.config.ca.ca_dir);
     let ca_cert_path = ca_dir.join("ca.pem");
     let ca_key_path = ca_dir.join("ca.key");
 
@@ -197,5 +197,63 @@ pub async fn list_certs_handler(
             page: req.page,
             page_size: req.page_size,
         },
+    }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/ca/cert/{id}",
+    tag = "admin",
+    responses(
+        (status = 200, description = "Certificate detail", body = CertIssue),
+        (status = 404, description = "Certificate not found"),
+        (status = 500, description = "Server error")
+    )
+)]
+pub async fn get_cert_handler(
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<i64>,
+) -> Result<Json<CertIssue>, ApiError> {
+    let app_state = &state.admin;
+    let cert = app_state
+        .db
+        .cert_issue()
+        .find_by_id(id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {e}");
+            ApiError::internal("Database operation failed")
+        })?;
+    match cert {
+        Some(c) => Ok(Json(c)),
+        None => Err(ApiError::not_found("Certificate not found")),
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CaCertResponse {
+    pub ca_pem: String,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/ca/pem",
+    tag = "admin",
+    responses(
+        (status = 200, description = "CA certificate PEM", body = CaCertResponse),
+        (status = 500, description = "Server error")
+    )
+)]
+pub async fn get_ca_cert_handler(
+    State(state): State<Arc<ApiState>>,
+) -> Result<Json<CaCertResponse>, ApiError> {
+    let app_state = &state.admin;
+    let ca_dir = StdPath::new(&app_state.config.ca.ca_dir);
+    let ca_cert_path = ca_dir.join("ca.pem");
+    let ca_cert_pem = fs::read_to_string(ca_cert_path)
+        .await
+        .map_err(|_e| ApiError::internal("could not get CA file"))?;
+    Ok(Json(CaCertResponse {
+        ca_pem: ca_cert_pem,
     }))
 }

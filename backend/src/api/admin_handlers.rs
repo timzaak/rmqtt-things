@@ -6,8 +6,9 @@ use crate::api::web_models::{FileUploadRequest, FileUploadResponse};
 use crate::cache::SchemaCacheManager;
 use crate::db::models::OtaVersion;
 use axum::Json;
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum_extra::extract::Query;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 

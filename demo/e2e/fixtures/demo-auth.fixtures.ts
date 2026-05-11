@@ -21,11 +21,13 @@ import { UnifiedLogger } from 'playwright-unified-logger'
 import { verifyTestEnvironment } from '../helpers/environment-setup'
 import { loginAsAdmin } from '../helpers/auth'
 
-export const test = base.extend<{
+type DemoFixtures = {
   demoLogger: UnifiedLogger
-  authenticatedPage: Page
   testStartTime: number
-}>({
+  authenticatedPage: Page
+}
+
+export const test = base.extend<DemoFixtures>({
   /**
    * Fixture: Demo Logger
    *
@@ -43,7 +45,8 @@ export const test = base.extend<{
    *
    * 记录测试开始时间，用于后续数据清理。
    */
-  testStartTime: async (_, use) => {
+  // eslint-disable-next-line no-empty-pattern -- Playwright requires object destructuring for fixture dependencies.
+  testStartTime: async ({}, use) => {
     const startTime = Date.now()
     await use(startTime)
   },
@@ -54,9 +57,9 @@ export const test = base.extend<{
    * 验证环境后执行管理员登录，返回已认证的 Page。
    * 注意：此 fixture 会增加约 5-10 秒的测试设置时间。
    */
-  authenticatedPage: async ({ page, demoLogger: _demoLogger, testStartTime: _testStartTime }, use) => {
-    await verifyTestEnvironment(page, { logger: _demoLogger })
-    await loginAsAdmin(page, { logger: _demoLogger })
+  authenticatedPage: async ({ page, demoLogger, testStartTime: _testStartTime }, use) => {
+    await verifyTestEnvironment(page, { logger: demoLogger })
+    await loginAsAdmin(page, { logger: demoLogger })
     await use(page)
   },
 })

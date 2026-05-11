@@ -99,6 +99,21 @@ function CertsCreatePage() {
             </button>
           </div>
 
+          <div className="mt-4 space-y-3">
+            <div>
+              <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Certificate</dt>
+              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-100 p-3 font-mono text-xs text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+                {issued.cert.cert_pem}
+              </pre>
+            </div>
+            <div>
+              <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">Private Key</dt>
+              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-100 p-3 font-mono text-xs text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+                {issued.cert.key_pem}
+              </pre>
+            </div>
+          </div>
+
           <Link
             to="/certs"
             className="mt-4 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"

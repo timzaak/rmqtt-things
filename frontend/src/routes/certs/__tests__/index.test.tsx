@@ -24,9 +24,11 @@ vi.mock('@/hooks/useProducts', () => ({
 
 const mockUseCerts = vi.fn()
 const mockUseUpdateCertStatus = vi.fn()
+const mockUseCaCert = vi.fn()
 vi.mock('@/hooks/useCerts', () => ({
   useCerts: (...args: unknown[]) => mockUseCerts(...args),
   useUpdateCertStatus: () => mockUseUpdateCertStatus(),
+  useCaCert: (...args: unknown[]) => mockUseCaCert(...args),
 }))
 
 // Import the module to trigger createRoute and capture the component
@@ -76,6 +78,7 @@ describe('CertsIndexPage', () => {
     mockUseProducts.mockReturnValue({ data: mockProducts, isLoading: false })
     mockUseCerts.mockReturnValue({ data: { data: mockCerts }, isLoading: false })
     mockUseUpdateCertStatus.mockReturnValue({ mutate: vi.fn() })
+    mockUseCaCert.mockReturnValue({ data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' } })
   }
 
   test('renders PageHeader with title "Certificates"', () => {
@@ -122,6 +125,7 @@ describe('CertsIndexPage', () => {
     mockUseProducts.mockReturnValue({ data: mockProducts, isLoading: false })
     mockUseCerts.mockReturnValue({ data: { data: [] }, isLoading: false })
     mockUseUpdateCertStatus.mockReturnValue({ mutate: vi.fn() })
+    mockUseCaCert.mockReturnValue({ data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' } })
 
     renderWithProviders(<Page />)
 

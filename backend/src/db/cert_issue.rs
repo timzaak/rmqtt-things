@@ -57,6 +57,13 @@ impl CertIssueRepo {
         Ok(())
     }
 
+    pub async fn find_by_id(&self, id: i64) -> Result<Option<CertIssue>, sqlx::Error> {
+        sqlx::query_as::<_, CertIssue>("SELECT * FROM cert_issue WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     pub async fn list(
         &self,
         product_id: Option<String>,

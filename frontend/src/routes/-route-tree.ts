@@ -11,6 +11,7 @@ import { validTemplatesEditRoute } from './valid-templates/edit.$id'
 import { validTemplatesShowRoute } from './valid-templates/show.$id'
 import { certsIndexRoute } from './certs/index'
 import { certsCreateRoute } from './certs/create'
+import { certsShowRoute } from './certs/show.$id'
 import { otaIndexRoute } from './ota/index'
 import { otaCreateRoute } from './ota/create'
 import { otaEditRoute } from './ota/edit.$id'
@@ -29,6 +30,7 @@ export const routeTree = rootRoute.addChildren([
   validTemplatesShowRoute,
   certsIndexRoute,
   certsCreateRoute,
+  certsShowRoute,
   otaIndexRoute,
   otaCreateRoute,
   otaEditRoute,

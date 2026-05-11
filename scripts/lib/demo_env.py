@@ -38,7 +38,7 @@ class HealthStatus:
         self.errors.append(error)
 
 # Demo 环境端口和容器名称
-BACKEND_PORT = 8080
+BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8080"))
 FRONTEND_PORT = 3000
 RMQTT_HTTP_PORT = 6060
 POSTGRES_CONTAINER = "t-demo-postgres"
@@ -477,6 +477,8 @@ def start_environment(
         backend_env["APP_CONFIG"] = str((REPO_ROOT / "backend" / "config.demo.toml").resolve())
         backend_env["TOTP_SECRET_KEY"] = "demo-totp-encryption-key-32-bytes-long"
         backend_env["ADMIN_REALM_ID"] = "admin"
+        if BACKEND_PORT != 8080:
+            backend_env["PORT"] = str(BACKEND_PORT)
 
         from .proc import spawn_background
 

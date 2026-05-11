@@ -288,20 +288,12 @@ pub async fn file_upload_handler(
         let device_id = &mqtt_msg.client_id;
         validate_identifier(device_id, "device_id")?;
 
-        let is_directory_allowed = s3_client.config.directories.iter().any(|rule| {
-            let rule = rule
-                .replace("${productId}", &product_id)
-                .replace("${deviceId}", device_id);
-            if rule.ends_with('*') {
-                file_upload_req
-                    .directory
-                    .starts_with(&rule[..rule.len() - 1])
-            } else {
-                file_upload_req.directory == rule
-            }
-        });
-
-        if !is_directory_allowed {
+        if !is_file_upload_directory_allowed(
+            &s3_client.config.directories,
+            &product_id,
+            device_id,
+            &file_upload_req.directory,
+        ) {
             return Err(ApiError::bad_request("Directory not allowed"));
         }
 
@@ -365,6 +357,27 @@ pub async fn file_upload_handler(
         }
         Ok(StatusCode::NO_CONTENT)
     }
+}
+
+fn is_file_upload_directory_allowed(
+    rules: &[String],
+    product_id: &str,
+    device_id: &str,
+    directory: &str,
+) -> bool {
+    rules.iter().any(|rule| {
+        let rule = rule
+            .replace("${productId}", product_id)
+            .replace("${deviceId}", device_id);
+
+        if let Some(base) = rule.strip_suffix("/*") {
+            directory == base || directory.starts_with(&format!("{base}/"))
+        } else if let Some(prefix) = rule.strip_suffix('*') {
+            directory.starts_with(prefix)
+        } else {
+            directory == rule
+        }
+    })
 }
 
 #[utoipa::path(
@@ -481,6 +494,62 @@ pub async fn health_check() -> Json<serde_json::Value> {
         "status": "health",
         "timestamp": OffsetDateTime::now_utc()
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_file_upload_directory_allowed;
+
+    #[test]
+    fn file_upload_directory_wildcard_allows_base_and_children() {
+        let rules = vec![
+            "${productId}/${deviceId}/*".to_string(),
+            "public/*".to_string(),
+        ];
+
+        assert!(is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "demo_product/device-a"
+        ));
+        assert!(is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "demo_product/device-a/logs"
+        ));
+        assert!(is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "public"
+        ));
+        assert!(is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "public/logs"
+        ));
+    }
+
+    #[test]
+    fn file_upload_directory_wildcard_denies_prefix_only_matches() {
+        let rules = vec!["${productId}/${deviceId}/*".to_string()];
+
+        assert!(!is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "demo_product/device-ab"
+        ));
+        assert!(!is_file_upload_directory_allowed(
+            &rules,
+            "demo_product",
+            "device-a",
+            "demo_product/device-b"
+        ));
+    }
 }
 
 fn resolve_device_identity(

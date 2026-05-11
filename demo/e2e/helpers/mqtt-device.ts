@@ -25,6 +25,67 @@ export interface OtaUpgradeMessage {
   }>
 }
 
+export interface FileUploadResponse {
+  id: string
+  code: number
+  data?: {
+    url?: string
+    fields?: Record<string, string>
+  } | string
+}
+
+export function generateHmacPassword(deviceId: string, authSuffix: string): string {
+  const nonce = randomBytes(3).toString('hex')
+  const timestamp = Math.floor(Date.now() / 1000)
+  const toSign = `${deviceId}.${nonce}.${timestamp}.${authSuffix}`
+  const hash = createHmac('sha1', authSuffix).update(toSign).digest('hex')
+  return `${nonce}.${timestamp}.${hash}`
+}
+
+export async function connectRawMqttClient(
+  clientId: string,
+  username: string,
+  password: string,
+  brokerUrl?: string,
+): Promise<MqttClient> {
+  const url = brokerUrl || process.env.MQTT_URL || 'mqtt://127.0.0.1:1883'
+  return new Promise<MqttClient>((resolve, reject) => {
+    const client = mqtt.connect(url, {
+      clientId,
+      username,
+      password,
+      clean: true,
+      reconnectPeriod: 0,
+      connectTimeout: 10_000,
+    })
+
+    const cleanup = () => {
+      client.removeAllListeners('connect')
+      client.removeAllListeners('error')
+    }
+
+    const onError = (err: Error) => {
+      cleanup()
+      reject(err)
+    }
+
+    client.once('connect', () => {
+      cleanup()
+      client.on('error', () => {})
+      resolve(client)
+    })
+
+    client.once('error', onError)
+  })
+}
+
+export async function disconnectRawClient(client: MqttClient): Promise<void> {
+  if (!client.connected || client.disconnected) {
+    return
+  }
+  await new Promise<void>((resolve) => client.end(false, {}, () => resolve()))
+}
+
 export class DemoMqttDevice {
   readonly productId: string
   readonly deviceId: string
@@ -34,12 +95,15 @@ export class DemoMqttDevice {
   readonly eventPostTopic: string
   readonly otaUpgradeTopic: string
   readonly otaVersionReportTopic: string
+  readonly fileUploadTopic: string
+  readonly fileUploadReplyTopic: string
 
   private readonly brokerUrl: string
   private readonly authSuffix: string
   private client?: MqttClient
   private commandWaiters: Array<(message: PropertyCommandMessage) => void> = []
   private otaUpgradeWaiters: Array<(message: OtaUpgradeMessage) => void> = []
+  private fileUploadWaiters: Array<(response: FileUploadResponse) => void> = []
 
   constructor(options: DemoMqttDeviceOptions) {
     this.productId = options.productId
@@ -53,6 +117,8 @@ export class DemoMqttDevice {
     this.eventPostTopic = `${this.productId}/${this.deviceId}/thing/event/test/post`
     this.otaUpgradeTopic = `/${this.productId}/${this.deviceId}/ota/upgrade`
     this.otaVersionReportTopic = `${this.productId}/${this.deviceId}/ota/version`
+    this.fileUploadTopic = `${this.productId}/${this.deviceId}/thing/file/upload`
+    this.fileUploadReplyTopic = `${this.productId}/${this.deviceId}/thing/file/upload_reply`
   }
 
   async connect(): Promise<void> {
@@ -71,6 +137,12 @@ export class DemoMqttDevice {
         const waiters = this.otaUpgradeWaiters.splice(0)
         for (const resolve of waiters) {
           resolve(upgrade)
+        }
+      } else if (topic === this.fileUploadReplyTopic) {
+        const response = JSON.parse(payload.toString()) as FileUploadResponse
+        const waiters = this.fileUploadWaiters.splice(0)
+        for (const resolve of waiters) {
+          resolve(response)
         }
       }
     })
@@ -144,6 +216,39 @@ export class DemoMqttDevice {
     await this.subscribe(this.otaUpgradeTopic)
   }
 
+  async subscribeFileUploadReply(): Promise<void> {
+    await this.subscribe(this.fileUploadReplyTopic)
+  }
+
+  async publishFileUploadRequest(params: {
+    fileName: string
+    directory: string
+    useOriginName: boolean
+    fileType: string
+  }): Promise<string> {
+    const id = `file-upload-${Date.now()}`
+    await this.publishJson(this.fileUploadTopic, {
+      id,
+      ack: 1,
+      params,
+    })
+    return id
+  }
+
+  waitForFileUploadResponse(timeoutMs = 15_000): Promise<FileUploadResponse> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.fileUploadWaiters = this.fileUploadWaiters.filter(waiter => waiter !== resolve)
+        reject(new Error(`Timed out waiting for file upload response on ${this.fileUploadReplyTopic}`))
+      }, timeoutMs)
+
+      this.fileUploadWaiters.push((response) => {
+        globalThis.clearTimeout(timeout)
+        resolve(response)
+      })
+    })
+  }
+
   async publishOtaVersionReport(
     params: Array<{ key: string; version: number }>,
   ): Promise<void> {
@@ -174,11 +279,7 @@ export class DemoMqttDevice {
   }
 
   private generatePassword(): string {
-    const nonce = randomBytes(3).toString('hex')
-    const timestamp = Math.floor(Date.now() / 1000)
-    const toSign = `${this.deviceId}.${nonce}.${timestamp}.${this.authSuffix}`
-    const hash = createHmac('sha1', this.authSuffix).update(toSign).digest('hex')
-    return `${nonce}.${timestamp}.${hash}`
+    return generateHmacPassword(this.deviceId, this.authSuffix)
   }
 
   private async subscribe(topic: string): Promise<void> {

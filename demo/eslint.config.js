@@ -30,6 +30,10 @@ export default [
         fetch: 'readonly',
         AbortSignal: 'readonly',
         setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        Buffer: 'readonly',
       },
     },
     plugins: {

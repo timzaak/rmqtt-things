@@ -116,6 +116,8 @@ pub fn create_router(
             "/admin/ca/cert",
             get(ca_handlers::list_certs_handler).post(ca_handlers::issue_cert_handler),
         )
+        .route("/admin/ca/pem", get(ca_handlers::get_ca_cert_handler))
+        .route("/admin/ca/cert/{id}", get(ca_handlers::get_cert_handler))
         .route(
             "/admin/ca/cert/status",
             patch(ca_handlers::update_cert_status_handler),

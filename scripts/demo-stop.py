@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import os
 import sys
 import subprocess
 import time
@@ -18,7 +19,7 @@ def should_print(quiet: bool) -> bool:
 
 # Demo environment ports that may have node processes
 DEMO_PORTS = [3000, 3001, 3002, 3003]
-BACKEND_PORT = 8080
+BACKEND_PORT = int(os.environ.get("BACKEND_PORT", "8080"))
 LOG_DELETE_RETRIES = 5
 LOG_DELETE_RETRY_INTERVAL_SECONDS = 0.3
 DEMO_LOG_FILES = [

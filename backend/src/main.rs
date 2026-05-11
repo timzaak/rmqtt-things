@@ -103,7 +103,12 @@ async fn main() -> anyhow::Result<()> {
 
     let router = create_router(config, app_state, admin_state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
+    let port: u16 = env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8080);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
+    info!("Listening on port {port}");
 
     tokio::select! {
         result = axum::serve(listener, router) => {

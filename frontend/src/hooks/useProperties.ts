@@ -96,7 +96,10 @@ export function useDeletePropertyCommands() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (ids: number[]) => {
-      const res = await deletePropertyCommands({ query: { ids }, throwOnError: true })
+      const res = await deletePropertyCommands({
+        query: { ids: ids.join(',') as unknown as number[] },
+        throwOnError: true,
+      })
       return res.data
     },
     onSuccess: () => {

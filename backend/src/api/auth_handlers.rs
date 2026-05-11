@@ -85,8 +85,8 @@ pub async fn acl(Json(payload): Json<AclPayload>) -> &'static str {
         return "deny";
     }
 
-    // Allow thing topics: {product}/{device}/thing/{event|service}/...
-    if p2 == "thing" && (p3 == "event" || p3 == "service") {
+    // Allow thing topics: {product}/{device}/thing/{event|service|file}/...
+    if p2 == "thing" && (p3 == "event" || p3 == "service" || p3 == "file") {
         return "allow";
     }
 

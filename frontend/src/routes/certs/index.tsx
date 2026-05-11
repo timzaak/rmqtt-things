@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { createRoute, Link } from '@tanstack/react-router'
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import { rootRoute } from '../__root'
-import { useCerts, useUpdateCertStatus } from '@/hooks/useCerts'
+import { useCerts, useUpdateCertStatus, useCaCert } from '@/hooks/useCerts'
 import { useProducts } from '@/hooks/useProducts'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
@@ -38,7 +38,7 @@ function StatusActions({ row }: { row: CertIssue }) {
 
   function handleConfirm() {
     if (!pendingAction) return
-    const status = pendingAction === 'revoke' ? 1 : 2
+    const status = pendingAction === 'revoke' ? 2 : 1
     updateStatus.mutate({
       product_id: row.product_id,
       device_id: row.device_id,
@@ -53,8 +53,16 @@ function StatusActions({ row }: { row: CertIssue }) {
 
   return (
     <>
-      {row.status === 'Normal' && (
-        <div className="flex gap-2">
+      <div className="flex gap-2">
+        <Link
+          to="/certs/show/$id"
+          params={{ id: String(row.id) }}
+          className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+        >
+          Show
+        </Link>
+        {row.status === 'Normal' && (
+          <>
           <button
             onClick={() => openConfirm('revoke')}
             className="text-sm text-orange-600 hover:underline dark:text-orange-400"
@@ -67,8 +75,9 @@ function StatusActions({ row }: { row: CertIssue }) {
           >
             Invalidate
           </button>
-        </div>
-      )}
+          </>
+        )}
+      </div>
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -112,6 +121,7 @@ function CertsIndexPage() {
   const [page, setPage] = useState(1)
 
   const { data: products } = useProducts()
+  const { data: caCertData } = useCaCert()
   const { data: certPage, isLoading } = useCerts({
     product_id: searchParams.product_id || null,
     device_id: searchParams.device_id || null,
@@ -137,13 +147,33 @@ function CertsIndexPage() {
       <PageHeader
         title="Certificates"
         actions={
-          <Link
-            to="/certs/create"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-          >
-            <Plus className="h-4 w-4" />
-            Issue Certificate
-          </Link>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!caCertData?.ca_pem}
+              onClick={() => {
+                if (!caCertData?.ca_pem) return
+                const blob = new Blob([caCertData.ca_pem], { type: 'application/x-pem-file' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = 'ca.pem'
+                a.click()
+                URL.revokeObjectURL(url)
+              }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Download className="h-4 w-4" />
+              Download CA Certificate
+            </button>
+            <Link
+              to="/certs/create"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            >
+              <Plus className="h-4 w-4" />
+              Issue Certificate
+            </Link>
+          </div>
         }
       />
       <SearchForm
