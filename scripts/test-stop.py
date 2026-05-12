@@ -8,6 +8,8 @@ TEST_CONTAINERS = [
     "rmqtt-things-test-postgres",
     "rmqtt-things-test-localstack",
     "rmqtt-things-test-rmqtt",
+    "rmqtt-things-test-redis",
+    "rmqtt-things-test-herald",
 ]
 
 

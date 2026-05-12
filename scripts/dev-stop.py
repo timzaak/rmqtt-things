@@ -5,6 +5,11 @@ from lib import docker
 
 
 def main() -> int:
+    if docker.container_running("t-dev-herald"):
+        docker.stop_container("t-dev-herald")
+    if docker.container_exists("t-dev-herald"):
+        docker.rm_container("t-dev-herald")
+
     if docker.container_running("t-dev-postgres"):
         docker.stop_container("t-dev-postgres")
     if docker.container_exists("t-dev-postgres"):

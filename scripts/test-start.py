@@ -6,6 +6,7 @@ import urllib.error
 import urllib.request
 
 from lib import docker
+from lib.herald import init_permissions as init_herald_permissions
 from lib.net import is_port_open
 from lib.paths import SCRIPTS_DIR, TEST_CONFIG_DIR, ensure_dir
 
@@ -13,12 +14,16 @@ POSTGRES_CONTAINER = "rmqtt-things-test-postgres"
 PGDOG_CONTAINER = "rmqtt-things-test-pgdog"
 LOCALSTACK_CONTAINER = "rmqtt-things-test-localstack"
 RMQTT_CONTAINER = "rmqtt-things-test-rmqtt"
+HERALD_CONTAINER = "rmqtt-things-test-herald"
+REDIS_CONTAINER = "rmqtt-things-test-redis"
 
 POSTGRES_PORT = 15433
 PGDOG_PORT = 16432
 LOCALSTACK_PORT = 14566
 RMQTT_MQTT_PORT = 11883
 RMQTT_HTTP_PORT = 16060
+HERALD_PORT = 13000
+REDIS_PORT = 16379
 TEST_BACKEND_PORT = 18080
 
 POSTGRES_USER = "rmqtt_user"
@@ -381,6 +386,117 @@ rules = [
     return conf_dir
 
 
+def _start_redis() -> bool:
+    print("Starting Redis...")
+    if not docker.run_detached(
+        [
+            "--name",
+            REDIS_CONTAINER,
+            "--memory=128m",
+            "--cpus=0.25",
+            "--restart=unless-stopped",
+            "--log-opt",
+            "max-size=10m",
+            "--log-opt",
+            "max-file=3",
+            "-p",
+            f"{REDIS_PORT}:6379",
+            "redis:8.4-alpine",
+        ]
+    ):
+        print("ERROR: Redis test container failed to start")
+        return False
+
+    for _ in range(30):
+        result = subprocess.run(
+            ["docker", "exec", REDIS_CONTAINER, "redis-cli", "ping"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and "PONG" in result.stdout:
+            print("Redis is ready")
+            return True
+        time.sleep(1)
+
+    print("ERROR: Redis failed to start")
+    return False
+
+
+def _generate_herald_config() -> str:
+    """Generate Herald config directory with database and redis settings."""
+    conf_dir = ensure_dir(TEST_CONFIG_DIR / "herald")
+    (conf_dir / "config.toml").write_text(
+        f"""[database]
+url = "postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@host.docker.internal:{POSTGRES_PORT}/herald_test?sslmode=disable"
+
+[redis]
+url = "redis://host.docker.internal:{REDIS_PORT}"
+
+[server]
+bind_address = "0.0.0.0:3000"
+log_level = "warn"
+app_env = "test"
+
+[frontend]
+url = "http://localhost:3000"
+""",
+        encoding="utf-8",
+    )
+    return str(conf_dir.resolve())
+
+
+def _start_herald() -> bool:
+    print("Starting Herald...")
+    conf_dir = _generate_herald_config()
+
+    cid = docker.create_container(
+        [
+            "--name",
+            HERALD_CONTAINER,
+            "--memory=512m",
+            "--cpus=0.5",
+            "--restart=unless-stopped",
+            "--add-host",
+            "host.docker.internal:host-gateway",
+            "--log-opt",
+            "max-size=10m",
+            "--log-opt",
+            "max-file=3",
+            "-e",
+            "HERALD_CONFIG=/app/config/config.toml",
+            "-p",
+            f"{HERALD_PORT}:3000",
+            "ghcr.io/timzaak/herald:v0.1.1",
+        ]
+    )
+    if not cid:
+        print("ERROR: Herald container create failed")
+        return False
+
+    config_file = str((TEST_CONFIG_DIR / "herald" / "config.toml").resolve())
+    if not docker.copy_into_container(cid, config_file, "/app/config/config.toml"):
+        print("ERROR: Herald config copy failed")
+        return False
+
+    if not docker.start_container(cid):
+        print("ERROR: Herald container start failed")
+        return False
+
+    health_url = f"http://127.0.0.1:{HERALD_PORT}/health"
+    for _ in range(60):
+        try:
+            with urllib.request.urlopen(health_url, timeout=2) as response:
+                if response.status == 200:
+                    print("Herald is ready")
+                    return True
+        except (ConnectionError, TimeoutError, urllib.error.URLError):
+            pass
+        time.sleep(1)
+
+    print("ERROR: Herald failed to start")
+    return False
+
+
 def _start_rmqtt() -> bool:
     print("Starting RMQTT...")
     backend_port = TEST_BACKEND_PORT
@@ -478,6 +594,17 @@ def main() -> int:
 
     _cleanup_test_schemas()
 
+    # Create Herald database in shared PostgreSQL
+    print("Creating Herald database...")
+    code, out = docker.exec_check(
+        POSTGRES_CONTAINER,
+        ["psql", "-U", POSTGRES_USER, "-d", POSTGRES_DB, "-c", "CREATE DATABASE herald_test"],
+    )
+    if code == 0 or "already exists" in out:
+        print("Herald database ready")
+    else:
+        print(f"WARN: Failed to create Herald database: {out}")
+
     if not _start_pgdog():
         return 1
 
@@ -500,10 +627,19 @@ def main() -> int:
     if not _start_rmqtt():
         return 1
 
+    if not _start_redis():
+        return 1
+
+    if not _start_herald():
+        return 1
+
+    if not init_herald_permissions(POSTGRES_CONTAINER, POSTGRES_USER, "herald_test"):
+        return 1
+
     print(
         "Test environment is ready. "
         f"PgDog=localhost:{PGDOG_PORT} LocalStack=localhost:{LOCALSTACK_PORT} "
-        f"RMQTT=localhost:{RMQTT_MQTT_PORT}/{RMQTT_HTTP_PORT}"
+        f"RMQTT=localhost:{RMQTT_MQTT_PORT}/{RMQTT_HTTP_PORT} Herald=localhost:{HERALD_PORT}"
     )
     return 0
 

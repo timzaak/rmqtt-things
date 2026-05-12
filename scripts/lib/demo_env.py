@@ -13,8 +13,9 @@ from pathlib import Path
 
 from . import docker
 from .cli import require_executable
+from .herald import init_permissions as init_herald_permissions
 from .net import wait_for_http_ok, wait_for_tcp
-from .paths import LOG_DIR, REPO_ROOT, SCRIPTS_DIR, ensure_dir
+from .paths import LOG_DIR, REPO_ROOT, RUNTIME_DIR, SCRIPTS_DIR, ensure_dir
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -47,6 +48,10 @@ RMQTT_CONTAINER = "t-demo-rmqtt"
 RMQTT_IMAGE = "rmqtt/rmqtt:0.20.0"
 LOCALSTACK_CONTAINER = "t-demo-localstack"
 LOCALSTACK_PORT = 4566
+HERALD_CONTAINER = "t-demo-herald"
+HERALD_IMAGE = "ghcr.io/timzaak/herald:v0.1.1"
+HERALD_PORT = 13000
+HERALD_DB = "herald_demo"
 
 
 def check_postgres_container(status: HealthStatus) -> bool:
@@ -135,6 +140,27 @@ def check_localstack_container(status: HealthStatus) -> bool:
     return True
 
 
+def check_herald_container(status: HealthStatus) -> bool:
+    """检查 Herald 容器状态。"""
+    if not docker.container_exists(HERALD_CONTAINER):
+        status.add_error(f"Herald container '{HERALD_CONTAINER}' not found")
+        status.add_service("herald", "not found")
+        return False
+
+    if not docker.container_running(HERALD_CONTAINER):
+        status.add_error(f"Herald container '{HERALD_CONTAINER}' not running")
+        status.add_service("herald", "stopped")
+        return False
+
+    if not wait_for_http_ok(f"http://127.0.0.1:{HERALD_PORT}/health", 2):
+        status.add_error("Herald health check failed")
+        status.add_service("herald", "health check failed")
+        return False
+
+    status.add_service("herald", "healthy")
+    return True
+
+
 def check_backend_process(status: HealthStatus) -> bool:
     """检查后端进程状态。"""
     # Skip state file check - check port and health endpoint directly
@@ -189,6 +215,9 @@ def check_environment_health(require_frontend: bool = False) -> HealthStatus:
     # 检查 LocalStack
     localstack_ok = check_localstack_container(status)
 
+    # 检查 Herald
+    herald_ok = check_herald_container(status)
+
     # 检查后端
     backend_ok = check_backend_process(status)
 
@@ -200,7 +229,7 @@ def check_environment_health(require_frontend: bool = False) -> HealthStatus:
         frontend_ok = True
 
     # 更新环境状态
-    if pg_ok and redis_ok and rmqtt_ok and localstack_ok and backend_ok:
+    if pg_ok and redis_ok and rmqtt_ok and localstack_ok and herald_ok and backend_ok:
         status.healthy = True
 
     # Skip environment state file updating - it may be inaccurate
@@ -325,6 +354,77 @@ def start_rmqtt_container(logger: "Logger") -> bool:
     return True
 
 
+def _create_herald_database(logger: "Logger") -> bool:
+    """Create the Herald database in the shared PostgreSQL container."""
+    code, out = docker.exec_check(
+        POSTGRES_CONTAINER,
+        ["psql", "-U", "postgres", "-c", f"CREATE DATABASE {HERALD_DB}"],
+    )
+    if code == 0 or "already exists" in out:
+        logger.verbose_info(f"Herald database '{HERALD_DB}' ready")
+        return True
+    logger.error(f"Failed to create Herald database: {out}")
+    return False
+
+
+def start_herald_container(logger: "Logger") -> bool:
+    """Start Herald auth service container."""
+    # Generate Herald config with correct DB and Redis URLs
+    herald_conf_dir = ensure_dir(RUNTIME_DIR / "demo-config" / "herald")
+    (herald_conf_dir / "config.toml").write_text(
+        f"""\
+[database]
+url = "postgresql://postgres:postgres@host.docker.internal:5432/{HERALD_DB}?sslmode=disable"
+
+[redis]
+url = "redis://host.docker.internal:6379"
+
+[server]
+bind_address = "0.0.0.0:3000"
+log_level = "warn"
+app_env = "demo"
+
+[frontend]
+url = "http://localhost:3000"
+""",
+        encoding="utf-8",
+    )
+
+    cid = docker.create_container(
+        [
+            "--name",
+            HERALD_CONTAINER,
+            "--memory=512m",
+            "--cpus=0.5",
+            "--restart=unless-stopped",
+            "--add-host",
+            "host.docker.internal:host-gateway",
+            "--log-opt",
+            "max-size=10m",
+            "--log-opt",
+            "max-file=3",
+            "-e",
+            "HERALD_CONFIG=/app/config/config.toml",
+            "-p",
+            f"{HERALD_PORT}:3000",
+            HERALD_IMAGE,
+        ]
+    )
+    if not cid:
+        logger.error("Herald container create failed")
+        return False
+
+    if not docker.copy_into_container(cid, str((herald_conf_dir / "config.toml").resolve()), "/app/config/config.toml"):
+        logger.error("Herald config copy failed")
+        return False
+
+    if not docker.start_container(cid):
+        logger.error("Herald container start failed")
+        return False
+
+    return True
+
+
 def start_environment(
     logger: "Logger",
     timeout: int = 60,
@@ -341,7 +441,7 @@ def start_environment(
     logger.info("Starting Demo environment...")
 
     # Skip environment state file tracking - it may be inaccurate
-    total_steps = 8
+    total_steps = 10
 
     # Step 1: Stop old environment (if running)
     with logger.step(1, total_steps, "Stopping old environment"):
@@ -460,6 +560,25 @@ def start_environment(
             logger.error("LocalStack failed to start")
             return False
 
+    # Step 5: Create Herald database
+    with logger.step(5, total_steps, "Creating Herald database"):
+        if not _create_herald_database(logger):
+            return False
+
+    # Step 6: Start Herald container
+    with logger.step(6, total_steps, "Starting Herald"):
+        if not start_herald_container(logger):
+            return False
+
+        if not wait_for_http_ok(f"http://127.0.0.1:{HERALD_PORT}/health", 60, logger=logger):
+            logger.error("Herald failed to start")
+            return False
+
+    # Step 6b: Initialize Herald permissions
+    if not init_herald_permissions(POSTGRES_CONTAINER, "postgres", HERALD_DB):
+        logger.error("Herald permissions initialization failed")
+        return False
+
     # Prepare log paths
     backend_log_base = LOG_DIR / "backend-demo.log"
     frontend_log_base = LOG_DIR / "frontend-demo.log"
@@ -471,8 +590,8 @@ def start_environment(
     cargo = require_executable("cargo")
     npm = require_executable("npm", windows_fallback="npm.cmd")
 
-    # Step 5: Start backend process
-    with logger.step(5, total_steps, "Starting backend"):
+    # Step 7: Start backend process
+    with logger.step(7, total_steps, "Starting backend"):
         backend_env = dict(os.environ)
         backend_env["APP_CONFIG"] = str((REPO_ROOT / "backend" / "config.demo.toml").resolve())
         backend_env["TOTP_SECRET_KEY"] = "demo-totp-encryption-key-32-bytes-long"
@@ -502,13 +621,13 @@ def start_environment(
             logger.error(f"Backend health check failed. Check {backend_out}")
             return False
 
-    # Step 6: Seed demo data
-    with logger.step(6, total_steps, "Initializing demo data"):
+    # Step 8: Seed demo data
+    with logger.step(8, total_steps, "Initializing demo data"):
         if not seed_demo_data(logger):
             return False
 
-    # Step 7: Start RMQTT container
-    with logger.step(7, total_steps, "Starting RMQTT"):
+    # Step 9: Start RMQTT container
+    with logger.step(9, total_steps, "Starting RMQTT"):
         if not start_rmqtt_container(logger):
             return False
 
@@ -516,8 +635,8 @@ def start_environment(
             logger.error("RMQTT HTTP API failed to start")
             return False
 
-    # Step 8: Start frontend process
-    with logger.step(8, total_steps, "Starting frontend"):
+    # Step 10: Start frontend process
+    with logger.step(10, total_steps, "Starting frontend"):
         spawn_background(
             name=None,
             command=[npm, "run", "dev"],
@@ -603,6 +722,8 @@ def stop_environment() -> bool:
 
     # 停止 Docker 容器
     print("  Stopping containers...")
+    if docker.container_exists(HERALD_CONTAINER):
+        docker.stop_container(HERALD_CONTAINER)
     if docker.container_exists(LOCALSTACK_CONTAINER):
         docker.stop_container(LOCALSTACK_CONTAINER)
     if docker.container_exists(REDIS_CONTAINER):
@@ -612,6 +733,8 @@ def stop_environment() -> bool:
 
     time.sleep(1.0)
 
+    if docker.container_exists(HERALD_CONTAINER):
+        docker.rm_force_container(HERALD_CONTAINER)
     if docker.container_exists(LOCALSTACK_CONTAINER):
         docker.rm_force_container(LOCALSTACK_CONTAINER)
     if docker.container_exists(REDIS_CONTAINER):

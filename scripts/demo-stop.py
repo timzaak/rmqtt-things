@@ -146,7 +146,7 @@ def main() -> int:
     # Step 3: Stop and remove Docker containers
     if should_print(quiet):
         print("Stopping containers...")
-    containers_to_stop = ["t-demo-rmqtt", "t-demo-localstack", "t-demo-redis", "t-demo-postgres"]
+    containers_to_stop = ["t-demo-rmqtt", "t-demo-localstack", "t-demo-herald", "t-demo-redis", "t-demo-postgres"]
     for container in containers_to_stop:
         if docker.container_exists(container):
             log_verbose(f"Stopping container: {container}")
