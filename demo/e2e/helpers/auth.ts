@@ -2,89 +2,169 @@
  * 认证辅助函数
  *
  * 为 E2E 测试提供登录、登出等认证相关功能。
- *
- * 使用方式：
- * ```typescript
- * import { loginAsAdmin, logout } from './helpers/auth'
- * await loginAsAdmin(page)
- * ```
- *
- * 配置：
- * - BASE_URL: 后端地址（环境变量，默认 http://localhost:8080）
- * - 修改 DEMO_ADMIN 以匹配你的测试账号
+ * 自动检测 Herald SSO 是否启用，支持两种认证模式。
  */
 
-import { Page, type Response } from '@playwright/test'
+import { Page } from '@playwright/test'
 import type { UnifiedLogger } from 'playwright-unified-logger'
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8080'
 
 /**
- * 默认管理员账号 — 根据项目实际情况修改
+ * 默认管理员账号 — 匹配 Herald SSO 测试环境
  */
 export const DEMO_ADMIN = {
-  email: 'admin@example.com',
+  email: 'admin@rmqtt-things.local',
   password: 'password',
+}
+
+/** GET /api/auth/config 返回结构 */
+export interface AuthConfig {
+  enabled: boolean
+  herald_url?: string | null
+}
+
+/**
+ * 获取后端认证配置
+ */
+export async function fetchAuthConfig(): Promise<AuthConfig> {
+  const resp = await fetch(`${BASE_URL}/api/auth/config`, {
+    method: 'GET',
+    signal: AbortSignal.timeout(5000),
+  })
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch auth config: ${resp.status}`)
+  }
+  return resp.json() as Promise<AuthConfig>
+}
+
+/**
+ * 通过 Herald API 直接登录，提取 X-Auth token 并注入浏览器
+ */
+async function loginViaHeraldApi(
+  page: Page,
+  heraldUrl: string,
+  options: { logger?: UnifiedLogger } = {}
+): Promise<void> {
+  const { logger } = options
+  const loginUrl = `${heraldUrl}/api/auth/default/login`
+
+  logger?.testCode.log(`[Auth] Herald SSO 登录: ${loginUrl}`) ?? console.warn(`[Auth] Herald SSO 登录: ${loginUrl}`)
+
+  const resp = await fetch(loginUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: DEMO_ADMIN.email,
+      password: DEMO_ADMIN.password,
+      clientId: 'rmqtt-things-admin',
+    }),
+    signal: AbortSignal.timeout(10000),
+  })
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`Herald login failed (${resp.status}): ${body}`)
+  }
+
+  // 从 Set-Cookie 提取 X-Auth token
+  const setCookieHeaders = resp.headers.getSetCookie()
+  const xAuthCookie = setCookieHeaders.find((h) => h.startsWith('X-Auth='))
+  if (!xAuthCookie) {
+    throw new Error('Herald login response missing X-Auth cookie')
+  }
+
+  const token = xAuthCookie.replace('X-Auth=', '').split(';')[0]
+
+  // 注入浏览器 cookie — domain 从 BASE_URL 提取以兼容 localhost 和 127.0.0.1
+  const domain = new URL(BASE_URL).hostname
+  await page.context().addCookies([
+    { name: 'X-Auth', value: token, domain, path: '/' },
+  ])
+
+  logger?.testCode.log(`[Auth] Herald SSO 登录成功，token 已注入`) ?? console.warn(`[Auth] Herald SSO 登录成功，token 已注入`)
+}
+
+/**
+ * 确保浏览器上下文包含认证 cookie（不导航）
+ *
+ * 自动检测 Herald SSO 是否启用。启用时通过 API 登录并注入 X-Auth cookie。
+ * 供 fixture 在每个测试前自动调用，避免各测试文件重复处理认证。
+ */
+export async function ensureAuthCookie(
+  page: Page,
+  options: { logger?: UnifiedLogger } = {}
+): Promise<void> {
+  const { logger } = options
+  const config = await fetchAuthConfig()
+
+  if (!config.enabled || !config.herald_url) {
+    return
+  }
+
+  const loginUrl = `${config.herald_url}/api/auth/default/login`
+  logger?.testCode.log(`[Auth] 注入认证 cookie: ${loginUrl}`) ?? console.warn(`[Auth] 注入认证 cookie: ${loginUrl}`)
+
+  const resp = await fetch(loginUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: DEMO_ADMIN.email,
+      password: DEMO_ADMIN.password,
+      clientId: 'rmqtt-things-admin',
+    }),
+    signal: AbortSignal.timeout(10000),
+  })
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`Herald login failed (${resp.status}): ${body}`)
+  }
+
+  const setCookieHeaders = resp.headers.getSetCookie()
+  const xAuthCookie = setCookieHeaders.find((h) => h.startsWith('X-Auth='))
+  if (!xAuthCookie) {
+    throw new Error('Herald login response missing X-Auth cookie')
+  }
+
+  const token = xAuthCookie.replace('X-Auth=', '').split(';')[0]
+  const domain = new URL(BASE_URL).hostname
+  await page.context().addCookies([
+    { name: 'X-Auth', value: token, domain, path: '/' },
+  ])
+
+  logger?.testCode.log('[Auth] 认证 cookie 已注入') ?? console.warn('[Auth] 认证 cookie 已注入')
 }
 
 /**
  * 使用管理员账号登录
  *
- * @param page Playwright Page 对象
- * @param options.waitNavigation 是否等待导航完成（默认 true）
+ * 自动检测认证模式：Herald SSO 启用时走 API 登录，否则直接导航。
  */
 export async function loginAsAdmin(
   page: Page,
   options: {
-    waitNavigation?: boolean
     logger?: UnifiedLogger
   } = {}
 ): Promise<void> {
-  const { waitNavigation = true, logger } = options
+  const { logger } = options
 
   logger?.testCode.log(`[Auth] 登录管理员`) ?? console.warn(`[Auth] 登录管理员`)
 
   await clearSessionData(page)
 
-  // 导航到管理后台登录页
-  await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'domcontentloaded' })
+  const config = await fetchAuthConfig()
 
-  // 检查是否已登录（自动跳转到管理页面）
-  if (page.url().includes('/admin/dashboard') || page.url().includes('/admin/devices')) {
-    logger?.testCode.log(`[Auth] 已登录，跳过`) ?? console.warn(`[Auth] 已登录，跳过`)
-    return
+  if (config.enabled && config.herald_url) {
+    await loginViaHeraldApi(page, config.herald_url, { logger })
+    // 导航到后台页面验证会话生效
+    await page.goto(`${BASE_URL}/admin/devices`, { waitUntil: 'domcontentloaded' })
+  } else {
+    // 无认证模式，直接导航
+    await page.goto(`${BASE_URL}/admin/devices`, { waitUntil: 'domcontentloaded' })
   }
 
-  try {
-    // 等待登录表单出现 — 选择器根据项目实际情况修改
-    await page.waitForSelector('input[type="text"], [data-testid="email-input"]', { timeout: 10000 })
-    await page.waitForSelector('input[type="password"], [data-testid="password-input"]', { timeout: 10000 })
-
-    const usernameInput = page.locator('input[type="text"], [data-testid="email-input"]').first()
-    const passwordInput = page.locator('input[type="password"], [data-testid="password-input"]').first()
-
-    await usernameInput.fill(DEMO_ADMIN.email)
-    await passwordInput.fill(DEMO_ADMIN.password)
-
-    const submitButton = page.locator('button[type="submit"]').first()
-    await submitButton.click()
-
-    // 等待登录 API 响应
-    const loginResponse = await waitForLoginResponse(page)
-    if (loginResponse && !loginResponse.ok()) {
-      const errorBody = await loginResponse.text().catch(() => '')
-      throw new Error(`Login failed: API returned ${loginResponse.status()} - ${errorBody}`)
-    }
-
-    if (waitNavigation) {
-      await page.waitForURL('**/admin/**', { timeout: 10000 }).catch(() => {})
-    }
-
-    logger?.testCode.log(`[Auth] 登录成功`) ?? console.warn(`[Auth] 登录成功`)
-  } catch (error) {
-    logger?.testCode.error(`[Auth] 登录失败:`, error) ?? console.error(`[Auth] 登录失败:`, error)
-    throw error
-  }
+  logger?.testCode.log(`[Auth] 登录完成`) ?? console.warn(`[Auth] 登录完成`)
 }
 
 /**
@@ -92,19 +172,8 @@ export async function loginAsAdmin(
  */
 export async function logout(page: Page, logger?: UnifiedLogger): Promise<void> {
   logger?.testCode.log('[Auth] 执行登出') ?? console.warn('[Auth] 执行登出')
-
-  try {
-    const logoutButton = page.locator('[data-testid="logout-button"]').first()
-    if (await logoutButton.isVisible({ timeout: 2000 })) {
-      await logoutButton.click()
-      await page.waitForURL('**/login', { timeout: 5000 })
-    }
-  } catch {
-    logger?.testCode.log('[Auth] UI 登出失败，清除会话') ?? console.warn('[Auth] UI 登出失败，清除会话')
-  } finally {
-    await clearSessionData(page)
-    await page.goto(`${BASE_URL}/admin/login`, { waitUntil: 'networkidle' })
-  }
+  await clearSessionData(page)
+  logger?.testCode.log('[Auth] 会话已清除') ?? console.warn('[Auth] 会话已清除')
 }
 
 async function clearSessionData(page: Page): Promise<void> {
@@ -117,13 +186,4 @@ async function clearSessionData(page: Page): Promise<void> {
   } catch {
     // localStorage 访问被阻止时忽略
   }
-}
-
-async function waitForLoginResponse(page: Page): Promise<Response | null> {
-  return page
-    .waitForResponse(
-      response => response.url().includes('/login') && response.request().method() === 'POST',
-      { timeout: 10000 }
-    )
-    .catch(() => null)
 }
