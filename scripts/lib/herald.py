@@ -5,12 +5,15 @@ Inserts rmqtt-things permissions (product/device/cert x read/write)
 into Herald's PostgreSQL database after the service has started.
 """
 
+import hashlib
+
 from . import docker
 
 _REALM_ID = "default"
 _CLIENT_ID = "rmqtt-things-admin"
 _ROLE_NAME = "things-admin"
 _TEST_USER_EMAIL = "admin@rmqtt-things.local"
+_API_KEY_RAW = "rmqtt-things-test-api-key"
 
 _PERMISSIONS = [
     ("product", "read", "View products and validation templates"),
@@ -27,6 +30,7 @@ DECLARE
     v_role_id uuid;
     v_user_id uuid;
     v_password_hash text;
+    v_client_app_id uuid;
 BEGIN
     -- 1. Create realm
     INSERT INTO realm (id, name) VALUES ('{realm}', 'Default Realm')
@@ -89,6 +93,14 @@ BEGIN
     INSERT INTO user_roles (id, user_id, role_id, realm_id, client_id)
     VALUES (uuidv7(), v_user_id, v_role_id, '{realm}', '{client}')
         ON CONFLICT (user_id, role_id, realm_id) DO NOTHING;
+
+    -- 10. Insert API key for backend herald_sdk client
+    SELECT id INTO v_client_app_id FROM client_app
+        WHERE client_id = '{client}' AND realm_id = '{realm}';
+
+    INSERT INTO client_api_keys (id, name, api_key_hash, realm_id, enabled, client_app_id)
+    VALUES (uuidv7(), 'RMQTT Things Test', '{api_key_hash}', '{realm}', true, v_client_app_id)
+        ON CONFLICT DO NOTHING;
 END $$;
 """
 
@@ -119,11 +131,15 @@ def init_permissions(pg_container: str, pg_user: str, herald_db: str) -> bool:
         for res, act, _ in _PERMISSIONS
     )
 
+    salted = f"{_API_KEY_RAW}:herald-api-key-salt-v1"
+    api_key_hash = f"sha256:{hashlib.sha256(salted.encode()).hexdigest()}"
+
     sql = _INIT_SQL.format(
         realm=_REALM_ID,
         client=_CLIENT_ID,
         role=_ROLE_NAME,
         email=_TEST_USER_EMAIL,
+        api_key_hash=api_key_hash,
         permission_defs=permission_defs,
         policies=policy_values,
         permission_pairs=permission_pairs,

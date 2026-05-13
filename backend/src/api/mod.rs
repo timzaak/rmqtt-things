@@ -33,6 +33,7 @@ pub mod utils;
 pub mod web_models;
 
 use crate::api::handlers::S3Client;
+use crate::api::middleware::{HeraldAuthState, herald_auth_middleware};
 use crate::api::openapi::ApiDoc;
 use crate::api::web_models::MqttResponse;
 
@@ -54,14 +55,16 @@ pub fn create_router(
     config: Arc<Config>,
     app_state: Arc<handlers::AppState>,
     admin_state: Arc<AdminAppState>,
+    herald_client: Option<Arc<herald_sdk::Client>>,
 ) -> Router {
     let state = Arc::new(ApiState {
         app: app_state,
         admin: admin_state,
     });
 
-    let api_routes = Router::new()
+    let device_routes = Router::new()
         .route("/health", get(handlers::health_check))
+        .route("/auth/config", get(auth_handlers::get_auth_config))
         .route("/access/auth", post(auth_handlers::auth))
         .route("/access/acl", post(auth_handlers::acl))
         .route(
@@ -77,7 +80,9 @@ pub fn create_router(
         .route("/thing/file/upload", post(handlers::file_upload_handler))
         .route("/ota/version", post(ota_handlers::ota_version_post))
         .route("/device/connect", post(handlers::device_connect))
-        .route("/device/disconnect", post(handlers::device_disconnect))
+        .route("/device/disconnect", post(handlers::device_disconnect));
+
+    let admin_routes = Router::new()
         .route("/admin/property", get(admin_handlers::get_property_latest))
         .route(
             "/admin/property/command",
@@ -144,6 +149,21 @@ pub fn create_router(
             "/admin/file/upload",
             post(admin_handlers::admin_file_upload_handler),
         );
+
+    let admin_routes = match (config.herald.as_ref(), herald_client) {
+        (Some(herald_config), Some(herald_sdk)) => {
+            admin_routes.layer(axum::middleware::from_fn_with_state(
+                HeraldAuthState {
+                    herald_sdk,
+                    client_id: herald_config.client_id.clone().into(),
+                },
+                herald_auth_middleware,
+            ))
+        }
+        (_, _) => admin_routes,
+    };
+
+    let api_routes = device_routes.merge(admin_routes);
 
     let otel_enabled = config.otel.trace.is_some() || config.otel.log.is_some();
 

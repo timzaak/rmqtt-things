@@ -2,7 +2,7 @@ use crate::api::ApiState;
 use axum::Json;
 use axum::extract::State;
 use hmac::{Hmac, Mac};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use std::sync::Arc;
 use time::OffsetDateTime;
@@ -10,6 +10,27 @@ use tracing::{info, warn};
 use utoipa::ToSchema;
 
 type HmacSha1 = Hmac<Sha1>;
+
+#[derive(Serialize, ToSchema)]
+pub struct AuthConfigResponse {
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub herald_url: Option<String>,
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/auth/config",
+    tag = "system",
+    responses((status = 200, description = "Auth configuration", body = AuthConfigResponse))
+)]
+pub async fn get_auth_config(State(state): State<Arc<ApiState>>) -> Json<AuthConfigResponse> {
+    let herald = &state.admin.config.herald;
+    Json(AuthConfigResponse {
+        enabled: herald.is_some(),
+        herald_url: herald.as_ref().map(|h| h.base_url.clone()),
+    })
+}
 
 #[derive(Deserialize, ToSchema, Debug)]
 #[allow(dead_code)]

@@ -16,6 +16,8 @@ pub struct Config {
     pub s3: Option<S3Config>,
     #[serde(default)]
     pub ca: CAConfig,
+    #[serde(default)]
+    pub herald: Option<HeraldConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -46,6 +48,14 @@ pub struct S3Config {
     pub bucket: String,
     pub directories: Vec<String>,
     pub expired_seconds: u32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HeraldConfig {
+    pub base_url: String,
+    pub api_key: String,
+    pub realm_id: String,
+    pub client_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

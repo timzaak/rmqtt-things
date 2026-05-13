@@ -73,7 +73,7 @@ impl AsyncTestContext for TestContext {
             s3_client: app_state.s3_client.clone(),
         });
 
-        let router = create_router(config, app_state.clone(), admin_state.clone());
+        let router = create_router(config, app_state.clone(), admin_state.clone(), None);
 
         TestContext {
             _app_state: app_state,

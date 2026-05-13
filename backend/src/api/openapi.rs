@@ -1,11 +1,14 @@
 use crate::api::{
     admin_handlers, auth_handlers, ca_handlers, handlers, ota_handlers, product_handlers,
 };
-use utoipa::OpenApi;
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityRequirement, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 
 #[derive(OpenApi)]
 #[openapi(
+    modifiers(&SecurityAddon),
     paths(
+        auth_handlers::get_auth_config,
         auth_handlers::auth,
         auth_handlers::acl,
         handlers::property_set_subscribe,
@@ -84,6 +87,7 @@ use utoipa::OpenApi;
             crate::api::auth_handlers::AclPayload,
             crate::api::auth_handlers::AuthPayload,
             crate::api::auth_handlers::Access,
+            crate::api::auth_handlers::AuthConfigResponse,
             crate::api::auth_handlers::MqttProtocol,
             crate::api::ca_handlers::IssueCertRequest,
             crate::api::ca_handlers::IssueCertResponse,
@@ -129,3 +133,39 @@ use utoipa::OpenApi;
     )
 )]
 pub struct ApiDoc;
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "cookie_auth",
+                SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new("X-Auth"))),
+            );
+        }
+
+        let security = vec![SecurityRequirement::new(
+            "cookie_auth",
+            Vec::<String>::new(),
+        )];
+        for (path, path_item) in openapi.paths.paths.iter_mut() {
+            if !path.starts_with("/api/admin/") {
+                continue;
+            }
+
+            for operation in [
+                &mut path_item.get,
+                &mut path_item.put,
+                &mut path_item.post,
+                &mut path_item.delete,
+                &mut path_item.patch,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                operation.security = Some(security.clone());
+            }
+        }
+    }
+}

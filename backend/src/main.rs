@@ -84,13 +84,20 @@ async fn main() -> anyhow::Result<()> {
     } else {
         None
     };
+    let herald_client = config.herald.as_ref().map(|herald| {
+        Arc::new(herald_sdk::Client::new(
+            herald.base_url.clone(),
+            herald.api_key.clone(),
+            None,
+        ))
+    });
 
     let app_state = Arc::new(AppState {
         db: db_service.clone(),
         rmqtt_client,
         config: Arc::clone(&config),
         cache: schema_cache.clone(),
-        s3_client,
+        s3_client: s3_client.clone(),
     });
 
     let admin_state = Arc::new(AdminAppState {
@@ -98,10 +105,10 @@ async fn main() -> anyhow::Result<()> {
         rmqtt_client: rmqtt_client_clone,
         cache: schema_cache,
         config: Arc::clone(&config),
-        s3_client: app_state.s3_client.clone(),
+        s3_client,
     });
 
-    let router = create_router(config, app_state, admin_state);
+    let router = create_router(config, app_state, admin_state, herald_client);
 
     let port: u16 = env::var("PORT")
         .ok()

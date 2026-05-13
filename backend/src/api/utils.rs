@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_extract_and_validate_product_id_rejects_invalid() {
-        let result = extract_and_validate_product_id("/bad/product/dev1/thing/property/post");
+        let result = extract_and_validate_product_id("/bad.product/dev1/thing/property/post");
         assert!(result.is_err());
     }
 }

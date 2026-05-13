@@ -126,7 +126,7 @@ impl AsyncTestContext for MqttTestContext {
         });
 
         // Start real axum server
-        let router = create_router(config, app_state.clone(), admin_state.clone());
+        let router = create_router(config, app_state.clone(), admin_state.clone(), None);
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
         let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{backend_port}"))

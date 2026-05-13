@@ -4,7 +4,7 @@
 
 | 域 | PRD 数量 | 说明 |
 |----|----------|------|
-| auth | 1 | Admin 认证与权限管理（cas-2 集成） |
+| auth | 1 | Admin 认证与权限管理（Herald 集成） |
 | core | 1 | 产品与设备管理（核心业务） |
 | integration | 5 | 证书管理、OTA 固件升级、事件校验模板、RMQTT WebHook 集成、文件上传 |
 
@@ -18,7 +18,7 @@
 | [validation-template.md](integration/validation-template.md) | integration | P0 | Active | 事件/属性校验模板管理、JSON Schema 校验 |
 | [rmqtt-webhook.md](integration/rmqtt-webhook.md) | integration | P0 | Active | RMQTT WebHook 回调集成：认证、ACL、属性/事件上报、连接管理、MQTT 推送 |
 | [file-upload.md](integration/file-upload.md) | integration | P2 | Active | 管理端和设备端文件上传服务（S3 预签名） |
-| [auth.md](auth/auth.md) | auth | P0 | Draft | Admin 认证与权限管理：cas-2 集成、session 校验、权限控制、前端登录流程 |
+| [auth.md](auth/auth.md) | auth | P0 | Draft | Admin 认证与权限管理：Herald 集成、session 校验、权限控制、前端登录流程 |
 
 ## 关联关系
 
