@@ -158,6 +158,8 @@ Response: plain text `"allow"` or `"deny"`
 
 APIs for the management backend. Supports paginated queries.
 
+**Authentication**: When Herald is configured, all Admin endpoints require a valid `X-Auth` cookie. Unauthenticated requests return `401 Unauthorized`, unauthorized requests return `403 Forbidden`. Without Herald, no authentication is required. See [Authentication & Authorization](auth-en.md).
+
 Common pagination parameters (query string) for most GET endpoints:
 
 | Parameter | Type | Default | Description |

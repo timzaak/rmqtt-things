@@ -41,3 +41,9 @@ secret_key = "CHANGE_ME"
 bucket = "rmqtt-things"
 directories = ["${productId}/${deviceId}/*", "public/*"]
 expired_seconds = 600
+
+# [herald]
+# base_url = "http://herald:3000"
+# api_key = "CHANGE_ME_HERALD_API_KEY"
+# realm_id = "default"
+# client_id = "rmqtt-things-admin"

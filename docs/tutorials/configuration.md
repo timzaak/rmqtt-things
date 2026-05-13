@@ -182,6 +182,27 @@ expired_seconds = 600
 
 `directories` 里可以用 `${productId}` 和 `${deviceId}` 变量，系统会根据实际的产品和设备做替换。`public/*` 是公共目录，不需要设备级权限就能访问。
 
+## herald
+
+Herald 统一认证服务配置。可选。配了之后管理端 API 会经过 Herald SSO 认证和权限校验；不配就无认证保护。详见[认证与权限](auth.md)。
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `base_url` | string | 无 | Herald 服务地址 |
+| `api_key` | string | 无 | 调用 Herald ext API 的密钥 |
+| `realm_id` | string | 无 | rmqtt-things 所属的 realm |
+| `client_id` | string | 无 | 客户端标识，如 `rmqtt-things-admin` |
+
+```toml
+[herald]
+base_url = "http://127.0.0.1:3000"
+api_key = "your-api-key"
+realm_id = "default"
+client_id = "rmqtt-things-admin"
+```
+
+生产环境把 `base_url` 改成 Herald 的实际地址（Docker 部署用容器名）。`api_key` 在 Herald 管理端生成。所有字段都是必填的，缺任何一个 `[herald]` 段就不会生效。
+
 ## ca
 
 CA 证书配置。系统用这些参数生成和管理设备 TLS 证书。

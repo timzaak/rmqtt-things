@@ -110,6 +110,13 @@ endpoint = "your S3-compatible storage endpoint"
 access_key = "your access key"
 secret_key = "your secret key"
 bucket = "rmqtt-things"
+
+# For admin authentication (recommended for production)
+[herald]
+base_url = "http://herald:3000"              # Herald container name or address
+api_key = "your Herald API Key"
+realm_id = "default"
+client_id = "rmqtt-things-admin"
 ```
 
 Redis has no password because the Docker network does not expose its port externally. If you expose the Redis port to the outside, you must add a password.
@@ -436,3 +443,35 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
 No need to restart the Caddy container.
+
+### Herald Authentication Not Working
+
+Admin endpoints accept requests without authentication.
+
+Check that the `[herald]` section in the config file is not commented out and all four fields (`base_url`, `api_key`, `realm_id`, `client_id`) are set. Verify that the `base_url` is reachable from the App container:
+
+```bash
+docker exec rmqtt-things-app wget -qO- http://herald:3000
+```
+
+### Herald Connection Timeout
+
+App logs show connection timeouts when calling Herald.
+
+Ensure both the App and Herald containers are on the same Docker network:
+
+```bash
+docker network inspect rmqtt-things-net
+```
+
+If Herald is not listed, connect it:
+
+```bash
+docker network connect rmqtt-things-net herald
+```
+
+### Login Loop After Herald Login
+
+After logging in via Herald SSO, the browser keeps redirecting back to the login page.
+
+Check Cookie domain settings. The Cookie domain must match the domain the browser is accessing. If using Caddy with a custom domain, ensure Herald's redirect URL and Cookie domain are configured for the same domain.

@@ -158,6 +158,8 @@ Base URL: `http://localhost:8080/api`
 
 管理后台用的 API。支持分页查询。
 
+**认证要求**：配置了 Herald 后，所有 Admin 接口需要携带有效的 `X-Auth` Cookie。未认证返回 `401 Unauthorized`，无权限返回 `403 Forbidden`。没配 Herald 时无认证要求。详见[认证与权限](auth.md)。
+
 分页参数（query string）在大多数 GET 接口中通用：
 
 | 参数 | 类型 | 默认值 | 说明 |

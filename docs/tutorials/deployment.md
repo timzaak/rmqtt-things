@@ -110,6 +110,13 @@ endpoint = "你的 S3 兼容存储地址"
 access_key = "你的 access key"
 secret_key = "你的 secret key"
 bucket = "rmqtt-things"
+
+# 如果需要管理端认证（推荐生产环境开启）
+[herald]
+base_url = "http://herald:3000"              # Herald 容器名或地址
+api_key = "你的 Herald API Key"
+realm_id = "default"
+client_id = "rmqtt-things-admin"
 ```
 
 Redis 没有密码，因为 Docker 网络不对外暴露端口。如果你对外暴露了 Redis 端口，需要加密码。
@@ -436,3 +443,28 @@ docker exec caddy caddy reload --config /etc/caddy/Caddyfile
 ```
 
 不需要重启 Caddy 容器。
+
+### Herald 认证不生效
+
+配了 `[herald]` 但管理端 API 还是能无认证访问：
+
+1. 检查配置文件里的 `[herald]` 段是否被注释掉了（生产配置模板里默认是注释的）
+2. 确认 `base_url` 在 Docker 网络内可达：`docker exec rmqtt-things-app wget -qO- http://herald:3000`
+3. 看 App 日志里有没有 Herald 连接错误
+
+### Herald 连接超时
+
+App 日志里看到 `auth service unavailable` 或 503 错误。检查 Herald 容器是否在同一个 Docker 网络里：
+
+```bash
+docker network inspect rmqtt-things-net
+```
+
+确认 Herald 容器出现在网络里，并且 `base_url` 用的是容器名而不是 `localhost`。
+
+### 管理后台登录后反复跳转
+
+Herald 登录成功但管理后台一直跳回登录页。通常是 Cookie 没写成功：
+
+- 同域子域名模式：检查 Herald 的 `X-Auth` Cookie domain 是否设为 `.your-domain.com`
+- 跨域模式：检查 `/auth/callback` 页面是否正常接收 token 并写入 Cookie（浏览器 DevTools → Application → Cookies）

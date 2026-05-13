@@ -182,6 +182,27 @@ expired_seconds = 600
 
 `directories` supports `${productId}` and `${deviceId}` variables, which the system replaces with the actual product and device IDs. `public/*` is a public directory accessible without device-level permissions.
 
+## herald
+
+Herald SSO configuration. Optional. When configured, Admin API endpoints require Herald SSO authentication and permission checks. Without it, admin endpoints have no authentication. See [Authentication & Authorization](auth-en.md).
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `base_url` | string | none | Herald service URL |
+| `api_key` | string | none | API key for Herald ext API |
+| `realm_id` | string | none | Realm that rmqtt-things belongs to |
+| `client_id` | string | none | Client identifier, e.g. `rmqtt-things-admin` |
+
+```toml
+[herald]
+base_url = "http://127.0.0.1:3000"
+api_key = "your-api-key"
+realm_id = "default"
+client_id = "rmqtt-things-admin"
+```
+
+In production, change `base_url` to the actual Herald address (use container name for Docker). Generate `api_key` from the Herald admin panel. All fields are required — if any is missing, the `[herald]` section won't take effect.
+
 ## ca
 
 CA certificate configuration. The system uses these parameters to generate and manage device TLS certificates.
