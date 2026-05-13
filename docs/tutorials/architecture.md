@@ -27,7 +27,8 @@ backend/src/
     error.rs           # 统一错误类型
     utils.rs           # 共享工具函数
     openapi.rs         # utoipa OpenAPI spec 定义
-    middleware.rs       # HTTP 中间件
+    middleware/
+      mod.rs           # Herald SSO 认证中间件（Admin API 权限校验）
   db/
     database.rs        # DatabaseService：属性、事件、命令、设备状态的数据操作
     models.rs          # 数据库模型（PropertyLatest、EventHistory、CommandStatus 等）
@@ -134,7 +135,7 @@ sequenceDiagram
 
 ### api/ -- 路由和 Handler
 
-路由分两组：设备侧和管理侧。设备侧（`/api/thing/*`、`/api/device/*`、`/api/access/*`）接收 RMQTT Broker 的 WebHook 回调，没有认证要求，因为 Broker 本身已经校验了设备身份。管理侧（`/api/admin/*`）是给后台 UI 用的 CRUD 接口，目前没有鉴权中间件，部署时靠网络隔离保护。
+路由分两组：设备侧和管理侧。设备侧（`/api/thing/*`、`/api/device/*`、`/api/access/*`）接收 RMQTT Broker 的 WebHook 回调，没有认证要求，因为 Broker 本身已经校验了设备身份。管理侧（`/api/admin/*`）是给后台 UI 用的 CRUD 接口，配置了 Herald 后会通过 `herald_auth_middleware` 做 SSO 认证和权限校验（详见[认证与权限](auth.md)）。不配 Herald 时管理端无认证保护，适合内网隔离环境。
 
 路由表在 `api/mod.rs` 的 `create_router()` 里定义，用了 Axum 的 method-router 写法，同一个路径可以链式注册 GET/POST/DELETE。
 

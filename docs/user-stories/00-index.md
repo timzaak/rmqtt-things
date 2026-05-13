@@ -8,7 +8,7 @@
 
 | 文件 | 角色 | 故事数量 |
 |------|------|----------|
-| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 25 |
+| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 28 |
 | [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 9 |
 | [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 6 |
 
@@ -43,6 +43,9 @@
 | US-PA-023 | 查看证书详情 | P2 | 01-platform-admin-user-stories.md |
 | US-PA-024 | 下载已签发证书和私钥 | P1 | 01-platform-admin-user-stories.md |
 | US-PA-025 | 下载 CA 证书 | P2 | 01-platform-admin-user-stories.md |
+| US-PA-026 | 管理员登录管理后台 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-027 | 管理员权限访问控制 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-028 | 会话过期处理 | P1 | 01-platform-admin-user-stories.md |
 
 ### Demo E2E (DEMO-xxx)
 

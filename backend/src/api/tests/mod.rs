@@ -1,4 +1,5 @@
 mod cert_scenarios;
+mod herald_auth_scenarios;
 mod mqtt_device_flow_scenarios;
 mod mqtt_integration;
 mod mqtt_test_context;

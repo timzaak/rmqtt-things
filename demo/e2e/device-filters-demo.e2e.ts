@@ -14,6 +14,9 @@
  * 前置条件：
  * - 系统中已有 demo_product 产品和 demo-device 设备（seed_demo_data 初始化）
  * - 后端 API 和前端服务均已运行
+ *
+ * 注意：由于其他测试可能留下大量设备数据，seed 设备 demo-device 不一定在
+ * 设备列表第一页。因此测试使用第一页可见的任意设备进行验证。
  */
 
 import { test, expect } from './fixtures/demo-auth.fixtures'
@@ -33,15 +36,15 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     await page.goto(`${FRONTEND_URL}/devices`)
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
 
-    // Wait for the seed device to appear
-    await expect(page.getByText('demo-device')).toBeVisible({ timeout: POLL_TIMEOUT })
+    // Wait for any device row to appear (table body has data)
+    await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: POLL_TIMEOUT })
 
     // Status column should contain Online or Offline
     const statusCells = page.locator('tbody td').filter({ hasText: /^Online|Offline$/ })
     await expect(statusCells.first()).toBeVisible()
 
-    // IP Address column should be visible (seed data has 127.0.0.1)
-    await expect(page.getByText('127.0.0.1')).toBeVisible()
+    // IP Address column should be visible (any row will do)
+    await expect(page.locator('tbody td').filter({ hasText: /\d+\.\d+\.\d+\.\d+/ }).first()).toBeVisible()
   })
 
   test('US-PA-014 S2 / US-PA-019 S3: filter devices by Online status', async ({ page, demoLogger: _demoLogger }) => {
@@ -68,10 +71,8 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
       const statusSelect = page.locator('form select').filter({ has: page.getByRole('option', { name: 'Online' }) })
       await statusSelect.selectOption({ label: 'Online' })
 
-      // Click Search button
       await page.getByRole('button', { name: 'Search' }).click()
 
-      // Wait for filtered results
       await expect(page.getByText(onlineDeviceId)).toBeVisible({ timeout: POLL_TIMEOUT })
 
       // Offline devices should not appear - check that no Offline text is in the table body
@@ -117,10 +118,7 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     const statusSelect = page.locator('form select').filter({ has: page.getByRole('option', { name: 'Offline' }) })
     await statusSelect.selectOption({ label: 'Offline' })
 
-    // Click Search button
     await page.getByRole('button', { name: 'Search' }).click()
-
-    // Wait for filtered results
     await expect(page.getByText(offlineDeviceId)).toBeVisible({ timeout: POLL_TIMEOUT })
 
     // Online devices should not appear
@@ -132,33 +130,23 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     await page.goto(`${FRONTEND_URL}/devices`)
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
 
-    // Wait for data to load
-    await expect(page.getByText('demo-device')).toBeVisible({ timeout: POLL_TIMEOUT })
+    // The Product select uses model_no as value and product name as label.
+    // Wait for product options to populate (loaded asynchronously via useProducts hook).
+    // Note: <option> elements are "hidden" in Playwright's visibility model,
+    // so we use count() with polling instead of toBeVisible().
+    const firstSelect = page.locator('form select').first()
+    const productOptions = firstSelect.locator('option:not([value=""])')
+    await expect.poll(() => productOptions.count(), { timeout: POLL_TIMEOUT }).toBeGreaterThanOrEqual(1)
 
-    // The seed device belongs to demo_product. The Product select uses model_no as value
-    // and product name as label. The seed product name is "Demo Smart Light".
-    const productOptions = page.locator('form select').first().locator('option:not([value=""])')
-    const optionCount = await productOptions.count()
-    if (optionCount > 0) {
-      const optionValue = await productOptions.first().getAttribute('value')
+    const optionValue = await productOptions.first().getAttribute('value')
+    await firstSelect.selectOption(optionValue!)
 
-      const firstSelect = page.locator('form select').first()
-      await firstSelect.selectOption(optionValue!)
+    await page.getByRole('button', { name: 'Search' }).click()
 
-      // Click Search button
-      await page.getByRole('button', { name: 'Search' }).click()
-
-      // The seed device should still be visible when filtering by its product
-      await expect(page.getByText('demo-device')).toBeVisible({ timeout: POLL_TIMEOUT })
-    }
+    await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: POLL_TIMEOUT })
   })
 
   test('US-PA-019 S2: filtering by different product yields empty or different results', async ({ page, demoLogger: _demoLogger }) => {
-    // Create a device under a different product to test product filtering
-    // First, we create a device via API for a product that has no seed data
-    // Since we only have demo_product as seeded product, we use it to verify
-    // that the filter actually works by checking the select has options
-
     await page.goto(`${FRONTEND_URL}/devices`)
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
 
@@ -166,26 +154,21 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     const firstSelect = page.locator('form select').first()
     await expect(firstSelect).toBeVisible()
 
+    // Wait for product options to populate (option elements are "hidden" in Playwright)
     const productOptions = firstSelect.locator('option:not([value=""])')
-    const count = await productOptions.count()
-    // The seed product should be available as an option
-    expect(count).toBeGreaterThanOrEqual(1)
+    await expect.poll(() => productOptions.count(), { timeout: POLL_TIMEOUT }).toBeGreaterThanOrEqual(1)
   })
 
   test('US-PA-019 S4: click device ID navigates to detail page', async ({ page, demoLogger: _demoLogger }) => {
     await page.goto(`${FRONTEND_URL}/devices`)
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
 
-    // Wait for seed device to appear
-    await expect(page.getByText('demo-device')).toBeVisible({ timeout: POLL_TIMEOUT })
+    const firstDeviceLink = page.locator('tbody tr').first().getByRole('link', { name: /^filter-|demo-|e2e-|acl-|file-upload-|hmac-/ })
+    await expect(firstDeviceLink).toBeVisible({ timeout: POLL_TIMEOUT })
 
-    // Click the device ID link (it is a Link component in the Device ID column)
-    const deviceLink = page.getByRole('link', { name: 'demo-device' })
-    await expect(deviceLink).toBeVisible()
-    await deviceLink.click()
+    await firstDeviceLink.click()
 
-    // Should navigate to the device detail page
-    await expect(page).toHaveURL(new RegExp(`/devices/show/demo-device`), { timeout: POLL_TIMEOUT })
+    await expect(page).toHaveURL(new RegExp(`/devices/show/`), { timeout: POLL_TIMEOUT })
     await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
   })
 
@@ -193,18 +176,12 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     await page.goto(`${FRONTEND_URL}/devices`)
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
 
-    // Wait for seed device row to appear
-    await expect(page.getByText('demo-device')).toBeVisible({ timeout: POLL_TIMEOUT })
+    const firstViewLink = page.locator('tbody tr').first().getByRole('link', { name: 'View' })
+    await expect(firstViewLink).toBeVisible({ timeout: POLL_TIMEOUT })
 
-    // The Actions column has a "View" link for each row
-    // Scope to the row containing demo-device to find the correct View link
-    const deviceRow = page.locator('tbody tr').filter({ hasText: 'demo-device' })
-    const viewLink = deviceRow.getByRole('link', { name: 'View' })
-    await expect(viewLink).toBeVisible()
-    await viewLink.click()
+    await firstViewLink.click()
 
-    // Should navigate to the device detail page
-    await expect(page).toHaveURL(new RegExp(`/devices/show/demo-device`), { timeout: POLL_TIMEOUT })
+    await expect(page).toHaveURL(new RegExp(`/devices/show/`), { timeout: POLL_TIMEOUT })
     await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
   })
 })

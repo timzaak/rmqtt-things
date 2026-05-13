@@ -22,5 +22,6 @@ Backend engineers who need to deploy or extend this system. Assumes experience w
 - [Connecting Your First Device](device-integration-en.md) — Walk through property reporting and command reception using mosquitto
 - [Device-side Development Reference](device-guide-en.md) — Connection parameters, password generation, topic quick-reference table
 - [Configuration](configuration-en.md) — Configuration options explained
+- [Authentication & Authorization](auth-en.md) — Herald SSO for admin, HMAC for devices
 - [Deployment](deployment-en.md) — Production deployment steps
 - [Developing with Claude Code](ai-development-en.md) — AI workflow commands and practical steps

@@ -19,7 +19,7 @@
 import { test as base, type Page } from '@playwright/test'
 import { UnifiedLogger } from 'playwright-unified-logger'
 import { verifyTestEnvironment } from '../helpers/environment-setup'
-import { loginAsAdmin } from '../helpers/auth'
+import { loginAsAdmin, ensureAuthCookie } from '../helpers/auth'
 
 type DemoFixtures = {
   demoLogger: UnifiedLogger
@@ -28,6 +28,27 @@ type DemoFixtures = {
 }
 
 export const test = base.extend<DemoFixtures>({
+  /**
+   * Fixture: Page (auto-auth)
+   *
+   * 覆盖内置 page fixture：自动检测 Herald SSO 并注入 X-Auth cookie。
+   * 所有使用 { page } 的测试自动获得认证，无需逐个文件处理。
+   */
+  page: async ({ page }, use) => {
+    await ensureAuthCookie(page)
+    await use(page)
+  },
+
+  /**
+   * Fixture: Request (shares auth with page)
+   *
+   * 覆盖内置 request fixture：使用 page.request 以共享浏览器上下文的 cookie。
+   * 确保 request.post/get 等 API 调用也携带认证信息。
+   */
+  request: async ({ page }, use) => {
+    await use(page.request)
+  },
+
   /**
    * Fixture: Demo Logger
    *
@@ -55,6 +76,7 @@ export const test = base.extend<DemoFixtures>({
    * Fixture: Authenticated Page
    *
    * 验证环境后执行管理员登录，返回已认证的 Page。
+   * 自动检测认证模式：Herald SSO 启用时走 API 登录，否则直接导航。
    * 注意：此 fixture 会增加约 5-10 秒的测试设置时间。
    */
   authenticatedPage: async ({ page, demoLogger, testStartTime: _testStartTime }, use) => {
@@ -62,6 +84,7 @@ export const test = base.extend<DemoFixtures>({
     await loginAsAdmin(page, { logger: demoLogger })
     await use(page)
   },
+
 })
 
 export { expect } from '@playwright/test'

@@ -27,7 +27,8 @@ backend/src/
     error.rs           # Unified error type
     utils.rs           # Shared utility functions
     openapi.rs         # utoipa OpenAPI spec definitions
-    middleware.rs       # HTTP middleware
+    middleware/
+      mod.rs           # Herald SSO auth middleware (Admin API permission checks)
   db/
     database.rs        # DatabaseService: data operations for properties, events, commands, device status
     models.rs          # Database models (PropertyLatest, EventHistory, CommandStatus, etc.)
@@ -134,7 +135,7 @@ sequenceDiagram
 
 ### api/ -- Routes and Handlers
 
-Routes are split into two groups: device-side and admin-side. Device-side routes (`/api/thing/*`, `/api/device/*`, `/api/access/*`) receive RMQTT Broker WebHook callbacks with no authentication requirement, since the Broker already validates device identity. Admin-side routes (`/api/admin/*`) are CRUD endpoints for the admin UI, currently without auth middleware -- they rely on network isolation for protection at deployment time.
+Routes are split into two groups: device-side and admin-side. Device-side routes (`/api/thing/*`, `/api/device/*`, `/api/access/*`) receive RMQTT Broker WebHook callbacks with no authentication requirement, since the Broker already validates device identity. Admin routes (`/api/admin/*`) serve the backend UI CRUD endpoints. When Herald is configured, these routes are protected by `herald_auth_middleware` for SSO authentication and permission checks (see [Authentication & Authorization](auth-en.md)). Without Herald, admin routes have no authentication.
 
 The route table is defined in `create_router()` in `api/mod.rs`, using Axum's method-router style where the same path can chain GET/POST/DELETE registrations.
 
