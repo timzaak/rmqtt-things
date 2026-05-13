@@ -33,7 +33,7 @@ pub mod utils;
 pub mod web_models;
 
 use crate::api::handlers::S3Client;
-use crate::api::middleware::{HeraldAuthState, herald_auth_middleware};
+use crate::api::middleware::{HeraldAuthState, herald_auth_middleware, internal_ip_middleware};
 use crate::api::openapi::ApiDoc;
 use crate::api::web_models::MqttResponse;
 
@@ -62,8 +62,9 @@ pub fn create_router(
         admin: admin_state,
     });
 
-    let device_routes = Router::new()
-        .route("/health", get(handlers::health_check))
+    let health_route = Router::new().route("/health", get(handlers::health_check));
+
+    let webhook_routes = Router::new()
         .route("/auth/config", get(auth_handlers::get_auth_config))
         .route("/access/auth", post(auth_handlers::auth))
         .route("/access/acl", post(auth_handlers::acl))
@@ -80,7 +81,10 @@ pub fn create_router(
         .route("/thing/file/upload", post(handlers::file_upload_handler))
         .route("/ota/version", post(ota_handlers::ota_version_post))
         .route("/device/connect", post(handlers::device_connect))
-        .route("/device/disconnect", post(handlers::device_disconnect));
+        .route("/device/disconnect", post(handlers::device_disconnect))
+        .layer(axum::middleware::from_fn(internal_ip_middleware));
+
+    let device_routes = health_route.merge(webhook_routes);
 
     let admin_routes = Router::new()
         .route("/admin/property", get(admin_handlers::get_property_latest))

@@ -4,6 +4,7 @@ use axum::http::{Method, Request, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use herald_sdk::{Client, Error, PermissionCheckRequest, Rule};
+use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -99,6 +100,71 @@ fn extract_auth_token(request: &Request<axum::body::Body>) -> Option<String> {
         let (name, value) = cookie.trim().split_once('=')?;
         (name == "X-Auth" && !value.is_empty()).then(|| value.to_string())
     })
+}
+
+/// Middleware that rejects requests from non-private (public) IP addresses.
+/// Checks X-Real-IP and X-Forwarded-For headers for the client IP.
+/// Returns 403 Forbidden if the IP is public or cannot be determined.
+pub async fn internal_ip_middleware(request: Request<axum::body::Body>, next: Next) -> Response {
+    let ip = extract_client_ip(&request);
+    match ip {
+        Some(ip) if is_private_ip(&ip) => next.run(request).await,
+        _ => ApiError::forbidden_with("access denied: internal network only").into_response(),
+    }
+}
+
+fn extract_client_ip(request: &Request<axum::body::Body>) -> Option<IpAddr> {
+    // Prefer X-Real-IP header
+    if let Some(real_ip) = request
+        .headers()
+        .get("x-real-ip")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<IpAddr>().ok())
+    {
+        return Some(real_ip);
+    }
+
+    // Fall back to first entry in X-Forwarded-For
+    if let Some(xff) = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        && let Some(first) = xff.split(',').next()
+        && let Ok(ip) = first.trim().parse::<IpAddr>()
+    {
+        return Some(ip);
+    }
+
+    None
+}
+
+/// Returns true if the IP address belongs to a private/reserved range:
+/// - 127.0.0.0/8 (loopback)
+/// - 10.0.0.0/8 (class A private)
+/// - 172.16.0.0/12 (class B private)
+/// - 192.168.0.0/16 (class C private)
+/// - ::1 (IPv6 loopback)
+/// - fc00::/7 (IPv6 unique local)
+fn is_private_ip(ip: &IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            let octets = v4.octets();
+            // 127.0.0.0/8
+            octets[0] == 127
+            // 10.0.0.0/8
+            || octets[0] == 10
+            // 172.16.0.0/12
+            || (octets[0] == 172 && (octets[1] & 0xf0) == 16)
+            // 192.168.0.0/16
+            || (octets[0] == 192 && octets[1] == 168)
+        }
+        IpAddr::V6(v6) => {
+            // ::1 loopback
+            *v6 == Ipv6Addr::LOCALHOST
+            // fc00::/7 (unique local: fc00:: and fd00:: ranges)
+            || (v6.segments()[0] & 0xfe00) == 0xfc00
+        }
+    }
 }
 
 #[cfg(test)]
@@ -242,5 +308,114 @@ mod tests {
         });
 
         format!("http://{}", address)
+    }
+
+    // --- Internal IP middleware tests ---
+
+    fn internal_ip_router() -> Router {
+        Router::new()
+            .route("/test", get(|| async { StatusCode::OK }))
+            .layer(axum::middleware::from_fn(internal_ip_middleware))
+    }
+
+    async fn send_with_ip(ip: Option<&str>, header_name: &str) -> StatusCode {
+        let mut builder = Request::builder().uri("/test");
+        if let Some(ip) = ip {
+            builder = builder.header(header_name, ip);
+        }
+        internal_ip_router()
+            .oneshot(builder.body(Body::empty()).unwrap())
+            .await
+            .unwrap()
+            .status()
+    }
+
+    #[test]
+    fn private_ip_check_loopback_v4() {
+        assert!(is_private_ip(&"127.0.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"127.255.255.255".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn private_ip_check_class_a() {
+        assert!(is_private_ip(&"10.0.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"10.255.255.255".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn private_ip_check_class_b() {
+        assert!(is_private_ip(&"172.16.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"172.31.255.255".parse::<IpAddr>().unwrap()));
+        assert!(!is_private_ip(&"172.32.0.1".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn private_ip_check_class_c() {
+        assert!(is_private_ip(&"192.168.0.1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"192.168.255.255".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn private_ip_check_loopback_v6() {
+        assert!(is_private_ip(&"::1".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn private_ip_check_unique_local_v6() {
+        assert!(is_private_ip(&"fc00::1".parse::<IpAddr>().unwrap()));
+        assert!(is_private_ip(&"fd12:3456::1".parse::<IpAddr>().unwrap()));
+    }
+
+    #[test]
+    fn public_ips_are_not_private() {
+        assert!(!is_private_ip(&"8.8.8.8".parse::<IpAddr>().unwrap()));
+        assert!(!is_private_ip(&"1.2.3.4".parse::<IpAddr>().unwrap()));
+        assert!(!is_private_ip(&"172.15.0.1".parse::<IpAddr>().unwrap()));
+        assert!(!is_private_ip(&"2001:db8::1".parse::<IpAddr>().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn internal_ip_allows_localhost_via_x_real_ip() {
+        assert_eq!(
+            send_with_ip(Some("127.0.0.1"), "x-real-ip").await,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_ip_allows_10_via_x_real_ip() {
+        assert_eq!(
+            send_with_ip(Some("10.0.0.1"), "x-real-ip").await,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_ip_allows_192_168_via_x_forwarded_for() {
+        assert_eq!(
+            send_with_ip(Some("192.168.1.100"), "x-forwarded-for").await,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_ip_allows_172_16_via_x_forwarded_for() {
+        assert_eq!(
+            send_with_ip(Some("172.16.5.5"), "x-forwarded-for").await,
+            StatusCode::OK
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_ip_rejects_public_ip() {
+        assert_eq!(
+            send_with_ip(Some("8.8.8.8"), "x-real-ip").await,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    #[tokio::test]
+    async fn internal_ip_rejects_missing_ip() {
+        assert_eq!(send_with_ip(None, "x-real-ip").await, StatusCode::FORBIDDEN);
     }
 }

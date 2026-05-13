@@ -304,7 +304,7 @@ git push origin v0.2.1
 2. 等 GitHub Actions 构建完成后，SSH 到生产服务器，设置版本号并执行升级：
 
 ```bash
-VERSION=v0.2.1  # 替换为目标版本
+VERSION=0.3.0  # 替换为目标版本
 
 # 拉取新镜像
 docker pull ghcr.io/timzaak/rmqtt-things:${VERSION}
@@ -347,7 +347,7 @@ docker run -d \
     --restart unless-stopped \
     -e APP_CONFIG=/app/config.toml \
     -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
-    ghcr.io/timzaak/rmqtt-things:v0.2.0  # 回滚到上一个版本
+    ghcr.io/timzaak/rmqtt-things:0.3.0  # 回滚到上一个版本
 ```
 
 ### 升级前备份数据库

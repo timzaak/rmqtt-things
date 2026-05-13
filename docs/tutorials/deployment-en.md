@@ -304,7 +304,7 @@ git push origin v0.2.1
 2. After GitHub Actions finishes, SSH into the production server, set the version and run the upgrade:
 
 ```bash
-VERSION=v0.2.1  # Replace with the target version
+VERSION=0.3.0  # Replace with the target version
 
 # Pull the new image
 docker pull ghcr.io/timzaak/rmqtt-things:${VERSION}
@@ -347,7 +347,7 @@ docker run -d \
     --restart unless-stopped \
     -e APP_CONFIG=/app/config.toml \
     -v /server/conf/rmqtt-thing/config.toml:/app/config.toml:ro \
-    ghcr.io/timzaak/rmqtt-things:v0.2.0  # Rollback to the previous version
+    ghcr.io/timzaak/rmqtt-things:0.3.0  # Rollback to the previous version
 ```
 
 ### Backup Database Before Upgrade
