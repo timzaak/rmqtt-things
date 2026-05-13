@@ -178,9 +178,7 @@ async fn request_with_cookie(
         .await
         .unwrap();
     let status = response.status();
-    let body = to_bytes(response.into_body(), usize::MAX)
-        .await
-        .unwrap();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     (status, String::from_utf8(body.to_vec()).unwrap())
 }
 

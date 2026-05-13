@@ -101,12 +101,11 @@ fn extract_auth_token(request: &Request<axum::body::Body>) -> Option<String> {
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::Router;
     use axum::Json;
+    use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use axum::middleware::from_fn_with_state;
