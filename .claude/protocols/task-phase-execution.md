@@ -2,6 +2,8 @@
 
 定义 `t-task` 与 `t-run` 共用的 phase/slot/item 编排规则。
 
+本协议只定义编排结构。
+
 ## Supported And Active Phases
 
 `supported_phases` 固定为：
@@ -74,6 +76,15 @@
 - 由 `context-isolator` 提取的设计摘要
 - 当前 phase 的最小状态切片
 - 当前 item 的 completion criteria / validation
+
+## Backend Test Item Types
+
+backend/test item 必须声明 `test_item_type`：
+
+- `authoring`：由 `backend-test` 编写或维护场景测试、helper、模块注册，只做编译验证。
+- `runner`：由 `backend-test` 加载 `skills/t-backend-test-run/SKILL.md`，执行定向测试、失败分类、生产代码修复委派和重测。
+
+缺少 `test_item_type`、类型非法、runner 缺少 `uses_skill`、或把 `t-backend-test-run` 当作 agent 时，执行应终止并提示重新运行 `/t-task-check` 或重建任务。
 
 ## Failure Handling
 

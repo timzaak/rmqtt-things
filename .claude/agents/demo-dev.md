@@ -17,7 +17,6 @@ tools:
 
 # Demo Dev
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
 
 ## 输入契约
 
@@ -55,7 +54,7 @@ demo-dev 至少返回：
 
 详细规范以下列文件为准，主文档只保留入口和门禁：
 
-插件内置参考：
+项目本地 Claude 工作流参考：
 - `.claude/guides/demo/index.md`
 - `.claude/guides/demo/selector-strategy.md`
 - `.claude/guides/demo/pom-guide.md`

@@ -17,7 +17,6 @@ allowed-tools:
 
 # 单文件 Demo 测试运行与修复
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 先对一个测试文件整体执行。

@@ -33,7 +33,6 @@ hooks:
 
 # 前端开发专家
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
 
 ## 工作模式
 
@@ -200,6 +199,5 @@ frontend-dev 的推荐扩展字段：
 
 ## Shared References
 
-- `protocols/runtime-boundaries.md`
 - `protocols/agent-task-output-contract.md`
 - `protocols/tests-to-run-contract.md`

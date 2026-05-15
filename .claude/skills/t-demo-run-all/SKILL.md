@@ -11,7 +11,6 @@ allowed-tools:
 
 # 批量运行 Demo 测试
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 自动发现全部 Demo 测试并逐个执行。

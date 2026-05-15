@@ -12,7 +12,6 @@ allowed-tools:
 
 # 任务规划质量检查
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 评估任务文档可执行性与一致性。
@@ -76,6 +75,13 @@ allowed-tools:
    - 必须包含 `id/title/agent/scope/inputs/steps/expected_files/validation/depends_on/handoff_summary/completion_criteria`
    - 不得把完整 slot 内容塞进一个 item
    - 超过拆分阈值必须有合理说明，否则记 P1
+   - scope 中包含两个可独立交付、独立验证的主交付物时，必须拆分，否则记 P1
+   - 单个 HTTP/API item 同时包含 5 个以上 endpoint、DTO、路由注册和 OpenAPI/schema 更新时，必须拆分，否则记 P1
+   - 单个 demo item 同时创建复用 helper 并覆盖多个完整用户故事或多个业务状态流时，必须拆分，否则记 P1
+   - backend/test item 必须包含 `test_item_type: authoring|runner`
+   - backend/test runner item 必须包含 `uses_skill: skills/t-backend-test-run/SKILL.md`
+   - backend/test authoring item 不得要求目标场景测试全部通过
+   - 不得生成 `agent: backend-test-run`
 9. 核对设计文档与任务文档的一致性。
 10. 调用当前阶段对应 agent 进行专业校验：
    - backend: `backend-dev`, `backend-test`, `backend-accept`
@@ -146,7 +152,6 @@ P1 问题:
 硬性门禁统一参考：`.claude/protocols/task-check-rubric.md`
 
 ## 相关引用
-- `.claude/protocols/runtime-boundaries.md`
 - `.claude/protocols/task-state-contract.md`
 - `.claude/protocols/task-check-rubric.md`
 - `skills/t-task/SKILL.md`

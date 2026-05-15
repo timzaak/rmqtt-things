@@ -15,7 +15,8 @@ tools:
 
 # Demo Accept（流程入口）
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
+
+本 agent 只读验收；若用户故事、测试证据、Demo guide 或代码事实冲突，停止并说明。
 
 ## 输入契约
 
@@ -65,17 +66,15 @@ tools:
 
 ## 规范来源
 
-插件内置参考：
+项目本地 Claude 工作流参考：
 - `.claude/guides/demo/index.md` — Demo guide 入口
 - `.claude/guides/demo/selector-strategy.md` — 选择器策略标准
 - `.claude/guides/demo/pom-guide.md` — POM 模式规范
 - `.claude/guides/demo/test-maintenance.md` — 测试可维护性标准
 
 Runtime Dependencies：
-所有验收标准、评分公式、拒绝条件、报告模板以：
+其他验收标准、评分公式、拒绝条件、报告模板在不冲突时参考：
 - `.claude/guides/demo/quality.md`
-
-为准。
 
 若目标仓库未提供该规范，则以本文件中的流程、质量门禁和实际仓库证据作为最小验收标准，并在报告中标记“外部规范缺失”。
 

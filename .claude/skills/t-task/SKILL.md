@@ -14,7 +14,8 @@ allowed-tools:
 
 # 任务规划生成
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
+
+任务拆分必须服务于简单、外科式、可验证的执行；如果设计文档、guide 或 protocol 冲突，停止并说明冲突。
 
 ## Input Contract
 
@@ -154,6 +155,8 @@ slot agent 输出必须至少包含：
 - `id`: 稳定 ID，例如 `BE-D01`、`FE-T02`、`MA-A01`、`DE-A01`
 - `title`: 子任务标题
 - `agent`: 执行 agent
+- backend/test item 必须额外包含 `test_item_type: authoring|runner`
+- backend/test runner item 必须包含 `uses_skill: skills/t-backend-test-run/SKILL.md`；authoring item 必须为 `uses_skill: none` 或省略
 - `scope`: 本 item 的明确边界
 - `inputs`: 必读设计、规范、上游 handoff 和相关文件
 - `steps`: 可执行步骤
@@ -173,11 +176,17 @@ slot agent 输出必须至少包含：
 - 跨越超过 2 个领域模块或页面域。
 - 超过 8 个主要步骤。
 - 单个 item 文件预计超过 12KB 且不是验收清单。
+- scope 中包含两个可独立交付、独立验证的主交付物（例如 `A + B`、两个页面、页面 + 弹窗、helper + 场景测试）。
+- 单个 HTTP/API item 同时包含 5 个以上 endpoint、DTO、路由注册和 OpenAPI/schema 更新。
+- 单个 demo item 同时创建复用 helper 并覆盖多个完整用户故事或多个业务状态流。
 
 推荐拆分方式：
 - backend dev：数据库/实体、domain、repository、service/use case、HTTP/OpenAPI、外部集成、SDK/API 影响点。
-- backend test：domain/unit、repository/integration、API scenario、regression、高风险业务规则。
+- backend HTTP/API：DTO 与路由骨架、读模型/list/detail、写操作/create/update、状态操作、配置类接口分别拆分；每个 item 必须能用定向 `cargo check` 或场景测试验证。
+- backend test：按场景测试 authoring 与测试执行 runner 拆分；不要把创建场景测试和修复实现直到测试通过放在同一个 item。
 - frontend dev：API/type 适配、schema/query/store、页面主流程、状态与错误处理、权限与空态。
+- frontend dev：一个 item 默认只交付一个页面域或一个可复用组件族；配置页、用户页、管理页、dialog 等可独立验证的 UI 不应合并。
+- demo dev：先拆 fixtures/helpers，再拆主流程、异常/校验场景、权限场景；不要把 helper 和完整业务流放在同一个 item。
 - accept：design consistency、public API contract、business rules、permission/security、test evidence、demo readiness。
 
 ## Backend Finalize
@@ -191,6 +200,21 @@ slot agent 输出必须至少包含：
   - 失败后从失败步骤恢复
 - `finalize.md` 不拆 item，不由 `/t-run` 执行。
 
+## Backend Test Planning Rules
+
+backend/test slot 必须按当前契约生成，不做旧格式兼容：
+
+| 类型 | agent | test_item_type | uses_skill | depends_on |
+|---|---|---|---|---|
+| authoring | backend-test | authoring | none | 对应 backend-dev item |
+| runner | backend-test | runner | `skills/t-backend-test-run/SKILL.md` | 对应 authoring item |
+
+authoring item 只创建或修改场景测试、测试 helper 和模块注册；完成标准只要求编译验证或建议 runner 命令，不要求目标测试全部通过。
+
+runner item 只执行定向测试、分析失败、委派生产代码修复和重测；测试语义可能错误时停止并输出诊断报告。
+
+accept item 必须依赖 runner item，不能只依赖 authoring item。`t-backend-test-run` 是 skill，不是 agent；不得生成 `agent: backend-test-run`。
+
 ## Forbidden
 - 生成或依赖旧状态字段。
 - 生成或依赖 `agents` 根字段。
@@ -201,6 +225,8 @@ slot agent 输出必须至少包含：
 - 当前阶段 slot 并行生成；slot 必须按依赖串行。
 - 未写入上游 manifest 和 item 文件就调用下游 slot agent。
 - backend 阶段遗漏 `finalize.md`。
+- 生成缺少 `test_item_type: authoring|runner` 的 backend/test item。
+- 生成 `agent: backend-test-run` 的 item。
 
 ## Failure
 - 设计文档不存在：提示先运行 `/t-design [feature]`。
@@ -232,7 +258,6 @@ slot agent 输出必须至少包含：
 ```
 
 ## 相关引用
-- `.claude/protocols/runtime-boundaries.md`
 - `.claude/protocols/task-state-contract.md`
 - `.claude/protocols/task-phase-execution.md`
 - [context-isolator.md](/skills/t-task/references/context-isolator.md)

@@ -12,7 +12,6 @@ allowed-tools:
 
 # Demo 测试验收
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 验证测试是否覆盖用户故事。

@@ -20,7 +20,6 @@ tools:
 
 # Demo Diagnose Agent
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
 
 你是 Demo 测试失败诊断代理。职责边界：
 - 只读取日志、测试代码、前端代码、相关规范并生成诊断报告
@@ -117,7 +116,7 @@ URL 归一化规则（前端 dev server :3000 代理 API 到后端 :8080，curl 
 
 ## 关键引用
 
-插件内置参考：
+项目本地 Claude 工作流参考：
 - `.claude/guides/demo/index.md`
 - `.claude/guides/demo/selector-strategy.md`
 - `.claude/guides/demo/common-failures.md`

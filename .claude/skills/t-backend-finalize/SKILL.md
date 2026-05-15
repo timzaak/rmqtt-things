@@ -17,7 +17,6 @@ allowed-tools:
 
 # 后端收口执行
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## Purpose
 - 读取 `.ai/task/[feature]/.state.json` 和 `backend/finalize.md`。

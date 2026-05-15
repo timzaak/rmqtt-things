@@ -12,7 +12,6 @@ allowed-tools:
 
 # 技术设计质量检查
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 评估技术设计文档的可实施性、完整性与一致性。
@@ -39,7 +38,6 @@ allowed-tools:
   - `.claude/guides/core/quality.md`
   - `.claude/guides/backend/development.md`
   - `.claude/guides/frontend/development.md`
-  - `AGENTS.md`
 
 ## 执行流程
 1. 校验设计文档是否存在。
@@ -91,5 +89,4 @@ P1 问题:
 
 ## 相关引用
 
-- `.claude/protocols/runtime-boundaries.md`
 - `.claude/protocols/design-check-rubric.md`

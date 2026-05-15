@@ -13,7 +13,6 @@ allowed-tools:
 
 # 后端一致性检查
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 对比 PRD 与后端实现。

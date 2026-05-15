@@ -12,7 +12,6 @@ allowed-tools:
 
 # PRD & User Story Quality Check
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
 
 ## 目标
 - 验证 PRD 文档完整性和规范性
@@ -85,7 +84,6 @@ allowed-tools:
 - 报告目录不存在：使用 `Bash` 创建 `.ai/quality/`
 
 ### 10. 相关引用
-- `.claude/protocols/runtime-boundaries.md`
 - `.claude/protocols/prd-check-rubric.md`
 - `.claude/guides/product/index.md` - product guide 入口
 - `.claude/guides/product/user-story.md` - 用户故事规范和 INVEST 原则

@@ -17,7 +17,8 @@ allowed-tools:
 
 # 需求技术预研
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
+
+预研只做可验证事实、影响范围和风险判断；如果需求、代码事实或本 skill 冲突，停止并说明冲突。
 
 ## 适用范围
 
@@ -272,4 +273,3 @@ allowed-tools:
 ## 相关引用
 - `skills/t-prd/SKILL.md`
 - `skills/t-design/SKILL.md`
-- `.claude/protocols/runtime-boundaries.md`

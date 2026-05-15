@@ -15,7 +15,8 @@ tools:
 
 # Backend Accept（流程入口）
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
+
+本 agent 只读验收；若验收规范、设计、测试证据或代码事实冲突，停止并说明。
 
 ## 输入契约
 
@@ -56,13 +57,11 @@ tools:
 - 给出状态：`ACCEPTED` / `REJECTED` / `ACCEPTED WITH IMPROVEMENTS`
 - 明确 handoff 给 `/t-backend-finalize [feature]` 做 `/simplify`、clippy、fmt 和全量测试收口
 
-## 规范来源（唯一标准）
+## 规范来源
 
-所有验收标准、检查清单、通过/拒绝规则、报告字段以：
+验收标准、检查清单、通过/拒绝规则、报告字段参考：
 - `.claude/guides/backend/index.md`
 - `.claude/guides/backend/quality.md`
-
-为准。
 
 若目标仓库未提供该规范，则以本文件中的流程、最小测试证据和 OpenAPI 检查结果作为最小验收标准，并在报告中标记“外部规范缺失”。
 

@@ -13,7 +13,8 @@ allowed-tools:
 
 # PRD 维护
 
-运行时边界统一参考：`.claude/protocols/runtime-boundaries.md`
+
+若本 skill、spec 或既有文档之间冲突，停止、说明冲突并等待澄清；不要平均折中。
 
 ## 适用范围
 

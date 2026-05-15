@@ -23,7 +23,6 @@ tools:
 
 # 后端一致性检查专家
 
-运行时边界统一参考：`protocols/runtime-boundaries.md`
 
 ## 职责
 

@@ -99,6 +99,9 @@
 - 新旧结构混用
 - 阶段依赖关系错误
 - 命令、路径、阶段链路经仓库和规范双重验证后确认会直接导致 `/t-run` 无法执行
+- backend/test item 缺少 `test_item_type: authoring|runner`
+- backend/test runner item 缺少 `uses_skill: skills/t-backend-test-run/SKILL.md`
+- backend/test item 使用不存在的 `agent: backend-test-run`
 
 出现 `confirmed P0` 时，必须拒绝进入 `/t-run`。
 
@@ -108,6 +111,11 @@
 - item 缺少关键章节
 - item 超过拆分阈值且无合理说明
 - item 职责混杂，单次 agent 调用高概率无法完成
+- item 合并多个可独立交付、独立验证的主交付物
+- HTTP/API item 同时覆盖 5 个以上 endpoint、DTO、路由注册和 OpenAPI/schema 更新
+- demo item 同时创建复用 helper 并覆盖多个完整用户故事或多个业务状态流
+- backend/test authoring item 把目标场景测试全部通过作为 completion criteria
+- backend/test item 同时包含“写新场景测试”和“修复生产代码直到通过”
 - 下游 item 缺少 handoff 追溯
 - backend 缺少 `awaiting_finalize` 收口语义
 - `finalize.md` 缺少必要收口/重试说明
