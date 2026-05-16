@@ -51,7 +51,7 @@
 6. 无旧结构残留
 7. item 文件包含必填字段
 8. 设计文档与任务文档一致
-9. 调用当前阶段对应 agents 做专业校验
+9. 通过 `Agent` tool 调度当前阶段对应 agents 做专业校验
 10. 主流程复核后生成最终结论
 
 ## Agent Review Contract
@@ -113,6 +113,7 @@
 - item 职责混杂，单次 agent 调用高概率无法完成
 - item 合并多个可独立交付、独立验证的主交付物
 - HTTP/API item 同时覆盖 5 个以上 endpoint、DTO、路由注册和 OpenAPI/schema 更新
+- 规划“为新增 struct/DTO/builder/getter/常量补单测”这类低价值 backend unit test item
 - demo item 同时创建复用 helper 并覆盖多个完整用户故事或多个业务状态流
 - backend/test authoring item 把目标场景测试全部通过作为 completion criteria
 - backend/test item 同时包含“写新场景测试”和“修复生产代码直到通过”

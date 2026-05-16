@@ -10,6 +10,7 @@ allowed-tools:
   - Task
   - Write
   - Bash
+  - Agent
 ---
 
 # 任务规划生成
@@ -110,7 +111,7 @@ demo 阶段：
 2. 解析 `[feature]` 和 `--phase`；根据 `.claude/protocols/task-phase-execution.md` 检测 active phases；未传 `--phase` 时自动选择第一未完成 active phase。
 3. 按 `.claude/protocols/task-phase-execution.md` 校验阶段前置和 slot 顺序；未启用的 phase 不参与校验或生成。
 4. 如目标阶段为 `frontend`，先运行 `generate-api`。
-5. 按当前阶段 slot 串行调度相应 agent。
+5. 按当前阶段 slot 串行调度相应 agent。每个 slot agent 必须通过 `Agent` tool 启动，`subagent_type` 按 Agent Dispatch Mapping 映射。传入 prompt 必须包含：设计文档相关节、上游 slot handoff（如有）、`.claude/guides/` 路径、Agent Output Contract 要求的字段列表。
 6. 每个 slot agent 必须返回：
    - slot manifest 正文
    - item 文件集合
@@ -121,6 +122,19 @@ demo 阶段：
 8. 当前阶段 slot 齐备后生成 `<phase>/index.md`。
 9. 写入或更新 `.state.json`。
 10. 返回下一步建议：`/t-run [feature] --phase [phase]`。
+
+## Agent Dispatch Mapping
+
+| phase | slot | subagent_type |
+|-------|------|---------------|
+| backend | dev | backend-dev |
+| backend | test | backend-test |
+| backend | accept | backend-accept |
+| frontend | dev | frontend-dev |
+| frontend | test | frontend-test |
+| frontend | accept | frontend-accept |
+| demo | dev | demo-dev |
+| demo | accept | demo-accept |
 
 ## Slot Manifest Contract
 每个 slot manifest 必须包含：
@@ -184,6 +198,7 @@ slot agent 输出必须至少包含：
 - backend dev：数据库/实体、domain、repository、service/use case、HTTP/OpenAPI、外部集成、SDK/API 影响点。
 - backend HTTP/API：DTO 与路由骨架、读模型/list/detail、写操作/create/update、状态操作、配置类接口分别拆分；每个 item 必须能用定向 `cargo check` 或场景测试验证。
 - backend test：按场景测试 authoring 与测试执行 runner 拆分；不要把创建场景测试和修复实现直到测试通过放在同一个 item。
+- backend unit test：不得规划“为新增 struct/DTO/builder/getter/常量补单测”这类低价值 item。
 - frontend dev：API/type 适配、schema/query/store、页面主流程、状态与错误处理、权限与空态。
 - frontend dev：一个 item 默认只交付一个页面域或一个可复用组件族；配置页、用户页、管理页、dialog 等可独立验证的 UI 不应合并。
 - demo dev：先拆 fixtures/helpers，再拆主流程、异常/校验场景、权限场景；不要把 helper 和完整业务流放在同一个 item。
@@ -212,6 +227,8 @@ backend/test slot 必须按当前契约生成，不做旧格式兼容：
 authoring item 只创建或修改场景测试、测试 helper 和模块注册；完成标准只要求编译验证或建议 runner 命令，不要求目标测试全部通过。
 
 runner item 只执行定向测试、分析失败、委派生产代码修复和重测；测试语义可能错误时停止并输出诊断报告。
+
+backend/test slot 不规划源文件内单元测试；确有必要的高价值单元测试归入对应 backend/dev item。
 
 accept item 必须依赖 runner item，不能只依赖 authoring item。`t-backend-test-run` 是 skill，不是 agent；不得生成 `agent: backend-test-run`。
 
