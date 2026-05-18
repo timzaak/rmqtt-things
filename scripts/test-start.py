@@ -466,7 +466,7 @@ def _start_herald() -> bool:
             "HERALD_CONFIG=/app/config/config.toml",
             "-p",
             f"{HERALD_PORT}:3000",
-            "ghcr.io/timzaak/herald:v0.1.1",
+            "ghcr.io/timzaak/herald:0.1.4",
         ]
     )
     if not cid:

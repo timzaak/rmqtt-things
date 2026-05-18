@@ -99,7 +99,7 @@ url = "http://localhost:3000"
             "HERALD_CONFIG=/app/config/config.toml",
             "-p",
             "13000:3000",
-            "ghcr.io/timzaak/herald:v0.1.1",
+            "ghcr.io/timzaak/herald:0.1.4",
         ]
     )
     if not cid:

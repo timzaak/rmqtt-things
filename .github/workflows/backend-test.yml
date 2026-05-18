@@ -6,7 +6,7 @@ on:
     - cron: "0 17 * * *"  # UTC 17:00 = 北京时间 01:00
 
 env:
-  CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: never
   RUSTC_WRAPPER: ""
   CARGO_BUILD_RUSTC_WRAPPER: ""
 
