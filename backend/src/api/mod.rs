@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
-use tower_http::services::ServeDir;
+use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 use tracing::{debug, info};
 use utoipa::OpenApi;
@@ -203,7 +203,8 @@ pub fn create_router(
         && !web_path.is_empty()
     {
         info!("Serving static files from: {}", web_path);
-        router = router.fallback_service(ServeDir::new(web_path));
+        let index_html = format!("{}/index.html", web_path.trim_end_matches('/'));
+        router = router.fallback_service(ServeDir::new(web_path).fallback(ServeFile::new(index_html)));
     }
 
     router
