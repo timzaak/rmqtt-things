@@ -5,7 +5,7 @@
 | 域 | PRD 数量 | 说明 |
 |----|----------|------|
 | auth | 1 | Admin 认证与权限管理（Herald 集成） |
-| core | 1 | 产品与设备管理（核心业务） |
+| core | 3 | 产品与设备管理、告警规则引擎、设备自动注册（核心业务） |
 | integration | 5 | 证书管理、OTA 固件升级、事件校验模板、RMQTT WebHook 集成、文件上传 |
 
 ## PRD 列表
@@ -13,6 +13,8 @@
 | PRD | 域 | 优先级 | 状态 | 说明 |
 |-----|----|--------|------|------|
 | [product-device-management.md](core/product-device-management.md) | core | P0 | Draft | 产品 CRUD、设备状态/属性/事件管理、属性命令下发、设备列表/详情前端页面 |
+| [alarm-rule-engine.md](core/alarm-rule-engine.md) | core | P0 | Draft | 告警规则引擎：属性阈值/事件/设备状态触发、规则 CRUD、告警记录管理 |
+| [device-auto-provisioning.md](core/device-auto-provisioning.md) | core | P0 | Draft | 设备自动注册：产品级自动注册开关、首次 HMAC 认证自动创建设备身份记录、注册来源标记 |
 | [cert-management.md](integration/cert-management.md) | integration | P0 | Active | TLS 证书签发/吊销、HMAC 设备认证、ACL 控制 |
 | [ota-management.md](integration/ota-management.md) | integration | P1 | Active | OTA 固件版本管理、设备版本上报与升级推送 |
 | [validation-template.md](integration/validation-template.md) | integration | P0 | Active | 事件/属性校验模板管理、JSON Schema 校验 |
@@ -23,10 +25,16 @@
 ## 关联关系
 
 ```
+core/device-auto-provisioning
+  --> core/product-device-management (产品模型扩展、设备列表展示)
+  <-- integration/cert-management (HMAC 认证作为自动注册前置条件)
+  <-- integration/rmqtt-webhook (auth webhook 阶段触发自动注册)
+
 core/product-device-management
-  <-- integration/validation-template (属性 Schema 校验)
-  <-- integration/cert-management (设备认证)
-  <-- integration/rmqtt-webhook (属性/事件上报回调、设备连接/断开回调)
+
+core/alarm-rule-engine
+  --> core/product-device-management (规则绑定产品维度)
+  <-- integration/rmqtt-webhook (规则评估在回调流程中触发)
 
 integration/cert-management
   --> core/product-device-management (产品关联)

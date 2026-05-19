@@ -19,6 +19,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 pub mod admin_handlers;
 pub mod admin_models;
+pub mod alarm_handlers;
+pub mod alarm_models;
 pub mod auth_handlers;
 pub mod ca_handlers;
 pub mod error;
@@ -43,6 +45,7 @@ pub struct AdminAppState {
     pub cache: SchemaCache,
     pub config: Arc<Config>,
     pub s3_client: Option<S3Client>,
+    pub rule_cache: crate::rule_engine::RuleCache,
 }
 
 #[derive(Clone)]
@@ -152,7 +155,23 @@ pub fn create_router(
         .route(
             "/admin/file/upload",
             post(admin_handlers::admin_file_upload_handler),
-        );
+        )
+        .route(
+            "/admin/alarm-rule",
+            get(alarm_handlers::list_alarm_rules).post(alarm_handlers::create_alarm_rule),
+        )
+        .route(
+            "/admin/alarm-rule/{id}",
+            get(alarm_handlers::get_alarm_rule)
+                .patch(alarm_handlers::update_alarm_rule)
+                .delete(alarm_handlers::delete_alarm_rule),
+        )
+        .route(
+            "/admin/alarm-rule/{id}/status",
+            patch(alarm_handlers::update_alarm_rule_status),
+        )
+        .route("/admin/alarm", get(alarm_handlers::list_alarms))
+        .route("/admin/alarm/{id}/ack", patch(alarm_handlers::ack_alarm));
 
     let admin_routes = match (config.herald.as_ref(), herald_client) {
         (Some(herald_config), Some(herald_sdk)) => {
@@ -204,7 +223,8 @@ pub fn create_router(
     {
         info!("Serving static files from: {}", web_path);
         let index_html = format!("{}/index.html", web_path.trim_end_matches('/'));
-        router = router.fallback_service(ServeDir::new(web_path).fallback(ServeFile::new(index_html)));
+        router =
+            router.fallback_service(ServeDir::new(web_path).fallback(ServeFile::new(index_html)));
     }
 
     router

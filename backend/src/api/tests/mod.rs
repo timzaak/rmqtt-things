@@ -1,3 +1,5 @@
+mod alarm_record_api_scenarios;
+mod alarm_rule_crud_scenarios;
 mod cert_scenarios;
 mod herald_auth_scenarios;
 mod mqtt_device_flow_scenarios;

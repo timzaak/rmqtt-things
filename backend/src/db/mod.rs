@@ -1,3 +1,4 @@
+pub mod alarm;
 pub mod cert_issue;
 pub mod database;
 pub mod models;

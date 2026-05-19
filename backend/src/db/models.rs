@@ -235,6 +235,40 @@ pub struct DeviceVersion {
 
  */
 
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, ToSchema)]
+pub struct AlarmRule {
+    pub id: i64,
+    pub product_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub trigger_type: String,
+    pub trigger_config: JsonValue,
+    pub condition: JsonValue,
+    pub actions: JsonValue,
+    pub enabled: bool,
+    pub throttle_minutes: i32,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize, ToSchema)]
+pub struct AlarmRecord {
+    pub id: i64,
+    pub rule_id: i64,
+    pub rule_name: String,
+    pub product_id: String,
+    pub device_id: String,
+    pub level: i16,
+    pub message: Option<String>,
+    pub trigger_value: Option<JsonValue>,
+    pub acknowledged: bool,
+    pub webhook_status: Option<i16>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
 #[cfg(test)]
 mod tests {
     use serde::Serialize;

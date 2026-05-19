@@ -8,8 +8,8 @@
 
 | 文件 | 角色 | 故事数量 |
 |------|------|----------|
-| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 28 |
-| [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 9 |
+| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 37 |
+| [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 10 |
 | [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 6 |
 
 ## 故事 ID 索引
@@ -46,6 +46,15 @@
 | US-PA-026 | 管理员登录管理后台 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-027 | 管理员权限访问控制 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-028 | 会话过期处理 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-029 | 创建告警规则 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-030 | 查看告警规则列表 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-031 | 编辑告警规则 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-032 | 启用/禁用告警规则 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-033 | 删除告警规则 | P2 | 01-platform-admin-user-stories.md |
+| US-PA-034 | 查看告警记录 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-035 | 确认告警 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-036 | 配置产品自动注册 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-037 | 查看设备注册来源 | P1 | 01-platform-admin-user-stories.md |
 
 ### Demo E2E (DEMO-xxx)
 
@@ -71,3 +80,4 @@
 | US-DV-007 | 请求文件上传 | P2 | 02-iot-device-user-stories.md |
 | US-DV-008 | 上报连接/断开状态 | P0 | 02-iot-device-user-stories.md |
 | US-DV-009 | 离线命令排队与上线投递 | P1 | 02-iot-device-user-stories.md |
+| US-DV-010 | 设备首次连接自动注册 | P0 | 02-iot-device-user-stories.md |

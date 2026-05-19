@@ -23,6 +23,7 @@ use utoipa::ToSchema;
 
 use crate::api::ApiState;
 use crate::api::error::ApiError;
+use crate::rule_engine::{TriggerContext, TriggerType, evaluate_and_trigger};
 
 #[derive(Deserialize, ToSchema)]
 pub struct PropertySetReplyPayload {
@@ -56,7 +57,7 @@ pub async fn property_post(
     State(state): State<Arc<ApiState>>,
     Json(mqtt_msg): Json<RMqttPublishMessage>,
 ) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
+    let app_state = &state.app;
 
     info!("Received property set from device: {}", mqtt_msg.client_id);
 
@@ -72,11 +73,11 @@ pub async fn property_post(
     let properties = payload.params.unwrap_or(JsonValue::Null);
     if let JsonValue::Object(map) = &properties {
         // 如果开启了 schema 校验
-        if state.config.api.property_schema_validator {
+        if app_state.config.api.property_schema_validator {
             let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
 
             // 尝试从缓存中获取 schema
-            let schema_value = state.cache.get(&product_id).await.map_err(|e| {
+            let schema_value = app_state.cache.get(&product_id).await.map_err(|e| {
                 error!("Cache error: {}", e);
                 ApiError::internal("Cache error")
             })?;
@@ -88,7 +89,7 @@ pub async fn property_post(
                 })?
             } else {
                 // 从数据库获取 schema
-                let schema_template = state
+                let schema_template = app_state
                     .db
                     .get_property_schema(&product_id)
                     .await
@@ -108,7 +109,7 @@ pub async fn property_post(
                 })?;
 
                 // 异步地将 schema 存入缓存
-                let cache_clone = state.cache.clone();
+                let cache_clone = app_state.cache.clone();
                 let product_id_clone = product_id.clone();
                 let schema_to_cache = schema_template.schema.clone();
                 tokio::spawn(async move {
@@ -134,7 +135,7 @@ pub async fn property_post(
 
         let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
         // 数据库操作
-        state
+        app_state
             .db
             .upsert_property_latest(&product_id, device_id, map.clone(), timestamp)
             .await
@@ -142,13 +143,30 @@ pub async fn property_post(
                 error!("Database error: {}", e);
                 ApiError::internal("Database operation failed")
             })?;
+
+        // 异步触发规则评估（不阻塞主流程）
+        let admin = Arc::clone(&state.admin);
+        let trigger_product_id = product_id.clone();
+        let trigger_device_id = device_id.clone();
+        let trigger_value = properties.clone();
+        tokio::spawn(async move {
+            let alarm_repo = admin.db.alarm();
+            let rule_cache = admin.rule_cache.clone();
+            let ctx = TriggerContext {
+                product_id: trigger_product_id,
+                device_id: trigger_device_id,
+                trigger_type: TriggerType::Property,
+                trigger_value,
+            };
+            evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+        });
     } else {
         return Err(ApiError::bad_request("Invalid params format"));
     }
 
     // 如果需要响应，发布到 RMQTT
     if payload.ack == AckStatus::Yes {
-        let _ = ack_response(payload.id, &state.rmqtt_client, &mqtt_msg.topic).await;
+        let _ = ack_response(payload.id, &app_state.rmqtt_client, &mqtt_msg.topic).await;
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -169,7 +187,7 @@ pub async fn event_post(
     State(state): State<Arc<ApiState>>,
     Json(mqtt_msg): Json<RMqttPublishMessage>,
 ) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
+    let app_state = &state.app;
 
     let payload = mqtt_msg.decode_payload_as_json().map_err(|e| {
         error!("Failed to decode payload: {}", e);
@@ -183,7 +201,7 @@ pub async fn event_post(
 
     let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
     // 保存事件到数据库
-    state
+    app_state
         .db
         .insert_event_history(&product_id, device_id, &events, timestamp)
         .await
@@ -192,9 +210,26 @@ pub async fn event_post(
             ApiError::internal("Database operation failed")
         })?;
 
+    // 异步触发规则评估（不阻塞主流程）
+    let admin = Arc::clone(&state.admin);
+    let trigger_product_id = product_id.clone();
+    let trigger_device_id = device_id.clone();
+    let trigger_value = events.clone();
+    tokio::spawn(async move {
+        let alarm_repo = admin.db.alarm();
+        let rule_cache = admin.rule_cache.clone();
+        let ctx = TriggerContext {
+            product_id: trigger_product_id,
+            device_id: trigger_device_id,
+            trigger_type: TriggerType::Event,
+            trigger_value,
+        };
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+    });
+
     // 如果需要响应，发布到 RMQTT
     if payload.ack == AckStatus::Yes {
-        let _ = ack_response(payload.id, &state.rmqtt_client, &mqtt_msg.topic).await;
+        let _ = ack_response(payload.id, &app_state.rmqtt_client, &mqtt_msg.topic).await;
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -588,7 +623,7 @@ pub async fn device_connect(
     State(state): State<Arc<ApiState>>,
     Json(mut req): Json<DeviceConnectRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
+    let app_state = &state.app;
     resolve_device_identity(
         &mut req.product_id,
         &mut req.device_id,
@@ -597,7 +632,7 @@ pub async fn device_connect(
     )?;
     info!("Device connected: {}", req.device_id);
 
-    state
+    app_state
         .db
         .upsert_device_status_connect(&req)
         .await
@@ -605,6 +640,22 @@ pub async fn device_connect(
             error!("Database error on device connect: {}", e);
             ApiError::internal("Database operation failed")
         })?;
+
+    // 异步触发规则评估（不阻塞主流程）
+    let admin = Arc::clone(&state.admin);
+    let trigger_product_id = req.product_id.clone();
+    let trigger_device_id = req.device_id.clone();
+    tokio::spawn(async move {
+        let alarm_repo = admin.db.alarm();
+        let rule_cache = admin.rule_cache.clone();
+        let ctx = TriggerContext {
+            product_id: trigger_product_id,
+            device_id: trigger_device_id,
+            trigger_type: TriggerType::DeviceOnline,
+            trigger_value: json!({}),
+        };
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+    });
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -623,7 +674,7 @@ pub async fn device_disconnect(
     State(state): State<Arc<ApiState>>,
     Json(mut req): Json<DeviceDisconnectRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
+    let app_state = &state.app;
     resolve_device_identity(
         &mut req.product_id,
         &mut req.device_id,
@@ -632,7 +683,7 @@ pub async fn device_disconnect(
     )?;
     info!("Device disconnected: {}", req.device_id);
 
-    state
+    app_state
         .db
         .update_device_status_disconnect(&req)
         .await
@@ -640,6 +691,22 @@ pub async fn device_disconnect(
             error!("Database error on device disconnect: {}", e);
             ApiError::internal("Database operation failed")
         })?;
+
+    // 异步触发规则评估（不阻塞主流程）
+    let admin = Arc::clone(&state.admin);
+    let trigger_product_id = req.product_id.clone();
+    let trigger_device_id = req.device_id.clone();
+    tokio::spawn(async move {
+        let alarm_repo = admin.db.alarm();
+        let rule_cache = admin.rule_cache.clone();
+        let ctx = TriggerContext {
+            product_id: trigger_product_id,
+            device_id: trigger_device_id,
+            trigger_type: TriggerType::DeviceOffline,
+            trigger_value: json!({}),
+        };
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+    });
 
     Ok(StatusCode::NO_CONTENT)
 }

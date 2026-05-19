@@ -1,4 +1,5 @@
 use crate::api::web_models::{DeviceConnectRequest, DeviceDisconnectRequest};
+use crate::db::alarm::AlarmRepo;
 use crate::db::cert_issue::CertIssueRepo;
 use crate::db::models::*;
 use crate::db::ota::OtaRepo;
@@ -38,6 +39,10 @@ impl DatabaseService {
 
     pub fn ota(&self) -> OtaRepo {
         OtaRepo::new(self.pool.clone())
+    }
+
+    pub fn alarm(&self) -> AlarmRepo {
+        AlarmRepo::new(self.pool.clone())
     }
 
     fn add_device_filter<'a>(

@@ -123,6 +123,7 @@ impl AsyncTestContext for MqttTestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client,
+            rule_cache: crate::rule_engine::RuleCache::new(),
         });
 
         // Start real axum server

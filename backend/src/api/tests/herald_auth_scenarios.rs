@@ -81,6 +81,7 @@ impl AsyncTestContext for HeraldAuthTestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client,
+            rule_cache: crate::rule_engine::RuleCache::new(),
         });
 
         // Create Herald SDK client and pass it to the router

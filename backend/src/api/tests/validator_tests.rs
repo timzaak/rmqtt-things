@@ -56,6 +56,7 @@ impl AsyncTestContext for TestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client: app_state.s3_client.clone(),
+            rule_cache: crate::rule_engine::RuleCache::new(),
         });
 
         let router = create_router(config, app_state.clone(), admin_state.clone(), None);

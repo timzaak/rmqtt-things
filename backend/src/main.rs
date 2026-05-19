@@ -4,6 +4,7 @@ mod cache;
 mod config;
 mod db;
 mod rmqtt_client;
+mod rule_engine;
 mod telemetry;
 
 use crate::cache::{InMemorySchemaCache, RedisSchemaCache, SchemaCache};
@@ -106,6 +107,7 @@ async fn main() -> anyhow::Result<()> {
         cache: schema_cache,
         config: Arc::clone(&config),
         s3_client,
+        rule_cache: crate::rule_engine::RuleCache::new(),
     });
 
     let router = create_router(config, app_state, admin_state, herald_client);

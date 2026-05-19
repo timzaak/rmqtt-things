@@ -1,5 +1,6 @@
 use crate::api::{
-    admin_handlers, auth_handlers, ca_handlers, handlers, ota_handlers, product_handlers,
+    admin_handlers, alarm_handlers, auth_handlers, ca_handlers, handlers, ota_handlers,
+    product_handlers,
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityRequirement, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -47,6 +48,14 @@ use utoipa::{Modify, OpenApi};
         admin_handlers::update_ota_version,
         admin_handlers::delete_ota_version,
         admin_handlers::admin_file_upload_handler,
+        alarm_handlers::list_alarm_rules,
+        alarm_handlers::create_alarm_rule,
+        alarm_handlers::get_alarm_rule,
+        alarm_handlers::update_alarm_rule,
+        alarm_handlers::update_alarm_rule_status,
+        alarm_handlers::delete_alarm_rule,
+        alarm_handlers::list_alarms,
+        alarm_handlers::ack_alarm,
     ),
     components(
         schemas(
@@ -122,6 +131,17 @@ use utoipa::{Modify, OpenApi};
             crate::db::models::PropertyHistory,
             crate::db::models::PropertyLatest,
             crate::db::models::UpdateProductRequest,
+            crate::db::models::AlarmRule,
+            crate::api::alarm_models::AlarmRuleQuery,
+            crate::api::alarm_models::CreateAlarmRuleRequest,
+            crate::api::alarm_models::UpdateAlarmRuleRequest,
+            crate::api::alarm_models::UpdateAlarmRuleStatusRequest,
+            crate::api::alarm_models::AlarmRuleResponse,
+            crate::api::admin_models::PaginatedResponse<crate::db::models::AlarmRule>,
+            crate::api::alarm_models::AlarmQuery,
+            crate::api::alarm_models::ApiAlarmRecord,
+            crate::api::alarm_models::AlarmRecordResponse,
+            crate::api::admin_models::PaginatedResponse<crate::api::alarm_models::ApiAlarmRecord>,
         )
     ),
     tags(

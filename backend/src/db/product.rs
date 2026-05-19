@@ -54,6 +54,14 @@ impl ProductRepo {
         Ok(product)
     }
 
+    pub async fn get_product_by_model_no(&self, model_no: &str) -> anyhow::Result<Option<Product>> {
+        let product = sqlx::query_as::<_, Product>("SELECT * FROM product WHERE model_no = $1")
+            .bind(model_no)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(product)
+    }
+
     pub async fn update_product(
         &self,
         id: i32,

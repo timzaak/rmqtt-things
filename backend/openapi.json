@@ -1,0 +1,4700 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "rmqtt-things",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.3.0"
+  },
+  "paths": {
+    "/api/access/acl": {
+      "post": {
+        "tags": [
+          "access"
+        ],
+        "operationId": "acl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AclPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "allow or deny",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access/auth": {
+      "post": {
+        "tags": [
+          "access"
+        ],
+        "operationId": "auth",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "allow or deny",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/alarm": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_alarms",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "Filter by product ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "Filter by device ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "description": "Filter by level: info / warning / critical",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "acknowledged",
+            "in": "query",
+            "description": "Filter by acknowledged status",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, default 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Page size, default 10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alarm record list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/alarm-rule": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_alarm_rules",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "Filter by product ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "description": "Filter by enabled status",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number, default 1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "Page size, default 10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alarm rule list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_alarm_rule",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlarmRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Alarm rule created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRuleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid product_id or request body"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/alarm-rule/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_alarm_rule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm rule id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alarm rule details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRuleResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Alarm rule not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "delete_alarm_rule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm rule id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Alarm rule deleted"
+          },
+          "404": {
+            "description": "Alarm rule not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_alarm_rule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm rule id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAlarmRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Alarm rule updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRuleResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Alarm rule not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/alarm-rule/{id}/status": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_alarm_rule_status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm rule id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAlarmRuleStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Alarm rule status updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRuleResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Alarm rule not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/alarm/{id}/ack": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "ack_alarm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm record id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alarm acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRecordResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Alarm not found"
+          },
+          "409": {
+            "description": "Alarm already acknowledged"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/ca/cert": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_certs_handler",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "设备状态: online, offline",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DeviceConnectionStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Certificate list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimplePaginatedResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "issue_cert_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueCertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Certificate issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueCertResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/ca/cert/status": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_cert_status_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCertStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Certificate status updated"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/ca/pem": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_ca_cert_handler",
+        "responses": {
+          "200": {
+            "description": "CA certificate PEM",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaCertResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/device/status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_device_status",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "设备状态: online, offline",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DeviceConnectionStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device statuses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/device/status/history": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_device_status_history",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device status history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimplePaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/event": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_event_history",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Event history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimplePaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/file/upload": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "admin_file_upload_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Upload policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/ota/version": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_ota_versions",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTA versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_ota_version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOtaVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "OTA version created"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/ota/version/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_ota_version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "OTA version id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTA version",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtaVersion"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_ota_version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "OTA version id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOtaVersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OTA version updated"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "delete_ota_version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "OTA version id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTA version deleted"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/product": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "list_products",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "搜索关键字，模糊匹配产品名称或型号",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_Product"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_product",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Product created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/product/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_product",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Product id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Product details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_product",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Product id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Product updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Product"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_property_latest",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest properties",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimplePaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/command": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_property_commands",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Property commands",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_property_command",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePropertyCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Property command created"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "delete_property_commands",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Property commands deleted"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/history": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_property_history",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Property history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimplePaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/valid/event": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_event_valid_templates",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "event",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validation templates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "create_event_valid_template",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventValidTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Validation template created"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/valid/event/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_event_valid_template",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Template id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validation template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventValidTemplate"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_event_valid_template",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Template id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventValidTemplateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation template updated"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/valid/event/{id}/status": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "update_event_valid_template_status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Template id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventValidTemplateStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Validation template status updated"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/config": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "get_auth_config",
+        "responses": {
+          "200": {
+            "description": "Auth configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/device/connect": {
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "device_connect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceConnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Device connection stored"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/device/disconnect": {
+      "post": {
+        "tags": [
+          "device"
+        ],
+        "operationId": "device_disconnect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceDisconnectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Device disconnection stored"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy"
+          }
+        }
+      }
+    },
+    "/api/ota/version": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "ota_version_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "OTA report accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/thing/event/post": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "event_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Event accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/thing/file/upload": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "file_upload_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Upload command accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/thing/property/post": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "property_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Property accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/thing/property/set_reply": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "property_set_reply",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Reply accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    },
+    "/api/thing/property/set_subscribe": {
+      "post": {
+        "tags": [
+          "thing"
+        ],
+        "operationId": "property_set_subscribe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttSubscribeMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Subscription accepted"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Access": {
+        "type": "string",
+        "enum": [
+          "1",
+          "2"
+        ]
+      },
+      "AckStatus": {
+        "type": "string",
+        "enum": [
+          "No",
+          "Yes"
+        ]
+      },
+      "AclPayload": {
+        "type": "object",
+        "required": [
+          "access",
+          "client_id",
+          "ip",
+          "topic",
+          "protocol"
+        ],
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/Access"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "ip": {
+            "type": "string"
+          },
+          "protocol": {},
+          "topic": {
+            "type": "string"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AlarmQuery": {
+        "type": "object",
+        "description": "Query parameters for listing alarm records",
+        "properties": {
+          "acknowledged": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Filter by acknowledged status"
+          },
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Filter by device ID"
+          },
+          "level": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Filter by level: info / warning / critical"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Page number, default 1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Page size, default 10"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Filter by product ID"
+          }
+        }
+      },
+      "AlarmRecordResponse": {
+        "type": "object",
+        "description": "Single alarm record response wrapper",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ApiAlarmRecord"
+          }
+        }
+      },
+      "AlarmRule": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "name",
+          "trigger_type",
+          "trigger_config",
+          "condition",
+          "actions",
+          "enabled",
+          "throttle_minutes",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "throttle_minutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trigger_config": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "trigger_type": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AlarmRuleQuery": {
+        "type": "object",
+        "description": "Query parameters for listing alarm rules",
+        "properties": {
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Filter by enabled status"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Page number, default 1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Page size, default 10"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Filter by product ID"
+          }
+        }
+      },
+      "AlarmRuleResponse": {
+        "type": "object",
+        "description": "Single alarm rule response wrapper",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AlarmRule"
+          }
+        }
+      },
+      "ApiAlarmRecord": {
+        "type": "object",
+        "description": "API-level alarm record with string level and webhook_status",
+        "required": [
+          "id",
+          "rule_id",
+          "rule_name",
+          "product_id",
+          "device_id",
+          "level",
+          "acknowledged",
+          "created_at"
+        ],
+        "properties": {
+          "acknowledged": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "level": {
+            "type": "string",
+            "description": "Alarm level: \"info\" / \"warning\" / \"critical\""
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "rule_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rule_name": {
+            "type": "string"
+          },
+          "trigger_value": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "webhook_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
+          }
+        }
+      },
+      "ApiErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthConfigResponse": {
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "herald_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuthPayload": {
+        "type": "object",
+        "required": [
+          "client_id",
+          "protocol",
+          "ipaddress"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          },
+          "ipaddress": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "protocol": {},
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CaCertResponse": {
+        "type": "object",
+        "required": [
+          "ca_pem"
+        ],
+        "properties": {
+          "ca_pem": {
+            "type": "string"
+          }
+        }
+      },
+      "CertIssue": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "pub_cert",
+          "start_at",
+          "end_at",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "pub_cert": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CertStatus"
+          }
+        }
+      },
+      "CertStatus": {
+        "type": "string",
+        "enum": [
+          "Normal",
+          "InValid",
+          "Revoked"
+        ]
+      },
+      "CommandStatus": {
+        "type": "string",
+        "enum": [
+          "Pending",
+          "Sent",
+          "Success",
+          "Failed",
+          "Deleted"
+        ]
+      },
+      "CommonQuery": {
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "设备ID，可选"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "CommonQuery2": {
+        "type": "object",
+        "properties": {
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "设备ID，可选"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "产品ID"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeviceConnectionStatus",
+                "description": "设备状态: online, offline"
+              }
+            ]
+          }
+        }
+      },
+      "CreateAlarmRuleRequest": {
+        "type": "object",
+        "description": "Request body for creating an alarm rule",
+        "required": [
+          "product_id",
+          "name",
+          "trigger_type",
+          "condition",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "$ref": "#/components/schemas/Value",
+            "description": "Action list (must contain at least one alarm action)"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/Value",
+            "description": "Condition expression"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rule description"
+          },
+          "name": {
+            "type": "string",
+            "description": "Rule name"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "Product ID (mapped to product.model_no)"
+          },
+          "throttle_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Dedup interval in minutes, 0 means no dedup"
+          },
+          "trigger_config": {
+            "$ref": "#/components/schemas/Value",
+            "description": "Trigger configuration (e.g. property_name, event_identifier)"
+          },
+          "trigger_type": {
+            "type": "string",
+            "description": "Trigger type: property / event / device_online / device_offline"
+          }
+        }
+      },
+      "CreateEventValidTemplateRequest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "event",
+          "schema"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/Value"
+          }
+        }
+      },
+      "CreateOtaVersionRequest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "key",
+          "version",
+          "min_version",
+          "file_key",
+          "bin_length",
+          "bin_md5"
+        ],
+        "properties": {
+          "bin_length": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bin_md5": {
+            "type": "string"
+          },
+          "device_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "file_key": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "log": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "max_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_version": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateProductRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "model_no"
+        ],
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model_no": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CreatePropertyCommandRequest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "device_id",
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Value",
+            "description": "命令内容"
+          },
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "DeletePropertyCommandsQuery": {
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "DeviceConnectRequest": {
+        "type": "object",
+        "required": [
+          "node",
+          "ipaddress",
+          "keepalive",
+          "proto_ver",
+          "connected_at",
+          "session_present"
+        ],
+        "properties": {
+          "clean_start": {
+            "type": "boolean"
+          },
+          "clientid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connected_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "ipaddress": {
+            "type": "string"
+          },
+          "keepalive": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "node": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "proto_ver": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "session_present": {
+            "type": "boolean"
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DeviceConnectionStatus": {
+        "type": "string",
+        "enum": [
+          "Offline",
+          "Online"
+        ]
+      },
+      "DeviceDisconnectRequest": {
+        "type": "object",
+        "required": [
+          "node",
+          "disconnected_at",
+          "reason"
+        ],
+        "properties": {
+          "clientid": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "disconnected_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ipaddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "node": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        }
+      },
+      "DeviceStatus": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "device_id",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_offline_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "last_online_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeviceConnectionStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DeviceStatusHistory": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "status",
+          "created_at"
+        ],
+        "properties": {
+          "connected_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "disconnected_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ip_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/DeviceConnectionStatus"
+          }
+        }
+      },
+      "EventHistory": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "events",
+          "created_time"
+        ],
+        "properties": {
+          "created_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "events": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "reported_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "EventValidTemplate": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "event",
+          "schema",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EventValidTemplateStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EventValidTemplateQuery": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EventValidTemplateStatus": {
+        "type": "string",
+        "enum": [
+          "Draft",
+          "Active",
+          "Inactive"
+        ]
+      },
+      "FileUploadRequest": {
+        "type": "object",
+        "required": [
+          "fileName",
+          "directory",
+          "useOriginName",
+          "fileType"
+        ],
+        "properties": {
+          "directory": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "fileType": {
+            "type": "string"
+          },
+          "useOriginName": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FileUploadResponse": {
+        "type": "object",
+        "required": [
+          "url",
+          "fields"
+        ],
+        "properties": {
+          "fields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "IssueCertRequest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "device_id",
+          "force",
+          "start_at",
+          "end_at"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "end_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "start_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IssueCertResponse": {
+        "type": "object",
+        "required": [
+          "cert_pem",
+          "key_pem"
+        ],
+        "properties": {
+          "cert_pem": {
+            "type": "string"
+          },
+          "key_pem": {
+            "type": "string"
+          }
+        }
+      },
+      "MqttPayload": {
+        "type": "object",
+        "required": [
+          "id",
+          "ack"
+        ],
+        "properties": {
+          "ack": {
+            "$ref": "#/components/schemas/AckStatus"
+          },
+          "id": {
+            "type": "string"
+          },
+          "params": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          }
+        }
+      },
+      "MqttProtocol": {
+        "type": "string",
+        "enum": [
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "MqttResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "data": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "OtaReport": {
+        "type": "object",
+        "required": [
+          "key",
+          "version"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OtaVersion": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "key",
+          "version",
+          "min_version",
+          "file_key",
+          "released_at",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "file_key": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "key": {
+            "type": "string"
+          },
+          "log": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "max_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "min_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "released_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "OtaVersionQuery": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PaginatedResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiAlarmRecord"
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_AlarmRule": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "name",
+                "trigger_type",
+                "trigger_config",
+                "condition",
+                "actions",
+                "enabled",
+                "throttle_minutes",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "actions": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "condition": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "throttle_minutes": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "trigger_config": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "trigger_type": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_ApiAlarmRecord": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "API-level alarm record with string level and webhook_status",
+              "required": [
+                "id",
+                "rule_id",
+                "rule_name",
+                "product_id",
+                "device_id",
+                "level",
+                "acknowledged",
+                "created_at"
+              ],
+              "properties": {
+                "acknowledged": {
+                  "type": "boolean"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "level": {
+                  "type": "string",
+                  "description": "Alarm level: \"info\" / \"warning\" / \"critical\""
+                },
+                "message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "rule_id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "rule_name": {
+                  "type": "string"
+                },
+                "trigger_value": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Value"
+                    }
+                  ]
+                },
+                "webhook_status": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_DeviceStatus": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "product_id",
+                "device_id",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "ip_address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last_offline_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "last_online_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/DeviceConnectionStatus"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_EventValidTemplate": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "event",
+                "schema",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "event": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/EventValidTemplateStatus"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_OtaVersion": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "key",
+                "version",
+                "min_version",
+                "file_key",
+                "released_at",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_ids": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "file_key": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "log": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Value"
+                    }
+                  ]
+                },
+                "max_version": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32"
+                },
+                "min_version": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "released_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "version": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_Product": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "model_no",
+                "status",
+                "created_at",
+                "updated_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "model_no": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/ProductStatus"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginatedResponse_PropertyCommand": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "device_id",
+                "command",
+                "status",
+                "created_time",
+                "updated_time"
+              ],
+              "properties": {
+                "command": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "created_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CommandStatus"
+                },
+                "updated_time": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "PaginationInfo": {
+        "type": "object",
+        "required": [
+          "page",
+          "page_size",
+          "total"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "当前页码"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "总记录数"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "model_no",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "model_no": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProductStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProductQuery": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "search": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "搜索关键字，模糊匹配产品名称或型号"
+          }
+        }
+      },
+      "ProductStatus": {
+        "type": "string",
+        "enum": [
+          "Online",
+          "Offline"
+        ]
+      },
+      "PropertyCommand": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "command",
+          "status",
+          "created_time",
+          "updated_time"
+        ],
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "created_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "updated_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PropertyCommandQuery": {
+        "type": "object",
+        "required": [
+          "product_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "设备ID，可选"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandStatus",
+                "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted"
+              }
+            ]
+          }
+        }
+      },
+      "PropertyHistory": {
+        "type": "object",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "properties",
+          "created_time"
+        ],
+        "properties": {
+          "created_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "reported_time": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "PropertyLatest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "device_id",
+          "properties",
+          "updated_time"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "updated_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PropertySetReplyPayload": {
+        "type": "object",
+        "required": [
+          "data",
+          "id",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "RMqttPublishMessage": {
+        "type": "object",
+        "required": [
+          "dup",
+          "from_clientid",
+          "from_ipaddress",
+          "from_type",
+          "packet_id",
+          "payload",
+          "qos",
+          "retain",
+          "time",
+          "topic",
+          "ts"
+        ],
+        "properties": {
+          "dup": {
+            "type": "boolean"
+          },
+          "from_clientid": {
+            "type": "string"
+          },
+          "from_ipaddress": {
+            "type": "string"
+          },
+          "from_type": {
+            "type": "string"
+          },
+          "from_username": {
+            "type": "string"
+          },
+          "packet_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payload": {
+            "type": "string"
+          },
+          "qos": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "retain": {
+            "type": "boolean"
+          },
+          "time": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RMqttSubscribeMessage": {
+        "type": "object",
+        "required": [
+          "clientid"
+        ],
+        "properties": {
+          "clean_start": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "clientid": {
+            "type": "string"
+          },
+          "connected_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ipaddress": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "keepalive": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "node": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "proto_ver": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "session_present": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topic": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "username": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SimplePaginatedResponse": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CertIssue"
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginatedResponse_CertIssue": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "device_id",
+                "pub_cert",
+                "start_at",
+                "end_at",
+                "status",
+                "created_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "end_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "pub_cert": {
+                  "type": "string"
+                },
+                "start_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CertStatus"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginatedResponse_DeviceStatusHistory": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "device_id",
+                "status",
+                "created_at"
+              ],
+              "properties": {
+                "connected_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "disconnected_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "ip_address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "$ref": "#/components/schemas/DeviceConnectionStatus"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginatedResponse_EventHistory": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "device_id",
+                "events",
+                "created_time"
+              ],
+              "properties": {
+                "created_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "events": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "reported_time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginatedResponse_PropertyHistory": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "product_id",
+                "device_id",
+                "properties",
+                "created_time"
+              ],
+              "properties": {
+                "created_time": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "device_id": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "properties": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "reported_time": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginatedResponse_PropertyLatest": {
+        "type": "object",
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "product_id",
+                "device_id",
+                "properties",
+                "updated_time"
+              ],
+              "properties": {
+                "device_id": {
+                  "type": "string"
+                },
+                "product_id": {
+                  "type": "string"
+                },
+                "properties": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "updated_time": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/SimplePaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
+      "SimplePaginationInfo": {
+        "type": "object",
+        "required": [
+          "page",
+          "page_size"
+        ],
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "当前页码"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小"
+          }
+        }
+      },
+      "UpdateAlarmRuleRequest": {
+        "type": "object",
+        "description": "Request body for updating an alarm rule",
+        "properties": {
+          "actions": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value",
+                "description": "Action list"
+              }
+            ]
+          },
+          "condition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value",
+                "description": "Condition expression"
+              }
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rule description"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Rule name"
+          },
+          "throttle_minutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Dedup interval in minutes"
+          },
+          "trigger_config": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value",
+                "description": "Trigger configuration"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateAlarmRuleStatusRequest": {
+        "type": "object",
+        "description": "Request body for enabling/disabling an alarm rule",
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the rule is enabled"
+          }
+        }
+      },
+      "UpdateCertStatusRequest": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "device_id",
+          "status"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "UpdateEventValidTemplateRequest": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "schema": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateEventValidTemplateStatusRequest": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/EventValidTemplateStatus"
+          }
+        }
+      },
+      "UpdateOtaVersionRequest": {
+        "type": "object",
+        "properties": {
+          "bin_length": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bin_md5": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "file_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "log": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "max_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "min_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "UpdateProductRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Value": {}
+    },
+    "securitySchemes": {
+      "cookie_auth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "X-Auth"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "access",
+      "description": "RMQTT access callbacks"
+    },
+    {
+      "name": "thing",
+      "description": "RMQTT thing callbacks"
+    },
+    {
+      "name": "device",
+      "description": "Device lifecycle callbacks"
+    },
+    {
+      "name": "admin",
+      "description": "Administrative APIs"
+    },
+    {
+      "name": "system",
+      "description": "System APIs"
+    }
+  ]
+}
