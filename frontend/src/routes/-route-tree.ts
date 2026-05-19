@@ -1,5 +1,9 @@
 import { rootRoute } from './__root'
 import { indexRoute } from './index'
+import { alarmRulesIndexRoute } from './alarm-rules/index'
+import { alarmRulesCreateRoute } from './alarm-rules/create'
+import { alarmRulesEditIdRoute } from './alarm-rules/edit.$id'
+import { alarmsIndexRoute } from './alarms/index'
 import { productsIndexRoute } from './products/index'
 import { productsCreateRoute } from './products/create'
 import { productsEditRoute } from './products/edit.$id'
@@ -20,6 +24,10 @@ import { authCallbackRoute } from './auth/callback'
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
+  alarmRulesIndexRoute,
+  alarmRulesCreateRoute,
+  alarmRulesEditIdRoute,
+  alarmsIndexRoute,
   productsIndexRoute,
   productsCreateRoute,
   productsEditRoute,

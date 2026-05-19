@@ -5,6 +5,8 @@ import {
   FileCode2,
   ShieldCheck,
   Upload,
+  Bell,
+  AlertTriangle,
 } from 'lucide-react'
 
 const navItems = [
@@ -13,6 +15,8 @@ const navItems = [
   { to: '/valid-templates' as const, label: 'Schema', icon: FileCode2 },
   { to: '/certs' as const, label: 'Certificates', icon: ShieldCheck },
   { to: '/ota' as const, label: 'OTA', icon: Upload },
+  { to: '/alarm-rules' as string, label: 'Alarm Rules', icon: Bell },
+  { to: '/alarms' as string, label: 'Alarms', icon: AlertTriangle },
 ] as const
 
 export function Sidebar() {
