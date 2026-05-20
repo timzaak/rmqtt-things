@@ -36,6 +36,7 @@ impl RuleCache {
     }
 
     /// Invalidate all cached rules.
+    #[cfg(test)]
     pub fn invalidate_all(&self) {
         self.rules.clear();
     }

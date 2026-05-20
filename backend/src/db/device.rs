@@ -1,4 +1,6 @@
-use crate::db::models::{Device, RegistrationSource};
+#[cfg(test)]
+use crate::db::models::Device;
+use crate::db::models::RegistrationSource;
 use sqlx::{PgPool, Row};
 
 pub struct DeviceRepo {
@@ -54,6 +56,7 @@ impl DeviceRepo {
         Ok(())
     }
 
+    #[cfg(test)]
     pub async fn find_by_product_and_device(
         &self,
         product_id: &str,

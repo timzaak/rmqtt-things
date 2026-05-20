@@ -88,6 +88,7 @@ pub enum RegistrationSource {
     Manual = 1,
 }
 
+#[cfg(test)]
 #[derive(Debug, FromRow, Serialize, ToSchema)]
 pub struct Device {
     pub id: i64,

@@ -366,9 +366,9 @@ mod tests {
 
     #[test]
     fn test_float_comparison() {
-        let cond = json!({"operator": ">", "value": 3.14});
-        assert!(RuleEvaluator::evaluate(&cond, &json!(3.15)));
-        assert!(!RuleEvaluator::evaluate(&cond, &json!(3.13)));
+        let cond = json!({"operator": ">", "value": 10.5});
+        assert!(RuleEvaluator::evaluate(&cond, &json!(10.6)));
+        assert!(!RuleEvaluator::evaluate(&cond, &json!(10.4)));
     }
 
     #[test]
