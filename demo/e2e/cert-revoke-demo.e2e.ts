@@ -23,11 +23,11 @@ test.describe('Certificate revoke/invalidate demo (US-PA-006)', () => {
     await verifyTestEnvironment(null)
   })
 
-  test('revokes a Normal certificate and status updates to Revoked (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {
+  test('revokes a Normal certificate and status updates to Revoked (Scenario 1)', async ({ page, request, demoLogger: _demoLogger }) => {
     const deviceId = `revoke-device-${Date.now()}`
 
     // Precondition: issue a Normal certificate via API
-    await issueCert(deviceId)
+    await issueCert(request, deviceId)
 
     // Navigate to certs list
     await page.goto(`${FRONTEND_URL}/certs`)
@@ -49,11 +49,11 @@ test.describe('Certificate revoke/invalidate demo (US-PA-006)', () => {
     await expect(row.getByText('Revoked')).toBeVisible({ timeout: 15000 })
   })
 
-  test('invalidates a Normal certificate and status updates to Invalid (Scenario 2)', async ({ page, demoLogger: _demoLogger }) => {
+  test('invalidates a Normal certificate and status updates to Invalid (Scenario 2)', async ({ page, request, demoLogger: _demoLogger }) => {
     const deviceId = `invalidate-device-${Date.now()}`
 
     // Precondition: issue a Normal certificate via API
-    await issueCert(deviceId)
+    await issueCert(request, deviceId)
 
     // Navigate to certs list
     await page.goto(`${FRONTEND_URL}/certs`)
@@ -75,14 +75,14 @@ test.describe('Certificate revoke/invalidate demo (US-PA-006)', () => {
     await expect(row.locator('span').filter({ hasText: 'Invalid' })).toBeVisible({ timeout: 15000 })
   })
 
-  test('does not show action buttons for non-Normal certificates (Scenario 3)', async ({ page, demoLogger: _demoLogger }) => {
+  test('does not show action buttons for non-Normal certificates (Scenario 3)', async ({ page, request, demoLogger: _demoLogger }) => {
     const revokedDeviceId = `revoked-row-${Date.now()}`
     const invalidDeviceId = `invalid-row-${Date.now()}`
 
     // Issue two certificates and immediately change their status via API
     await Promise.all([
-      issueCert(revokedDeviceId).then(() => updateCertStatus('demo_product', revokedDeviceId, 2)),
-      issueCert(invalidDeviceId).then(() => updateCertStatus('demo_product', invalidDeviceId, 1)),
+      issueCert(request, revokedDeviceId).then(() => updateCertStatus(request, 'demo_product', revokedDeviceId, 2)),
+      issueCert(request, invalidDeviceId).then(() => updateCertStatus(request, 'demo_product', invalidDeviceId, 1)),
     ])
 
     // Navigate to certs list

@@ -46,15 +46,14 @@ export async function createProduct(
 ): Promise<ProductResponse> {
   const response = await request.post('/api/admin/product', { data })
   await assertOk(response)
-  return (await response.json()).data
+  return response.json()
 }
 
 export async function getProduct(
   request: APIRequestContext,
   id: number,
 ): Promise<ProductResponse> {
-  const json = await getJson<{ data: ProductResponse }>(request, `/api/admin/product/${id}`)
-  return json.data
+  return getJson<ProductResponse>(request, `/api/admin/product/${id}`)
 }
 
 export async function updateProduct(
@@ -62,7 +61,13 @@ export async function updateProduct(
   id: number,
   data: { name?: string; description?: string; auto_provisioning?: boolean },
 ): Promise<ProductResponse> {
-  const response = await request.patch(`/api/admin/product/${id}`, { data })
+  const current = await getProduct(request, id)
+  const merged = {
+    name: data.name ?? current.name,
+    description: data.description ?? (current.description ?? ''),
+    auto_provisioning: data.auto_provisioning ?? current.auto_provisioning,
+  }
+  const response = await request.patch(`/api/admin/product/${id}`, { data: merged })
   await assertOk(response)
-  return (await response.json()).data
+  return response.json()
 }

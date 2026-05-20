@@ -74,13 +74,14 @@ export class AlarmRulesListPage extends BasePage {
   }
 
   async confirmDelete(): Promise<void> {
-    await expect(this.deleteConfirmDialog).toBeVisible()
-    const confirmButton = this.page.getByRole('button', { name: 'Delete' })
+    await expect(this.page.getByRole('heading', { name: 'Delete Alarm Rule' })).toBeVisible()
+    const buttons = this.page.locator('[data-testid="delete-confirm-dialog"] button')
+    const confirmButton = buttons.filter({ hasText: 'Delete' }).last()
     await this.smartClick(confirmButton)
   }
 
   async cancelDelete(): Promise<void> {
-    await expect(this.deleteConfirmDialog).toBeVisible()
+    await expect(this.page.getByRole('heading', { name: 'Delete Alarm Rule' })).toBeVisible()
     const cancelButton = this.page.getByRole('button', { name: 'Cancel' })
     await this.smartClick(cancelButton)
   }

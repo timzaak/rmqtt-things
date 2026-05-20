@@ -56,9 +56,7 @@ test.describe('US-PA-036: Product auto-provisioning toggle', () => {
       await expect(checkbox).not.toBeChecked()
     } finally {
       if (productId !== undefined) {
-        await request.patch(`/api/admin/product/${productId}`, {
-          data: { name: `[E2E-cleaned] ${productName}`, description: 'Cleaned up by auto-prov E2E' },
-        })
+        await updateProduct(request, productId, { name: `[E2E-cleaned] ${productName}`, description: 'Cleaned up by auto-prov E2E' })
       }
     }
   })
@@ -114,7 +112,7 @@ test.describe('US-PA-036: Product auto-provisioning toggle', () => {
     await updateProduct(request, productId, { auto_provisioning: false })
 
     const deviceId = `autoprov-device-${Date.now()}`
-    await issueCert(deviceId)
+    await issueCert(request, deviceId)
 
     const deviceStatusResponse = await request.get(
       `/api/admin/device/status?product_id=${SEED_PRODUCT_MODEL_NO}&device_id=${deviceId}&page=1&page_size=10`,

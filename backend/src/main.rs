@@ -120,7 +120,10 @@ async fn main() -> anyhow::Result<()> {
     info!("Listening on port {port}");
 
     tokio::select! {
-        result = axum::serve(listener, router) => {
+        result = axum::serve(
+            listener,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        ) => {
             result?;
             info!("Server stopped");
         }

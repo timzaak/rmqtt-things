@@ -22,11 +22,11 @@ test.describe('Certificate detail demo (US-PA-023)', () => {
     await verifyTestEnvironment(null)
   })
 
-  test('shows certificate detail with all fields (Scenario 1)', async ({ page, demoLogger: _demoLogger }) => {
+  test('shows certificate detail with all fields (Scenario 1)', async ({ page, request, demoLogger: _demoLogger }) => {
     const deviceId = `detail-device-${Date.now()}`
 
     // Precondition: issue a certificate via API and get its ID
-    const certId = await issueCertAndGetId(deviceId)
+    const certId = await issueCertAndGetId(request, deviceId)
 
     // Navigate to certs list
     await page.goto(`${FRONTEND_URL}/certs`)
@@ -59,11 +59,11 @@ test.describe('Certificate detail demo (US-PA-023)', () => {
     await expect(page.getByText(/Created At/)).toBeVisible()
   })
 
-  test('navigates back to certificates list from detail page (Scenario 2)', async ({ page, demoLogger: _demoLogger }) => {
+  test('navigates back to certificates list from detail page (Scenario 2)', async ({ page, request, demoLogger: _demoLogger }) => {
     const deviceId = `back-device-${Date.now()}`
 
     // Precondition: issue a certificate and navigate to detail page
-    const certId = await issueCertAndGetId(deviceId)
+    const certId = await issueCertAndGetId(request, deviceId)
 
     // Go directly to the detail page URL
     await page.goto(`${FRONTEND_URL}/certs/show/${certId}`)

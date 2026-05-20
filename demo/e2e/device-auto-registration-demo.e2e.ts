@@ -108,7 +108,7 @@ test.describe('[US-DV-010] Device Auto-Registration', () => {
   test('US-DV-010 S4: cert issuance creates Manual registration record', async ({ request, demoLogger: _demoLogger }) => {
     const deviceId = `cert-manual-${Date.now()}`
 
-    await issueCert(deviceId)
+    await issueCert(request, deviceId)
     await waitForDeviceRegistration(request, deviceId, 'Manual')
   })
 

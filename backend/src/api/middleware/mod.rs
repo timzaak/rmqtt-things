@@ -66,6 +66,8 @@ pub fn extract_permission(path: &str, method: &Method) -> Option<Rule> {
     } else if path.starts_with("/admin/device")
         || path.starts_with("/admin/property")
         || path.starts_with("/admin/event")
+        || path.starts_with("/admin/alarm-rule")
+        || path.starts_with("/admin/alarm")
     {
         "device"
     } else if path.starts_with("/admin/ca") || path.starts_with("/admin/ota") {
@@ -135,6 +137,14 @@ fn extract_client_ip(request: &Request<axum::body::Body>) -> Option<IpAddr> {
         return Some(ip);
     }
 
+    // Fall back to connection info (direct connection without proxy)
+    if let Some(connect_info) = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+    {
+        return Some(connect_info.0.ip());
+    }
+
     None
 }
 
@@ -200,6 +210,16 @@ mod tests {
             ("/api/admin/event", Method::DELETE, "device", "write"),
             ("/api/admin/ca/cert", Method::GET, "cert", "read"),
             ("/api/admin/ota/version", Method::PUT, "cert", "write"),
+            ("/api/admin/alarm-rule", Method::POST, "device", "write"),
+            ("/api/admin/alarm-rule/1", Method::GET, "device", "read"),
+            (
+                "/api/admin/alarm-rule/1/status",
+                Method::PATCH,
+                "device",
+                "write",
+            ),
+            ("/api/admin/alarm", Method::GET, "device", "read"),
+            ("/api/admin/alarm/1/ack", Method::PATCH, "device", "write"),
         ];
 
         for (path, method, resource, action) in cases {
@@ -417,5 +437,31 @@ mod tests {
     #[tokio::test]
     async fn internal_ip_rejects_missing_ip() {
         assert_eq!(send_with_ip(None, "x-real-ip").await, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn internal_ip_allows_connect_info_fallback() {
+        use axum::extract::ConnectInfo;
+        let mut req = Request::builder().uri("/test").body(Body::empty()).unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from((
+                [127, 0, 0, 1],
+                12345,
+            ))));
+        let resp = internal_ip_router().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn internal_ip_rejects_public_connect_info() {
+        use axum::extract::ConnectInfo;
+        let mut req = Request::builder().uri("/test").body(Body::empty()).unwrap();
+        req.extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from((
+                [8, 8, 8, 8],
+                12345,
+            ))));
+        let resp = internal_ip_router().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     }
 }

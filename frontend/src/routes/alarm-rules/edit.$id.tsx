@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRoute, Link, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
 import { useAlarmRule, useUpdateAlarmRule } from '@/hooks/useAlarmRules'
@@ -66,6 +66,13 @@ function AlarmRuleEditPage() {
   const [form, setForm] = useState<FormState>({ ...emptyForm })
   const [prevData, setPrevData] = useState<typeof alarmRule>(undefined)
   const [initialForm, setInitialForm] = useState<FormState | null>(null)
+  const [justSaved, setJustSaved] = useState(false)
+
+  useEffect(() => {
+    if (justSaved) {
+      navigate({ to: '/alarm-rules' })
+    }
+  }, [justSaved, navigate])
 
   // prevData pattern: initialize form once when data loads
   if (alarmRule && alarmRule !== prevData) {
@@ -82,6 +89,7 @@ function AlarmRuleEditPage() {
     TRIGGER_TYPE_OPTIONS.find((t) => t.value === form.trigger_type)?.label ?? form.trigger_type
 
   const isDirty =
+    !justSaved &&
     initialForm !== null &&
     (form.name !== initialForm.name ||
       form.description !== initialForm.description ||
@@ -157,7 +165,7 @@ function AlarmRuleEditPage() {
       {
         onSuccess: () => {
           toast.success('Alarm rule updated')
-          navigate({ to: '/alarm-rules' })
+          setJustSaved(true)
         },
         onError: (error) => {
           toast.error('Failed to update alarm rule', { description: error.message })

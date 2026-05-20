@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRoute, Link, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
 import { useCreateAlarmRule } from '@/hooks/useAlarmRules'
@@ -51,9 +51,17 @@ function AlarmRuleCreatePage() {
   const createAlarmRule = useCreateAlarmRule()
   const { data: products } = useProducts()
   const [form, setForm] = useState<FormState>({ ...initialForm, actions: [{ ...INITIAL_ACTIONS[0] }] })
+  const [justSaved, setJustSaved] = useState(false)
+
+  useEffect(() => {
+    if (justSaved) {
+      navigate({ to: '/alarm-rules' })
+    }
+  }, [justSaved, navigate])
 
   const isDirty =
-    form.product_id !== '' ||
+    !justSaved &&
+    (form.product_id !== '' ||
     form.name !== '' ||
     form.description !== '' ||
     form.trigger_type !== '' ||
@@ -63,7 +71,7 @@ function AlarmRuleCreatePage() {
     form.condition.min !== undefined ||
     form.condition.max !== undefined ||
     form.actions.some((a) => a.message !== '' || a.url !== '') ||
-    form.throttle_minutes !== 0
+    form.throttle_minutes !== 0)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -140,7 +148,7 @@ function AlarmRuleCreatePage() {
     createAlarmRule.mutate(body as any, {
       onSuccess: () => {
         toast.success('Alarm rule created')
-        navigate({ to: '/alarm-rules' })
+        setJustSaved(true)
       },
       onError: (error) => {
         toast.error('Failed to create alarm rule', { description: error.message })

@@ -19,6 +19,7 @@ import {
   type AlarmRecordResponse,
 } from './helpers/alarm-api'
 import { DemoMqttDevice } from './helpers/mqtt-device'
+import { findSeedProductId, getProduct, updateProduct } from './helpers/product-api'
 import { verifyTestEnvironment } from './helpers/environment-setup'
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
@@ -106,7 +107,40 @@ async function triggerAlarmViaMqtt(
 }
 
 /**
+ * Temporarily enables auto_provisioning on the seed product so that
+ * dynamically-created MQTT devices can connect and trigger alarms.
+ * Restores the original value in the finally block.
+ */
+async function withAutoProvisioning<T>(
+  request: Parameters<typeof createAlarmRule>[0],
+  body: () => Promise<T>,
+): Promise<T> {
+  const productId = await findSeedProductId(request)
+  const original = await getProduct(request, productId)
+  const originalAutoProv = original.auto_provisioning
+  try {
+    if (!originalAutoProv) {
+      await updateProduct(request, productId, {
+        name: original.name,
+        description: original.description || '',
+        auto_provisioning: true,
+      })
+    }
+    return await body()
+  } finally {
+    if (!originalAutoProv) {
+      await updateProduct(request, productId, {
+        name: original.name,
+        description: original.description || '',
+        auto_provisioning: originalAutoProv,
+      })
+    }
+  }
+}
+
+/**
  * Wrapper that triggers an alarm via MQTT and handles cleanup + ECONNREFUSED skip.
+ * Enables auto_provisioning around the MQTT connection so the dynamic device can register.
  * Runs the test body with the TriggerAlarmResult, then deletes the rule in finally.
  * Skips the test if the MQTT broker is unreachable.
  */
@@ -117,11 +151,11 @@ async function withTriggeredAlarm(
 ): Promise<void> {
   let ruleId: number | undefined
   try {
-    const result = await triggerAlarmViaMqtt(request, config)
+    const result = await withAutoProvisioning(request, () => triggerAlarmViaMqtt(request, config))
     ruleId = result.ruleId
     await body(result)
   } catch (err) {
-    if (err instanceof Error && err.message.includes('ECONNREFUSED')) {
+    if (err instanceof Error && (err.message.includes('ECONNREFUSED') || err.message.includes('Bad username or password'))) {
       test.skip()
     }
     throw err

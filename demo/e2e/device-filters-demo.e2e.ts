@@ -259,7 +259,7 @@ test.describe('[US-PA-037] Device registration source display and filtering', ()
   test('S4: cert-registered device shows Manual badge', async ({ page, request, demoLogger: _demoLogger }) => {
     const deviceId = `reg-manual-${Date.now()}`
 
-    await issueCert(deviceId)
+    await issueCert(request, deviceId)
     await waitForDeviceRegistration(request, deviceId, 'Manual')
 
     await page.goto(`${FRONTEND_URL}/devices`)
@@ -291,7 +291,7 @@ test.describe('[US-PA-037] Device registration source display and filtering', ()
         await autoDevice.disconnect()
       }
 
-      await issueCert(manualDeviceId)
+      await issueCert(request, manualDeviceId)
       await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
 
       await page.goto(`${FRONTEND_URL}/devices`)
@@ -326,7 +326,7 @@ test.describe('[US-PA-037] Device registration source display and filtering', ()
         await autoDevice.disconnect()
       }
 
-      await issueCert(manualDeviceId)
+      await issueCert(request, manualDeviceId)
       await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
 
       await page.goto(`${FRONTEND_URL}/devices`)
@@ -345,7 +345,7 @@ test.describe('[US-PA-037] Device registration source display and filtering', ()
 
   test('S7: filter by Auto with no auto-registered devices shows empty state', async ({ page, request, demoLogger: _demoLogger }) => {
     const manualDeviceId = `reg-empty-manual-${Date.now()}`
-    await issueCert(manualDeviceId)
+    await issueCert(request, manualDeviceId)
     await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
 
     await page.goto(`${FRONTEND_URL}/devices`)
