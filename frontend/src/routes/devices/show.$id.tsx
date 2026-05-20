@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { createRoute, Link } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
-import { useDevices, useDeviceStatusHistory } from '@/hooks/useDevices'
+import { useDevices, useDeviceStatusHistory, type DeviceRow } from '@/hooks/useDevices'
 import { usePropertyLatest, usePropertyHistory, usePropertyCommands, useCreatePropertyCommand, useDeletePropertyCommands } from '@/hooks/useProperties'
 import { useEventHistory } from '@/hooks/useEvents'
 import { DataTable, type Column } from '@/components/ui/data-table'
-import type { DeviceStatus } from '@/lib/api-generated/types.gen'
 import { PageHeader } from '@/components/ui/page-header'
 import { formatDatetime } from '@/lib/utils'
 
@@ -50,7 +49,7 @@ function DevicesShowPage() {
   return <DeviceDetailContent id={id} productId={device.product_id} device={device} />
 }
 
-function DeviceDetailContent({ id, productId, device }: { id: string; productId: string; device: DeviceStatus }) {
+function DeviceDetailContent({ id, productId, device }: { id: string; productId: string; device: DeviceRow }) {
   return (
     <div className="space-y-8">
       <PageHeader title="Device Detail" />

@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
-import type { DeviceStatus } from '@/lib/api-generated/types.gen'
+import type { DeviceRow } from '@/hooks/useDevices'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
@@ -40,7 +40,7 @@ vi.mock('@/hooks/useProducts', () => ({
 // Import the module to trigger createRoute and capture the component
 import '../index'
 
-const mockDevices: DeviceStatus[] = [
+const mockDevices: DeviceRow[] = [
   {
     device_id: 'device-001',
     product_id: 'product-a',
@@ -48,6 +48,7 @@ const mockDevices: DeviceStatus[] = [
     ip_address: '192.168.1.10',
     last_online_at: '2025-01-01T10:00:00Z',
     last_offline_at: null,
+    registration_source: 'Auto',
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T10:00:00Z',
   },
@@ -58,6 +59,7 @@ const mockDevices: DeviceStatus[] = [
     ip_address: null,
     last_online_at: '2025-01-02T08:00:00Z',
     last_offline_at: '2025-01-02T09:00:00Z',
+    registration_source: 'Manual',
     created_at: '2025-01-02T00:00:00Z',
     updated_at: '2025-01-02T09:00:00Z',
   },
@@ -84,14 +86,11 @@ describe('DevicesIndexPage', () => {
 
     const { container } = renderWithProviders(<Page />)
 
-    // SearchForm renders labels without htmlFor, so we check labels exist
-    // "Product" and "Status" appear as label text; use getAllByText for "Status"
-    // since it also appears as a table column header
+    // SearchForm has no htmlFor, and "Status" also appears as table header
     expect(screen.getByText('Product')).toBeInTheDocument()
     expect(screen.getAllByText('Status').length).toBeGreaterThanOrEqual(1)
-    // And there are select elements for the filters
     const selects = container.querySelectorAll('select')
-    expect(selects.length).toBe(2)
+    expect(selects.length).toBe(3)
   })
 
   test('shows empty state when API returns no devices', () => {
@@ -149,6 +148,48 @@ describe('DevicesIndexPage', () => {
     await waitFor(() => {
       expect(mockUseDevices).toHaveBeenLastCalledWith(
         expect.objectContaining({ status: 'Online' }),
+      )
+    })
+  })
+
+  test('renders registration source column', () => {
+    mockUseProducts.mockReturnValue({ data: [], isLoading: false })
+    mockUseDevices.mockReturnValue({ data: { data: mockDevices, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getAllByText('Registration').length).toBeGreaterThanOrEqual(1)
+    const autoBadges = screen.getAllByText('Auto')
+    expect(autoBadges.length).toBeGreaterThanOrEqual(1)
+    expect(autoBadges.some((el) => el.classList.contains('rounded-full'))).toBe(true)
+    const manualBadges = screen.getAllByText('Manual')
+    expect(manualBadges.length).toBeGreaterThanOrEqual(1)
+    expect(manualBadges.some((el) => el.classList.contains('rounded-full'))).toBe(true)
+  })
+
+  test('filter includes Registration select', () => {
+    getDefaultMocks()
+
+    const { container } = renderWithProviders(<Page />)
+
+    expect(screen.getAllByText('Registration').length).toBeGreaterThanOrEqual(1)
+    const selects = container.querySelectorAll('select')
+    expect(selects.length).toBe(3)
+  })
+
+  test('filter search triggers refetch with registration_source', async () => {
+    const user = userEvent.setup()
+    getDefaultMocks()
+
+    const { container } = renderWithProviders(<Page />)
+
+    const selects = container.querySelectorAll('select')
+    await user.selectOptions(selects[2], 'Auto')
+    await user.click(screen.getByRole('button', { name: /search/i }))
+
+    await waitFor(() => {
+      expect(mockUseDevices).toHaveBeenLastCalledWith(
+        expect.objectContaining({ registration_source: 'Auto' }),
       )
     })
   })

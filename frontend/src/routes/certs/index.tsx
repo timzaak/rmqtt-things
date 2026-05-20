@@ -8,6 +8,7 @@ import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Badge } from '@/components/ui/badge'
 import type { CertIssue, CertStatus } from '@/lib/api-generated/types.gen'
 import { formatDatetime } from '@/lib/utils'
 
@@ -25,10 +26,10 @@ const statusLabel: Record<CertStatus, string> = {
   Revoked: 'Revoked',
 }
 
-const statusBadgeClass: Record<CertStatus, string> = {
-  Normal: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  InValid: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
-  Revoked: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
+const statusBadgeVariant: Record<CertStatus, 'success' | 'danger' | 'warning'> = {
+  Normal: 'success',
+  InValid: 'danger',
+  Revoked: 'warning',
 }
 
 function StatusActions({ row }: { row: CertIssue }) {
@@ -100,11 +101,9 @@ const columns: Column<CertIssue>[] = [
   {
     header: 'Status',
     accessor: (row) => (
-      <span
-        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${statusBadgeClass[row.status] ?? ''}`}
-      >
+      <Badge variant={statusBadgeVariant[row.status]}>
         {statusLabel[row.status] ?? row.status}
-      </span>
+      </Badge>
     ),
   },
   {

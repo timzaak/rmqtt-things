@@ -37,6 +37,7 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
             <select
               value={values[field.name]}
               onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
+              aria-label={field.label}
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
             >
               <option value="">All</option>

@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDeviceStatus, getDeviceStatusHistory } from '@/lib/api-generated/sdk.gen'
-import type { PaginatedResponseDeviceStatus as DeviceStatusPage, SimplePaginatedResponseDeviceStatusHistory as StatusHistoryPage } from '@/lib/api-generated/types.gen'
+import type { PaginatedResponseDeviceStatusWithSource, SimplePaginatedResponseDeviceStatusHistory as StatusHistoryPage, RegistrationSource } from '@/lib/api-generated/types.gen'
+
+export type DeviceRow = PaginatedResponseDeviceStatusWithSource['data'][number]
 
 interface DeviceStatusParams {
   product_id: string | null
   device_id?: string | null
   status?: null | import('@/lib/api-generated/types.gen').DeviceConnectionStatus
+  registration_source?: null | RegistrationSource
   page?: number
   page_size?: number
 }
@@ -19,12 +22,13 @@ export function useDevices(params: DeviceStatusParams) {
           product_id: params.product_id ?? undefined,
           device_id: params.device_id ?? undefined,
           status: params.status ?? undefined,
+          registration_source: params.registration_source ?? undefined,
           page: params.page ?? 1,
           page_size: params.page_size ?? 10,
         },
         throwOnError: true,
       })
-      return res.data as unknown as DeviceStatusPage
+      return res.data as unknown as PaginatedResponseDeviceStatusWithSource
     },
   })
 }

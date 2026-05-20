@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { createRoute, Link } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
-import { useDevices } from '@/hooks/useDevices'
+import { useDevices, type DeviceRow } from '@/hooks/useDevices'
 import { useProducts } from '@/hooks/useProducts'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
-import type { DeviceStatus, DeviceConnectionStatus } from '@/lib/api-generated/types.gen'
+import { Badge } from '@/components/ui/badge'
+import type { DeviceConnectionStatus, RegistrationSource } from '@/lib/api-generated/types.gen'
 import { formatDatetime } from '@/lib/utils'
 
 export const devicesIndexRoute = createRoute({
@@ -17,7 +18,7 @@ export const devicesIndexRoute = createRoute({
 
 export const Route = devicesIndexRoute
 
-const columns: Column<DeviceStatus>[] = [
+const columns: Column<DeviceRow>[] = [
   {
     header: 'Device ID',
     accessor: (row) => (
@@ -43,6 +44,14 @@ const columns: Column<DeviceStatus>[] = [
   { header: 'Last Online', accessor: (row) => row.last_online_at ? formatDatetime(row.last_online_at) : '-' },
   { header: 'Last Offline', accessor: (row) => row.last_offline_at ? formatDatetime(row.last_offline_at) : '-' },
   {
+    header: 'Registration',
+    accessor: (row) => (
+      <Badge variant={row.registration_source === 'Auto' ? 'info' : 'default'}>
+        {row.registration_source}
+      </Badge>
+    ),
+  },
+  {
     header: 'Actions',
     accessor: (row) => (
       <Link
@@ -57,12 +66,17 @@ const columns: Column<DeviceStatus>[] = [
 ]
 
 function DevicesIndexPage() {
-  const [productId, setProductId] = useState<string | null>(null)
-  const [status, setStatus] = useState<DeviceConnectionStatus | null>(null)
+  const [filters, setFilters] = useState({ product_id: '', status: '', registration_source: '' })
   const [page, setPage] = useState(1)
 
   const { data: products } = useProducts(null)
-  const { data, isLoading } = useDevices({ product_id: productId, status, page, page_size: 10 })
+  const { data, isLoading } = useDevices({
+    product_id: filters.product_id || null,
+    status: (filters.status || null) as DeviceConnectionStatus | null,
+    registration_source: (filters.registration_source || null) as RegistrationSource | null,
+    page,
+    page_size: 10,
+  })
 
   const devices = data?.data ?? []
   const pagination = data?.pagination
@@ -87,10 +101,18 @@ function DevicesIndexPage() {
               { label: 'Offline', value: 'Offline' },
             ],
           },
+          {
+            name: 'registration_source',
+            label: 'Registration',
+            type: 'select',
+            options: [
+              { label: 'Auto', value: 'Auto' },
+              { label: 'Manual', value: 'Manual' },
+            ],
+          },
         ]}
         onSearch={(values) => {
-          setProductId(values.product_id || null)
-          setStatus((values.status || null) as DeviceConnectionStatus | null)
+          setFilters(values as typeof filters)
           setPage(1)
         }}
       />

@@ -35,17 +35,7 @@ vi.mock('@/hooks/useProducts', () => ({
 // Import the module to trigger createRoute and capture the component
 import '../edit.$id'
 
-import type { Product } from '@/lib/api-generated/types.gen'
-
-const mockProduct: Product = {
-  id: 1,
-  name: 'Sensor A',
-  model_no: 'SN-100',
-  description: 'Temperature sensor',
-  status: 'Online',
-  created_at: '2025-01-01T00:00:00Z',
-  updated_at: '2025-01-02T00:00:00Z',
-}
+import { mockProduct } from '@/test/fixtures'
 
 describe('ProductsEditPage', () => {
   const Page = (globalThis as Record<string, unknown>).__productsEditComponent as React.ComponentType
@@ -111,7 +101,50 @@ describe('ProductsEditPage', () => {
     await user.click(screen.getByRole('button', { name: /save/i }))
 
     expect(mockMutate).toHaveBeenCalledWith(
-      { id: 1, name: 'Updated Sensor', description: 'Temperature sensor' },
+      { id: 1, name: 'Updated Sensor', description: 'Temperature sensor', auto_provisioning: false },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    )
+  })
+
+  test('auto_provisioning checkbox reflects product data', async () => {
+    mockUseProduct.mockReturnValue({ data: mockProduct, isLoading: false })
+    mockUseUpdateProduct.mockReturnValue({ mutate: mockMutate, isPending: false })
+
+    renderWithProviders(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Product')).toBeInTheDocument()
+    })
+
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement
+    expect(checkbox.checked).toBe(false)
+  })
+
+  test('submit includes auto_provisioning in mutation payload', async () => {
+    const user = userEvent.setup()
+    const enabledProduct = { ...mockProduct, auto_provisioning: true }
+    mockUseProduct.mockReturnValue({ data: enabledProduct, isLoading: false })
+    mockUseUpdateProduct.mockReturnValue({ mutate: mockMutate, isPending: false })
+
+    renderWithProviders(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Product')).toBeInTheDocument()
+    })
+
+    const checkbox = screen.getByRole('checkbox') as HTMLInputElement
+    expect(checkbox.checked).toBe(true)
+
+    await user.click(checkbox)
+    expect(checkbox.checked).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      { id: 1, name: 'Sensor A', description: 'Temperature sensor', auto_provisioning: false },
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),

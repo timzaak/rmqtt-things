@@ -22,23 +22,23 @@ function ProductsEditPage() {
   const { data: product, isLoading } = useProduct(id)
   const updateProduct = useUpdateProduct()
 
-  const [form, setForm] = useState({ name: '', description: '' })
+  const [form, setForm] = useState({ name: '', description: '', auto_provisioning: false })
   const [prevProduct, setPrevProduct] = useState<typeof product>(undefined)
 
   if (product && product !== prevProduct) {
     setPrevProduct(product)
-    setForm({ name: product.name, description: product.description ?? '' })
+    setForm({ name: product.name, description: product.description ?? '', auto_provisioning: product.auto_provisioning })
   }
 
   const isDirty =
     prevProduct !== undefined &&
     product !== undefined &&
-    (form.name !== product.name || form.description !== (product.description ?? ''))
+    (form.name !== product.name || form.description !== (product.description ?? '') || form.auto_provisioning !== product.auto_provisioning)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     updateProduct.mutate(
-      { id, name: form.name, description: form.description },
+      { id, name: form.name, description: form.description, auto_provisioning: form.auto_provisioning },
       {
         onSuccess: () => {
           flushSync(() => setPrevProduct(undefined))
@@ -96,6 +96,22 @@ function ProductsEditPage() {
             rows={3}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            Auto Provisioning
+          </label>
+          <label className="inline-flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.auto_provisioning}
+              onChange={(e) => setForm((f) => ({ ...f, auto_provisioning: e.target.checked }))}
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 dark:border-slate-600"
+            />
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              Enable device auto-provisioning for this product
+            </span>
+          </label>
         </div>
         <div className="flex gap-2 pt-2">
           <button

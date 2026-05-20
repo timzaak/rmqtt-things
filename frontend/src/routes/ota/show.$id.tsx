@@ -3,6 +3,7 @@ import { rootRoute } from '../__root'
 import { useOtaVersion } from '@/hooks/useOta'
 import { useProducts } from '@/hooks/useProducts'
 import { PageHeader } from '@/components/ui/page-header'
+import { Badge } from '@/components/ui/badge'
 import { formatVersion } from '@/lib/version'
 import { formatDatetime } from '@/lib/utils'
 
@@ -80,12 +81,9 @@ function OtaShowPage() {
         {record.device_ids?.length ? (
           <dd className="flex flex-wrap gap-1.5">
             {record.device_ids.map((deviceId) => (
-              <span
-                key={deviceId}
-                className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-              >
+              <Badge key={deviceId} variant="info">
                 {deviceId}
-              </span>
+              </Badge>
             ))}
           </dd>
         ) : (

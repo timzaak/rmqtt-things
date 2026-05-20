@@ -34,19 +34,8 @@ vi.mock('@/hooks/useCerts', () => ({
 // Import the module to trigger createRoute and capture the component
 import '../index'
 
-import type { Product, CertIssue } from '@/lib/api-generated/types.gen'
-
-const mockProducts: Product[] = [
-  {
-    id: 1,
-    name: 'Sensor A',
-    model_no: 'SN-100',
-    description: 'Temperature sensor',
-    status: 'Online',
-    created_at: '2025-01-01T00:00:00Z',
-    updated_at: '2025-01-02T00:00:00Z',
-  },
-]
+import type { CertIssue } from '@/lib/api-generated/types.gen'
+import { mockProducts } from '@/test/fixtures'
 
 const mockCerts: CertIssue[] = [
   {
