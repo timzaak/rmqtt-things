@@ -75,6 +75,50 @@ export const SELECTORS = {
     showBackLink: '[data-testid="ota-show-back-link"]',
   },
 
+  /** Alarm Rules page selectors */
+  alarmRules: {
+    // List page
+    createButton: '[data-testid="alarm-rule-create-button"]',
+    searchForm: '[data-testid="alarm-rule-search-form"]',
+    table: '[data-testid="alarm-rule-table"]',
+    enabledSwitch: (id: number) => `[data-testid="alarm-rule-enabled-switch-${id}"]`,
+    deleteConfirmDialog: '[data-testid="delete-confirm-dialog"]',
+
+    // Create/Edit form
+    productSelect: '[data-testid="product-select"]',
+    nameInput: '[data-testid="name-input"]',
+    descriptionInput: '[data-testid="description-input"]',
+    triggerTypeSelect: '[data-testid="trigger-type-select"]',
+    propertyNameInput: '[data-testid="property-name-input"]',
+    eventIdentifierInput: '[data-testid="event-identifier-input"]',
+    conditionOperatorSelect: '[data-testid="condition-operator-select"]',
+    conditionValueInput: '[data-testid="condition-value-input"]',
+    conditionMinInput: '[data-testid="condition-min-input"]',
+    conditionMaxInput: '[data-testid="condition-max-input"]',
+    actionsEditor: '[data-testid="actions-editor"]',
+    actionLevelSelect: (index: number) => `[data-testid="action-level-select-${index}"]`,
+    actionMessageInput: (index: number) => `[data-testid="action-message-input-${index}"]`,
+    actionUrlInput: (index: number) => `[data-testid="action-url-input-${index}"]`,
+    actionRemoveButton: (index: number) => `[data-testid="action-remove-button-${index}"]`,
+    addAlarmActionButton: '[data-testid="add-alarm-action-button"]',
+    addWebhookActionButton: '[data-testid="add-webhook-action-button"]',
+    throttleMinutesInput: '[data-testid="throttle-minutes-input"]',
+    submitButton: '[data-testid="submit-button"]',
+    cancelButton: '[data-testid="cancel-button"]',
+
+    // Edit page disabled fields
+    productInputDisabled: '[data-testid="product-input-disabled"]',
+    triggerTypeInputDisabled: '[data-testid="trigger-type-input-disabled"]',
+  },
+
+  /** Alarm Records page selectors */
+  alarms: {
+    searchForm: '[data-testid="alarm-search-form"]',
+    table: '[data-testid="alarm-table"]',
+    ackButton: (id: number) => `[data-testid="ack-alarm-button-${id}"]`,
+    acknowledgedTag: (id: number) => `[data-testid="alarm-acknowledged-tag-${id}"]`,
+  },
+
   /** Products 页选择器 */
   products: {
     /** getByRole('link', { name: ... }) */

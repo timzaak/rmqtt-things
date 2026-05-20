@@ -120,6 +120,20 @@ pub async fn issue_cert_handler(
             ApiError::internal("Database operation failed")
         })?;
 
+    if let Err(e) = app_state
+        .db
+        .device()
+        .upsert_manual(&issue_req.product_id, &issue_req.device_id)
+        .await
+    {
+        tracing::warn!(
+            product_id = %issue_req.product_id,
+            device_id = %issue_req.device_id,
+            error = %e,
+            "Failed to create device record during cert issuance"
+        );
+    }
+
     Ok(Json(IssueCertResponse { cert_pem, key_pem }))
 }
 

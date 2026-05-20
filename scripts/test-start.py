@@ -112,6 +112,8 @@ min_pool_size = 1
             "max-size=10m",
             "--log-opt",
             "max-file=3",
+            "--add-host",
+            "host.docker.internal:host-gateway",
             "-e",
             "RUST_LOG=error",
             "-e",
@@ -321,11 +323,13 @@ deny_if_error = true
 http_auth_req.url = "http://{backend_host}/api/access/auth"
 http_auth_req.method = "post"
 http_auth_req.headers.content-type = "application/json"
+http_auth_req.headers.x-real-ip = "127.0.0.1"
 http_auth_req.params = {{ client_id = "%c", username = "%u", password = "%P", protocol = "%r", ipaddress = "%a" }}
 
 http_acl_req.url = "http://{backend_host}/api/access/acl"
 http_acl_req.method = "post"
 http_acl_req.headers.content-type = "application/json"
+http_acl_req.headers.x-real-ip = "127.0.0.1"
 http_acl_req.params = {{ access = "%A", username = "%u", client_id = "%c", ip = "%a", topic = "%t", protocol = "%r" }}
 """,
         encoding="utf-8",

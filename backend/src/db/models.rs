@@ -78,6 +78,29 @@ pub enum DeviceConnectionStatus {
     Online = 1,
 }
 
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize, ToSchema,
+)]
+#[repr(i16)]
+#[sqlx(type_name = "int2")]
+pub enum RegistrationSource {
+    Auto = 0,
+    Manual = 1,
+}
+
+#[derive(Debug, FromRow, Serialize, ToSchema)]
+#[allow(dead_code)]
+pub struct Device {
+    pub id: i64,
+    pub product_id: String,
+    pub device_id: String,
+    pub registration_source: RegistrationSource,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
 #[derive(Debug, FromRow, Serialize, ToSchema)]
 #[allow(dead_code)]
 pub struct DeviceStatus {
@@ -89,6 +112,24 @@ pub struct DeviceStatus {
     pub last_online_at: Option<OffsetDateTime>,
     #[serde(with = "time::serde::rfc3339::option")]
     pub last_offline_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, FromRow, Serialize, ToSchema)]
+#[allow(dead_code)]
+pub struct DeviceStatusWithSource {
+    pub product_id: String,
+    pub device_id: String,
+    pub status: DeviceConnectionStatus,
+    pub ip_address: Option<String>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub last_online_at: Option<OffsetDateTime>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub last_offline_at: Option<OffsetDateTime>,
+    pub registration_source: Option<RegistrationSource>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
@@ -178,6 +219,7 @@ pub struct Product {
     pub model_no: String,
     pub description: Option<String>,
     pub status: ProductStatus,
+    pub auto_provisioning: bool,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
@@ -195,6 +237,7 @@ pub struct CreateProductRequest {
 pub struct UpdateProductRequest {
     pub name: String,
     pub description: String,
+    pub auto_provisioning: bool,
 }
 
 #[derive(Debug, FromRow, Serialize, Deserialize, ToSchema, Clone)]

@@ -159,13 +159,27 @@ pub async fn request_json<T: serde::Serialize>(
     uri: &str,
     body: &T,
 ) -> (StatusCode, String) {
+    request_json_with_headers(service, method, uri, body, &[]).await
+}
+
+pub async fn request_json_with_headers<T: serde::Serialize>(
+    service: &Router,
+    method: Method,
+    uri: &str,
+    body: &T,
+    headers: &[(&str, &str)],
+) -> (StatusCode, String) {
+    let mut builder = Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", "application/json");
+    for (key, value) in headers {
+        builder = builder.header(*key, *value);
+    }
     let response = service
         .clone()
         .oneshot(
-            Request::builder()
-                .method(method)
-                .uri(uri)
-                .header("content-type", "application/json")
+            builder
                 .body(Body::from(serde_json::to_vec(body).unwrap()))
                 .unwrap(),
         )

@@ -26,7 +26,7 @@
 ### 阶段 3：测试执行验证（MANDATORY）
 
 ```bash
-uv run scripts/demo-test-runner.py "${TEST_FILE}" --mode fast --log-level mini
+uv run scripts/demo-test-runner.py "${TEST_FILE}" --mode fast --quiet-mode
 ```
 
 标准：

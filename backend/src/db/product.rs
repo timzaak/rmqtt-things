@@ -68,10 +68,11 @@ impl ProductRepo {
         req: &UpdateProductRequest,
     ) -> anyhow::Result<Option<Product>> {
         let product = sqlx::query_as::<_, Product>(
-            "UPDATE product SET name=$1, description=$2 WHERE id=$3 returning *",
+            "UPDATE product SET name=$1, description=$2, auto_provisioning=$3 WHERE id=$4 RETURNING *",
         )
         .bind(&req.name)
         .bind(&req.description)
+        .bind(req.auto_provisioning)
         .bind(id)
         .fetch_optional(&self.pool)
         .await?;

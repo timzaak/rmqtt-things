@@ -1,7 +1,7 @@
 use crate::db::models::{
-    CertIssue, CommandStatus, DeviceConnectionStatus, DeviceStatus, DeviceStatusHistory,
+    CertIssue, CommandStatus, DeviceConnectionStatus, DeviceStatusHistory, DeviceStatusWithSource,
     EventHistory, EventValidTemplate, EventValidTemplateStatus, PropertyCommand, PropertyHistory,
-    PropertyLatest,
+    PropertyLatest, RegistrationSource,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -53,6 +53,9 @@ pub struct CommonQuery2 {
     /// 设备状态: online, offline
     #[serde(default)]
     pub status: Option<DeviceConnectionStatus>,
+    /// 注册来源: 0=auto, 1=manual
+    #[serde(default)]
+    pub registration_source: Option<RegistrationSource>,
     /// 页码，默认为1
     #[serde(default = "default_page")]
     pub page: i64,
@@ -124,7 +127,7 @@ pub type PropertyLatestListResponse = SimplePaginatedResponse<PropertyLatest>;
 pub type CertificatesListResponse = SimplePaginatedResponse<CertIssue>;
 pub type PropertyHistoryListResponse = SimplePaginatedResponse<PropertyHistory>;
 pub type EventHistoryListResponse = SimplePaginatedResponse<EventHistory>;
-pub type DeviceStatusListResponse = PaginatedResponse<DeviceStatus>;
+pub type DeviceStatusListResponse = PaginatedResponse<DeviceStatusWithSource>;
 pub type DeviceStatusHistoryListResponse = SimplePaginatedResponse<DeviceStatusHistory>;
 pub type EventValidTemplateListResponse = PaginatedResponse<EventValidTemplate>;
 // 产品查询参数结构

@@ -502,6 +502,7 @@ pub async fn get_device_status(
             query.product_id.as_deref(),
             query.device_id.as_deref(),
             query.status,
+            query.registration_source,
             query.page,
             query.page_size,
         )

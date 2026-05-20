@@ -21,6 +21,7 @@
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "eslint": "^9.18.0",
+    "jscpd": "^4.0.5",
     "mqtt": "^5.15.1",
     "tsx": "^4.21.0",
     "typescript": "^5.8.0"

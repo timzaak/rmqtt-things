@@ -196,6 +196,37 @@ impl MqttTestContext {
         (status, body)
     }
 
+    pub async fn admin_patch_json<T: Serialize>(&self, path: &str, body: &T) -> (u16, String) {
+        let url = format!("http://127.0.0.1:{}{path}", self.backend_port);
+        let resp = self
+            .http_client
+            .patch(&url)
+            .json(body)
+            .send()
+            .await
+            .unwrap();
+        let status = resp.status().as_u16();
+        let body = resp.text().await.unwrap();
+        (status, body)
+    }
+
+    pub async fn admin_post_json_with_headers<T: Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+        headers: &[(&str, &str)],
+    ) -> (u16, String) {
+        let url = format!("http://127.0.0.1:{}{path}", self.backend_port);
+        let mut req = self.http_client.post(&url).json(body);
+        for (key, value) in headers {
+            req = req.header(*key, *value);
+        }
+        let resp = req.send().await.unwrap();
+        let status = resp.status().as_u16();
+        let body = resp.text().await.unwrap();
+        (status, body)
+    }
+
     pub async fn connect_device(&self, product_id: &str, device_id: &str) -> MqttDeviceClient {
         let password = generate_mqtt_password(device_id, AUTH_SUFFIX);
         let mut options = rumqttc::MqttOptions::new(device_id, "127.0.0.1", self.rmqtt_mqtt_port);
