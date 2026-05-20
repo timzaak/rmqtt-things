@@ -33,6 +33,7 @@ export default defineConfig({
     environment: 'jsdom',
     isolate: true,
     globals: true,
+    reporters: ['minimal'],
     testTimeout: 5000,
     include: ['**/__tests__/**/*.{test,spec}.{js,jsx,ts,tsx}'],
     exclude: [
