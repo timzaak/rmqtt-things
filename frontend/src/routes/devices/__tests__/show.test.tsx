@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
-import type { DeviceStatus } from '@/lib/api-generated/types.gen'
+import type { DeviceStatusWithSource } from '@/lib/api-generated/types.gen'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
@@ -56,7 +56,7 @@ vi.mock('@/hooks/useEvents', () => ({
 // Import the module to trigger createRoute and capture the component
 import '../show.$id'
 
-const mockDevice: DeviceStatus = {
+const mockDevice: DeviceStatusWithSource = {
   device_id: 'test-device-001',
   product_id: 'product-a',
   status: 'Online',
@@ -65,6 +65,7 @@ const mockDevice: DeviceStatus = {
   last_offline_at: null,
   created_at: '2025-01-01T00:00:00Z',
   updated_at: '2025-01-01T10:00:00Z',
+  registration_source: 'Manual',
 }
 
 function setupMocks(deviceData = mockDevice) {
