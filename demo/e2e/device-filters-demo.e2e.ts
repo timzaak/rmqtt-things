@@ -22,9 +22,12 @@
 import { test, expect } from './fixtures/demo-auth.fixtures'
 import { DemoMqttDevice } from './helpers/mqtt-device'
 import { verifyTestEnvironment } from './helpers/environment-setup'
+import { SELECTORS } from './selectors'
+import { issueCert } from './helpers/cert-api'
+import { findSeedProductId, getProduct, updateProduct, SEED_PRODUCT_MODEL_NO } from './helpers/product-api'
+import { waitForDeviceRegistration } from './helpers/device-api'
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
-const PRODUCT_ID = 'demo_product'
 const POLL_TIMEOUT = 15_000
 
 test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
@@ -50,14 +53,14 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
   test('US-PA-014 S2 / US-PA-019 S3: filter devices by Online status', async ({ page, demoLogger: _demoLogger }) => {
     // Create a device that will be Online
     const onlineDeviceId = `filter-online-${Date.now()}`
-    const mqttDevice = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId: onlineDeviceId })
+    const mqttDevice = new DemoMqttDevice({ productId: SEED_PRODUCT_MODEL_NO, deviceId: onlineDeviceId })
 
     await mqttDevice.connect()
     try {
       // Wait for the device to be registered as Online via API
       await expect.poll(async () => {
         const response = await page.request.get(
-          `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${onlineDeviceId}&page=1&page_size=10`,
+          `/api/admin/device/status?product_id=${SEED_PRODUCT_MODEL_NO}&device_id=${onlineDeviceId}&page=1&page_size=10`,
         )
         const body = await response.json()
         return body.data?.[0]?.status
@@ -86,13 +89,13 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
   test('US-PA-019 S3: filter devices by Offline status', async ({ page, demoLogger: _demoLogger }) => {
     // Create a device that connects then disconnects (will be Offline)
     const offlineDeviceId = `filter-offline-${Date.now()}`
-    const mqttDevice = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId: offlineDeviceId })
+    const mqttDevice = new DemoMqttDevice({ productId: SEED_PRODUCT_MODEL_NO, deviceId: offlineDeviceId })
 
     await mqttDevice.connect()
     // Wait for it to be Online first
     await expect.poll(async () => {
       const response = await page.request.get(
-        `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${offlineDeviceId}&page=1&page_size=10`,
+        `/api/admin/device/status?product_id=${SEED_PRODUCT_MODEL_NO}&device_id=${offlineDeviceId}&page=1&page_size=10`,
       )
       const body = await response.json()
       return body.data?.[0]?.status
@@ -104,7 +107,7 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
     // Wait for Offline status
     await expect.poll(async () => {
       const response = await page.request.get(
-        `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${offlineDeviceId}&page=1&page_size=10`,
+        `/api/admin/device/status?product_id=${SEED_PRODUCT_MODEL_NO}&device_id=${offlineDeviceId}&page=1&page_size=10`,
       )
       const body = await response.json()
       return body.data?.[0]?.status
@@ -183,5 +186,176 @@ test.describe('Device filters & navigation (US-PA-014, US-PA-019)', () => {
 
     await expect(page).toHaveURL(new RegExp(`/devices/show/`), { timeout: POLL_TIMEOUT })
     await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// US-PA-037: Device registration source display and filtering
+// ---------------------------------------------------------------------------
+
+const D = SELECTORS.devices
+
+test.describe('[US-PA-037] Device registration source display and filtering', () => {
+  test.beforeAll(async () => {
+    await verifyTestEnvironment(null)
+  })
+
+  test('S1: Registration column header is visible', async ({ page, demoLogger: _demoLogger }) => {
+    await page.goto(`${FRONTEND_URL}/devices`)
+    await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+    await expect(
+      page.getByRole('columnheader', { name: D.registrationColumnHeader }),
+    ).toBeVisible()
+  })
+
+  test('S2: Registration filter dropdown has Auto and Manual options', async ({ page, demoLogger: _demoLogger }) => {
+    await page.goto(`${FRONTEND_URL}/devices`)
+    await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+    const registrationSelect = page.getByLabel(D.registrationFilterLabel)
+    await expect(registrationSelect).toBeVisible()
+
+    await expect(
+      registrationSelect.locator('option', { hasText: new RegExp(`^${D.registrationAutoOption}$`) }),
+    ).toBeAttached()
+    await expect(
+      registrationSelect.locator('option', { hasText: new RegExp(`^${D.registrationManualOption}$`) }),
+    ).toBeAttached()
+  })
+
+  test('S3: auto-registered device shows Auto badge', async ({ page, request, demoLogger: _demoLogger }) => {
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
+    try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+
+      const deviceId = `reg-auto-${Date.now()}`
+      const device = new DemoMqttDevice({ productId: SEED_PRODUCT_MODEL_NO, deviceId })
+
+      await device.connect()
+      try {
+        await waitForDeviceRegistration(request, deviceId, 'Auto')
+      } finally {
+        await device.disconnect()
+      }
+
+      await page.goto(`${FRONTEND_URL}/devices`)
+      await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+      const deviceRow = page.locator('tbody tr').filter({ hasText: deviceId })
+      await expect(deviceRow).toBeVisible({ timeout: POLL_TIMEOUT })
+
+      await expect(
+        deviceRow.getByText(D.registrationAutoOption, { exact: true }),
+      ).toBeVisible()
+    } finally {
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
+    }
+  })
+
+  test('S4: cert-registered device shows Manual badge', async ({ page, request, demoLogger: _demoLogger }) => {
+    const deviceId = `reg-manual-${Date.now()}`
+
+    await issueCert(deviceId)
+    await waitForDeviceRegistration(request, deviceId, 'Manual')
+
+    await page.goto(`${FRONTEND_URL}/devices`)
+    await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+    const deviceRow = page.locator('tbody tr').filter({ hasText: deviceId })
+    await expect(deviceRow).toBeVisible({ timeout: POLL_TIMEOUT })
+
+    await expect(
+      deviceRow.getByText(D.registrationManualOption, { exact: true }),
+    ).toBeVisible()
+  })
+
+  test('S5: filter by Auto shows only Auto devices', async ({ page, request, demoLogger: _demoLogger }) => {
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
+    const autoDeviceId = `reg-filter-auto-${Date.now()}`
+    const manualDeviceId = `reg-filter-manual-${Date.now()}`
+
+    try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+      const autoDevice = new DemoMqttDevice({ productId: SEED_PRODUCT_MODEL_NO, deviceId: autoDeviceId })
+      await autoDevice.connect()
+      try {
+        await waitForDeviceRegistration(request, autoDeviceId, 'Auto')
+      } finally {
+        await autoDevice.disconnect()
+      }
+
+      await issueCert(manualDeviceId)
+      await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
+
+      await page.goto(`${FRONTEND_URL}/devices`)
+      await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+      const registrationSelect = page.getByLabel(D.registrationFilterLabel)
+      await registrationSelect.selectOption({ label: D.registrationAutoOption })
+      await page.getByRole('button', { name: 'Search' }).click()
+
+      await expect(page.getByText(autoDeviceId)).toBeVisible({ timeout: POLL_TIMEOUT })
+      await expect(page.getByText(manualDeviceId)).not.toBeVisible()
+    } finally {
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
+    }
+  })
+
+  test('S6: filter by Manual shows only Manual devices', async ({ page, request, demoLogger: _demoLogger }) => {
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
+    const autoDeviceId = `reg-manf-auto-${Date.now()}`
+    const manualDeviceId = `reg-manf-manual-${Date.now()}`
+
+    try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+      const autoDevice = new DemoMqttDevice({ productId: SEED_PRODUCT_MODEL_NO, deviceId: autoDeviceId })
+      await autoDevice.connect()
+      try {
+        await waitForDeviceRegistration(request, autoDeviceId, 'Auto')
+      } finally {
+        await autoDevice.disconnect()
+      }
+
+      await issueCert(manualDeviceId)
+      await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
+
+      await page.goto(`${FRONTEND_URL}/devices`)
+      await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+      const registrationSelect = page.getByLabel(D.registrationFilterLabel)
+      await registrationSelect.selectOption({ label: D.registrationManualOption })
+      await page.getByRole('button', { name: 'Search' }).click()
+
+      await expect(page.getByText(manualDeviceId)).toBeVisible({ timeout: POLL_TIMEOUT })
+      await expect(page.getByText(autoDeviceId)).not.toBeVisible()
+    } finally {
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
+    }
+  })
+
+  test('S7: filter by Auto with no auto-registered devices shows empty state', async ({ page, request, demoLogger: _demoLogger }) => {
+    const manualDeviceId = `reg-empty-manual-${Date.now()}`
+    await issueCert(manualDeviceId)
+    await waitForDeviceRegistration(request, manualDeviceId, 'Manual')
+
+    await page.goto(`${FRONTEND_URL}/devices`)
+    await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
+
+    const registrationSelect = page.getByLabel(D.registrationFilterLabel)
+    await registrationSelect.selectOption({ label: D.registrationAutoOption })
+    await page.getByRole('button', { name: 'Search' }).click()
+
+    await expect(page.getByText('No devices found')).toBeVisible({ timeout: POLL_TIMEOUT })
+    await expect(page.getByText(manualDeviceId)).not.toBeVisible()
   })
 })

@@ -141,6 +141,22 @@ export const SELECTORS = {
     searchButton: 'Search',
     /** getByRole('link', { name: ... }) - Edit link in table rows */
     editLink: 'Edit',
+    /** getByText(...) - Auto Provisioning label on product edit page */
+    autoProvisioningLabel: 'Auto Provisioning',
+    /** getByText(...) - Helper text under auto provisioning checkbox */
+    autoProvisioningText: 'Enable device auto-provisioning for this product',
+  },
+
+  /** Devices page selectors */
+  devices: {
+    /** getByRole('columnheader', { name: ... }) - Registration column header */
+    registrationColumnHeader: 'Registration',
+    /** getByLabel(...) - Registration filter select */
+    registrationFilterLabel: 'Registration',
+    /** option text in the filter dropdown */
+    registrationAutoOption: 'Auto',
+    /** option text in the filter dropdown */
+    registrationManualOption: 'Manual',
   },
 }
 
