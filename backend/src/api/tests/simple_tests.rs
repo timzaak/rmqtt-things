@@ -179,6 +179,7 @@ pub async fn request(service: &Router, method: Method, uri: &str) -> (StatusCode
             Request::builder()
                 .method(method)
                 .uri(uri)
+                .header("x-real-ip", "127.0.0.1")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -208,7 +209,8 @@ pub async fn request_json_with_headers<T: serde::Serialize>(
     let mut builder = Request::builder()
         .method(method)
         .uri(uri)
-        .header("content-type", "application/json");
+        .header("content-type", "application/json")
+        .header("x-real-ip", "127.0.0.1");
     for (key, value) in headers {
         builder = builder.header(*key, *value);
     }

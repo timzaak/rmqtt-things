@@ -37,7 +37,8 @@ async fn test_product_apis(ctx: &mut TestContext) {
     // 3. Update the product
     let update_req = json!({
         "name": "Updated Test Product",
-        "description": "This is an updated test product."
+        "description": "This is an updated test product.",
+        "auto_provisioning": false
     });
 
     let (status, body) = request_json(

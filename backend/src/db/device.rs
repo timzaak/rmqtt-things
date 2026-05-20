@@ -23,7 +23,7 @@ impl DeviceRepo {
               EXISTS(SELECT 1 FROM devices WHERE product_id = $1 AND device_id = $2) as device_exists,
               p.auto_provisioning
             FROM (SELECT $1::text as pid) const
-            LEFT JOIN products p ON p.model_no = const.pid
+            LEFT JOIN product p ON p.model_no = const.pid
             "#,
         )
         .bind(product_id)
