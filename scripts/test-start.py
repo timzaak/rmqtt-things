@@ -574,6 +574,8 @@ def main() -> int:
             "--memory=1g",
             "--cpus=0.5",
             "--restart=unless-stopped",
+            "--add-host",
+            "host.docker.internal:host-gateway",
             "--log-opt",
             "max-size=10m",
             "--log-opt",
