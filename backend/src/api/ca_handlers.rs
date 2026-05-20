@@ -3,7 +3,7 @@ use crate::api::admin_models::{CertificatesListResponse, CommonQuery2, SimplePag
 use crate::api::error::ApiError;
 use crate::api::utils::validate_identifier;
 use crate::ca;
-use crate::db::models::{CertIssue, CertStatus};
+use crate::db::models::{CertIssue, CertStatus, RegistrationSource};
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -123,7 +123,11 @@ pub async fn issue_cert_handler(
     if let Err(e) = app_state
         .db
         .device()
-        .upsert_manual(&issue_req.product_id, &issue_req.device_id)
+        .upsert(
+            &issue_req.product_id,
+            &issue_req.device_id,
+            RegistrationSource::Manual,
+        )
         .await
     {
         tracing::warn!(

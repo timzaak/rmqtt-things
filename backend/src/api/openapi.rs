@@ -119,7 +119,6 @@ use utoipa::{Modify, OpenApi};
             crate::db::models::CommandStatus,
             crate::db::models::CreateProductRequest,
             crate::db::models::DeviceConnectionStatus,
-            crate::db::models::DeviceStatus,
             crate::db::models::DeviceStatusWithSource,
             crate::db::models::RegistrationSource,
             crate::db::models::DeviceStatusHistory,

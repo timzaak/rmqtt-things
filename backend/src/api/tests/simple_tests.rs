@@ -136,6 +136,42 @@ fn database_url_with_schema(database_url: &str, schema_name: &str) -> String {
     format!("{database_url}{separator}options=-c%20search_path%3D{schema_name}")
 }
 
+impl TestContext {
+    pub async fn admin_get(&self, path: &str) -> (u16, String) {
+        let (status, body) = request(&self.service, Method::GET, path).await;
+        (status.as_u16(), body)
+    }
+
+    pub async fn admin_post_json<T: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> (u16, String) {
+        let (status, body) = request_json(&self.service, Method::POST, path, body).await;
+        (status.as_u16(), body)
+    }
+
+    pub async fn admin_patch_json<T: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+    ) -> (u16, String) {
+        let (status, body) = request_json(&self.service, Method::PATCH, path, body).await;
+        (status.as_u16(), body)
+    }
+
+    pub async fn admin_post_json_with_headers<T: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &T,
+        headers: &[(&str, &str)],
+    ) -> (u16, String) {
+        let (status, body) =
+            request_json_with_headers(&self.service, Method::POST, path, body, headers).await;
+        (status.as_u16(), body)
+    }
+}
+
 pub async fn request(service: &Router, method: Method, uri: &str) -> (StatusCode, String) {
     let response = service
         .clone()

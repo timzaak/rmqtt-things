@@ -89,7 +89,6 @@ pub enum RegistrationSource {
 }
 
 #[derive(Debug, FromRow, Serialize, ToSchema)]
-#[allow(dead_code)]
 pub struct Device {
     pub id: i64,
     pub product_id: String,
@@ -102,34 +101,17 @@ pub struct Device {
 }
 
 #[derive(Debug, FromRow, Serialize, ToSchema)]
-#[allow(dead_code)]
-pub struct DeviceStatus {
-    pub product_id: String,
-    pub device_id: String,
-    pub status: DeviceConnectionStatus,
-    pub ip_address: Option<String>,
-    #[serde(with = "time::serde::rfc3339::option")]
-    pub last_online_at: Option<OffsetDateTime>,
-    #[serde(with = "time::serde::rfc3339::option")]
-    pub last_offline_at: Option<OffsetDateTime>,
-    #[serde(with = "time::serde::rfc3339")]
-    pub created_at: OffsetDateTime,
-    #[serde(with = "time::serde::rfc3339")]
-    pub updated_at: OffsetDateTime,
-}
-
-#[derive(Debug, FromRow, Serialize, ToSchema)]
-#[allow(dead_code)]
 pub struct DeviceStatusWithSource {
     pub product_id: String,
     pub device_id: String,
-    pub status: DeviceConnectionStatus,
+    /// None when device is registered but has never connected.
+    pub status: Option<DeviceConnectionStatus>,
     pub ip_address: Option<String>,
     #[serde(with = "time::serde::rfc3339::option")]
     pub last_online_at: Option<OffsetDateTime>,
     #[serde(with = "time::serde::rfc3339::option")]
     pub last_offline_at: Option<OffsetDateTime>,
-    pub registration_source: Option<RegistrationSource>,
+    pub registration_source: RegistrationSource,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]

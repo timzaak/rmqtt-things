@@ -1,4 +1,5 @@
 use crate::api::ApiState;
+use crate::db::models::RegistrationSource;
 use axum::Json;
 use axum::extract::State;
 use hmac::{Hmac, Mac};
@@ -195,9 +196,7 @@ pub async fn auth(
         return "deny";
     }
 
-    // --- Device admission check (after HMAC verification) ---
-
-    // Extract product_id from username; deny if absent
+    // Device admission check
     let product_id = match &payload.username {
         Some(pid) => pid.as_str(),
         None => {
@@ -205,43 +204,52 @@ pub async fn auth(
             return "deny";
         }
     };
-    let device_id = &payload.client_id;
+    check_device_admission(state, product_id, &payload.client_id).await
+}
 
-    // Check if device is already registered
-    match state.db.device().exists(product_id, device_id).await {
-        Ok(true) => {
-            info!(client_id = %device_id, product_id = %product_id, "Device admission: already registered");
-            return "allow";
-        }
-        Ok(false) => {} // Not registered, proceed to auto-provisioning check
+async fn check_device_admission(
+    state: &crate::api::handlers::AppState,
+    product_id: &str,
+    device_id: &str,
+) -> &'static str {
+    let (device_exists, auto_provisioning) = match state
+        .db
+        .device()
+        .admission_check(product_id, device_id)
+        .await
+    {
+        Ok(result) => result,
         Err(e) => {
-            warn!(client_id = %device_id, product_id = %product_id, error = %e, "Device admission denied: DB error checking device existence");
+            warn!(client_id = %device_id, product_id = %product_id, error = %e, "Device admission denied: DB error");
             return "deny";
         }
+    };
+
+    if device_exists {
+        info!(client_id = %device_id, product_id = %product_id, "Device admission: already registered");
+        return "allow";
     }
 
-    // Device not registered — check product auto_provisioning setting
-    match state.db.product().get_product_by_model_no(product_id).await {
-        Ok(Some(product)) if product.auto_provisioning => {
-            // Auto-provisioning enabled, attempt to register device
-            if let Err(e) = state.db.device().upsert_auto(product_id, device_id).await {
-                warn!(client_id = %device_id, product_id = %product_id, error = %e, "Device admission denied: DB error during auto-provisioning");
+    match auto_provisioning {
+        Some(true) => {
+            if let Err(e) = state
+                .db
+                .device()
+                .upsert(product_id, device_id, RegistrationSource::Auto)
+                .await
+            {
+                warn!(client_id = %device_id, product_id = %product_id, error = %e, "Auto-provisioning failed");
                 return "deny";
             }
-            info!(client_id = %device_id, product_id = %product_id, "Device admission: auto-provisioned successfully");
+            info!(client_id = %device_id, product_id = %product_id, "Auto-provisioned");
             "allow"
         }
-        Ok(Some(_)) => {
-            // Product exists but auto_provisioning is OFF
-            warn!(client_id = %device_id, product_id = %product_id, "Device admission denied: auto-provisioning disabled for product");
+        Some(false) => {
+            warn!(client_id = %device_id, product_id = %product_id, "Device admission denied: auto-provisioning disabled");
             "deny"
         }
-        Ok(None) => {
+        None => {
             warn!(client_id = %device_id, product_id = %product_id, "Device admission denied: product not found");
-            "deny"
-        }
-        Err(e) => {
-            warn!(client_id = %device_id, product_id = %product_id, error = %e, "Device admission denied: DB error fetching product");
             "deny"
         }
     }

@@ -50,22 +50,6 @@ impl DatabaseService {
         DeviceRepo::new(self.pool.clone())
     }
 
-    #[allow(dead_code)]
-    fn add_device_filter<'a>(
-        builder: &mut QueryBuilder<'a, Postgres>,
-        product_id: Option<&'a str>,
-        device_id: Option<&'a str>,
-    ) {
-        if let Some(product_id) = product_id {
-            builder.push(" AND product_id = ");
-            builder.push_bind(product_id);
-        }
-        if let Some(device_id) = device_id {
-            builder.push(" AND device_id = ");
-            builder.push_bind(device_id);
-        }
-    }
-
     fn add_device_status_filter<'a>(
         builder: &mut QueryBuilder<'a, Postgres>,
         product_id: Option<&'a str>,
@@ -74,11 +58,11 @@ impl DatabaseService {
         registration_source: Option<RegistrationSource>,
     ) {
         if let Some(product_id) = product_id {
-            builder.push(" AND ds.product_id = ");
+            builder.push(" AND d.product_id = ");
             builder.push_bind(product_id);
         }
         if let Some(device_id) = device_id {
-            builder.push(" AND ds.device_id = ");
+            builder.push(" AND d.device_id = ");
             builder.push_bind(device_id);
         }
         if let Some(status) = status {
@@ -547,7 +531,7 @@ impl DatabaseService {
         page_size: i64,
     ) -> anyhow::Result<(Vec<DeviceStatusWithSource>, i64)> {
         let mut query_builder = QueryBuilder::new(
-            "SELECT ds.product_id, ds.device_id, ds.status, ds.ip_address, ds.last_online_at, ds.last_offline_at, d.registration_source, ds.created_at, ds.updated_at FROM device_status ds LEFT JOIN devices d ON ds.product_id = d.product_id AND ds.device_id = d.device_id WHERE 1=1",
+            "SELECT d.product_id, d.device_id, ds.status, ds.ip_address, ds.last_online_at, ds.last_offline_at, d.registration_source, d.created_at, COALESCE(ds.updated_at, d.updated_at) as updated_at FROM devices d LEFT JOIN device_status ds ON d.product_id = ds.product_id AND d.device_id = ds.device_id WHERE 1=1",
         );
 
         Self::add_device_status_filter(
@@ -558,7 +542,7 @@ impl DatabaseService {
             registration_source,
         );
 
-        query_builder.push(" ORDER BY ds.updated_at DESC");
+        query_builder.push(" ORDER BY updated_at DESC");
         Self::add_pagination(&mut query_builder, page, page_size);
 
         let devices = query_builder
@@ -567,20 +551,43 @@ impl DatabaseService {
             .await?;
 
         // Get total count
-        let mut count_builder = QueryBuilder::new(
-            "SELECT COUNT(*) as count FROM device_status ds LEFT JOIN devices d ON ds.product_id = d.product_id AND ds.device_id = d.device_id WHERE 1=1",
-        );
-
-        Self::add_device_status_filter(
-            &mut count_builder,
-            product_id,
-            device_id,
-            status,
-            registration_source,
-        );
-
-        let count_row = count_builder.build().fetch_one(&self.pool).await?;
-        let total: i64 = count_row.get("count");
+        let total: i64 = if status.is_none() {
+            let mut count_builder =
+                QueryBuilder::new("SELECT COUNT(*) as count FROM devices d WHERE 1=1");
+            if let Some(product_id) = product_id {
+                count_builder.push(" AND d.product_id = ");
+                count_builder.push_bind(product_id);
+            }
+            if let Some(device_id) = device_id {
+                count_builder.push(" AND d.device_id = ");
+                count_builder.push_bind(device_id);
+            }
+            if let Some(registration_source) = registration_source {
+                count_builder.push(" AND d.registration_source = ");
+                count_builder.push_bind(registration_source);
+            }
+            count_builder
+                .build()
+                .fetch_one(&self.pool)
+                .await?
+                .get("count")
+        } else {
+            let mut count_builder = QueryBuilder::new(
+                "SELECT COUNT(*) as count FROM devices d LEFT JOIN device_status ds ON d.product_id = ds.product_id AND d.device_id = ds.device_id WHERE 1=1",
+            );
+            Self::add_device_status_filter(
+                &mut count_builder,
+                product_id,
+                device_id,
+                status,
+                registration_source,
+            );
+            count_builder
+                .build()
+                .fetch_one(&self.pool)
+                .await?
+                .get("count")
+        };
 
         Ok((devices, total))
     }

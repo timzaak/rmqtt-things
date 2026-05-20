@@ -130,9 +130,22 @@ impl AsyncTestContext for MqttTestContext {
         let router = create_router(config, app_state.clone(), admin_state.clone(), None);
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
-        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{backend_port}"))
-            .await
-            .expect("Failed to bind backend port");
+        // Retry binding to the backend port with backoff, since serial_test may
+        // not fully release the port before the next test starts.
+        let mut listener = None;
+        for attempt in 0..30 {
+            match tokio::net::TcpListener::bind(format!("0.0.0.0:{backend_port}")).await {
+                Ok(l) => {
+                    listener = Some(l);
+                    break;
+                }
+                Err(_) if attempt < 29 => {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+                Err(e) => panic!("Failed to bind backend port after retries: {e}"),
+            }
+        }
+        let listener = listener.unwrap();
 
         tokio::spawn(async move {
             axum::serve(listener, router)
