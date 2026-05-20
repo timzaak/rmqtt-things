@@ -43,3 +43,6 @@ spec.md
 conf/*.key
 conf/*.pem
 .ai
+
+# Generated HTML previews
+docs/**/*.html
