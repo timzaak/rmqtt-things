@@ -1,6 +1,6 @@
 ---
 name: t-backend-finalize
-description: Run backend finalization after acceptance: simplify, clippy, fmt, tests, and OpenAPI export.
+description: Run backend finalization after acceptance: simplify, clippy, fmt, OpenAPI export, and frontend API generation.
 argument-hint: [任务名称]
 allowed-tools:
   - Read
@@ -24,7 +24,6 @@ allowed-tools:
   - `/simplify`
   - `cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features`
   - `cargo fmt --all`
-  - `uv run scripts/backend-test.py`
   - OpenAPI 文档导出与前端 API 生成
 - 若任一步失败，修复后默认从失败步骤恢复，不提供额外恢复参数。
 
@@ -50,14 +49,13 @@ allowed-tools:
 3. 执行 `/simplify`，简化目标范围内代码。
 4. 执行 `cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features`。
 5. 执行 `cargo fmt --all`。
-6. 执行全量 `uv run scripts/backend-test.py`。
-7. 导出 OpenAPI 文档并生成前端 API 客户端：
+6. 导出 OpenAPI 文档并生成前端 API 客户端：
    - 先根据目标仓库的 backend app crate、现有导出脚本或文档定位实际导出 binary
    - 执行 `cd backend && cargo run --bin <app-binary> -- --export-openapi ../frontend/api.json && cd ../`
    - 验证生成的 OpenAPI JSON（格式、路径占位符 camelCase）
    - 执行 `cd frontend && npm run generate-api && cd ../`
    - 验证生成的 TypeScript 文件
-8. 若任一步出现问题，则修复并从失败步骤恢复。
+7. 若任一步出现问题，则修复并从失败步骤恢复。
 
 ## State Transition
 1. 开始前写入：
@@ -66,7 +64,7 @@ allowed-tools:
    - `phases.backend.status = awaiting_finalize`
 2. 维护步骤级状态：
    - `tasks.backend.finalize.current_step`
-   - `tasks.backend.finalize.steps.simplify|clippy|fmt|full_test|openapi_export|frontend_api_gen`
+   - `tasks.backend.finalize.steps.simplify|clippy|fmt|openapi_export|frontend_api_gen`
 3. 某一步成功后，写入对应 step 为 `completed`。
 4. 某一步失败后：
    - `tasks.backend.finalize.status = failed`
@@ -75,7 +73,7 @@ allowed-tools:
    - `phases.backend.status = failed`
 5. 再次执行同一命令时：
    - 默认从 `current_step` 或最后失败步骤恢复
-   - 若失败发生在 `full_test` 或之后，修复后至少重新执行 `clippy -> fmt -> full_test -> openapi_export -> frontend_api_gen`
+   - 若失败发生在 `openapi_export` 或之后，修复后至少重新执行 `clippy -> fmt -> openapi_export -> frontend_api_gen`
 6. 全部成功后：
    - `tasks.backend.finalize.status = completed`
    - `tasks.backend.finalize.completed_at = <timestamp>`
@@ -85,7 +83,6 @@ allowed-tools:
 - `/simplify` 已执行且没有遗留待处理冲突。
 - `cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features` 执行完成，收口结束时无 warning。
 - `cargo fmt --all` 已执行。
-- `uv run scripts/backend-test.py` 全量通过。
 - OpenAPI 文档已成功导出到 `frontend/api.json`。
 - 前端 API 客户端已成功生成（`frontend/api/*.ts`）。
 
@@ -106,5 +103,4 @@ allowed-tools:
 - `skills/t-task/SKILL.md`
 - `skills/t-run/SKILL.md`
 - `.claude/guides/backend/development.md`
-- `.claude/guides/backend/testing.md`
 - `.claude/guides/backend/quality.md`

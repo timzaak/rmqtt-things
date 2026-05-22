@@ -119,11 +119,11 @@ cd backend
 /simplify
 cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features
 cargo fmt --all
-uv run scripts/backend-test.py
 ```
 
 说明：
-- 上述顺序用于 backend `accept` 通过后的统一收口，不替代 `backend-test` 的定向测试闭环。
+- 上述顺序用于 backend `accept` 通过后的统一收口。
+- 后端测试执行与补测证据属于 backend/test、backend-accept 或显式测试命令。
 - 在任务流中，这一步由 `/t-backend-finalize [feature]` 负责，默认从失败步骤恢复。
 
 如需更完整门禁、环境启动和 OpenAPI 一致性检查，按 `../agents/backend/validation.md` 与 `../agents/backend/quality.md` 执行。

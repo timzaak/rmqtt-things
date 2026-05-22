@@ -210,7 +210,6 @@ slot agent 输出必须至少包含：
   - `/simplify` 目标范围
   - `cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features`
   - `cargo fmt --all`
-  - 全量 `uv run scripts/backend-test.py`
   - OpenAPI 导出与前端 API 生成
   - 失败后从失败步骤恢复
 - `finalize.md` 不拆 item，不由 `/t-run` 执行。
