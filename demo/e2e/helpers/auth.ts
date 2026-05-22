@@ -21,7 +21,7 @@ export const DEMO_ADMIN = {
 /** GET /api/auth/config 返回结构 */
 export interface AuthConfig {
   enabled: boolean
-  herald_url?: string | null
+  login_url?: string | null
 }
 
 /**
@@ -47,7 +47,7 @@ async function loginViaHeraldApi(
   options: { logger?: UnifiedLogger } = {}
 ): Promise<void> {
   const { logger } = options
-  const loginUrl = `${heraldUrl}/api/auth/default/login`
+  const loginUrl = `${heraldUrl}/api/auth/rmqtt/login`
 
   logger?.testCode.log(`[Auth] Herald SSO 登录: ${loginUrl}`) ?? console.warn(`[Auth] Herald SSO 登录: ${loginUrl}`)
 
@@ -57,7 +57,7 @@ async function loginViaHeraldApi(
     body: JSON.stringify({
       email: DEMO_ADMIN.email,
       password: DEMO_ADMIN.password,
-      clientId: 'rmqtt-things-admin',
+      clientId: 'admin-web-console',
     }),
     signal: AbortSignal.timeout(10000),
   })
@@ -98,11 +98,13 @@ export async function ensureAuthCookie(
   const { logger } = options
   const config = await fetchAuthConfig()
 
-  if (!config.enabled || !config.herald_url) {
+  if (!config.enabled || !config.login_url) {
     return
   }
 
-  const loginUrl = `${config.herald_url}/api/auth/default/login`
+  // Derive Herald API base URL from login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
+  const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+  const loginUrl = `${heraldBaseUrl}/api/auth/rmqtt/login`
   logger?.testCode.log(`[Auth] 注入认证 cookie: ${loginUrl}`) ?? console.warn(`[Auth] 注入认证 cookie: ${loginUrl}`)
 
   const resp = await fetch(loginUrl, {
@@ -111,7 +113,7 @@ export async function ensureAuthCookie(
     body: JSON.stringify({
       email: DEMO_ADMIN.email,
       password: DEMO_ADMIN.password,
-      clientId: 'rmqtt-things-admin',
+      clientId: 'admin-web-console',
     }),
     signal: AbortSignal.timeout(10000),
   })
@@ -155,8 +157,9 @@ export async function loginAsAdmin(
 
   const config = await fetchAuthConfig()
 
-  if (config.enabled && config.herald_url) {
-    await loginViaHeraldApi(page, config.herald_url, { logger })
+  if (config.enabled && config.login_url) {
+    const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+    await loginViaHeraldApi(page, heraldBaseUrl, { logger })
     // 导航到后台页面验证会话生效
     await page.goto(`${BASE_URL}/admin/devices`, { waitUntil: 'domcontentloaded' })
   } else {

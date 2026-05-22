@@ -12,7 +12,17 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__devicesIndexComponent = options.component
       return { options }
     },
-    Link: ({ to, params, children, ...props }: { to: string; params?: Record<string, string>; children: React.ReactNode; [k: string]: unknown }) => {
+    Link: ({
+      to,
+      params,
+      children,
+      ...props
+    }: {
+      to: string
+      params?: Record<string, string>
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => {
       // Resolve $id-style params in the URL, matching TanStack Router behavior
       let href = to
       if (params) {
@@ -20,7 +30,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
           href = href.replace(`$${key}`, value)
         }
       }
-      return <a href={href} {...props}>{children}</a>
+      return (
+        <a href={href} {...props}>
+          {children}
+        </a>
+      )
     },
     useNavigate: () => vi.fn(),
   }
@@ -67,11 +81,15 @@ const mockDevices: DeviceRow[] = [
 
 function getDefaultMocks() {
   mockUseProducts.mockReturnValue({ data: [], isLoading: false })
-  mockUseDevices.mockReturnValue({ data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } }, isLoading: false })
+  mockUseDevices.mockReturnValue({
+    data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } },
+    isLoading: false,
+  })
 }
 
 describe('DevicesIndexPage', () => {
-  const Page = (globalThis as Record<string, unknown>).__devicesIndexComponent as React.ComponentType
+  const Page = (globalThis as Record<string, unknown>)
+    .__devicesIndexComponent as React.ComponentType
 
   test('renders page title "Devices"', () => {
     getDefaultMocks()
@@ -103,7 +121,10 @@ describe('DevicesIndexPage', () => {
 
   test('renders device list with Device ID as clickable links', () => {
     mockUseProducts.mockReturnValue({ data: [], isLoading: false })
-    mockUseDevices.mockReturnValue({ data: { data: mockDevices, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseDevices.mockReturnValue({
+      data: { data: mockDevices, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
 
     renderWithProviders(<Page />)
 
@@ -146,15 +167,16 @@ describe('DevicesIndexPage', () => {
     await user.click(screen.getByRole('button', { name: /search/i }))
 
     await waitFor(() => {
-      expect(mockUseDevices).toHaveBeenLastCalledWith(
-        expect.objectContaining({ status: 'Online' }),
-      )
+      expect(mockUseDevices).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'Online' }))
     })
   })
 
   test('renders registration source column', () => {
     mockUseProducts.mockReturnValue({ data: [], isLoading: false })
-    mockUseDevices.mockReturnValue({ data: { data: mockDevices, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseDevices.mockReturnValue({
+      data: { data: mockDevices, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
 
     renderWithProviders(<Page />)
 
@@ -189,7 +211,7 @@ describe('DevicesIndexPage', () => {
 
     await waitFor(() => {
       expect(mockUseDevices).toHaveBeenLastCalledWith(
-        expect.objectContaining({ registration_source: 'Auto' }),
+        expect.objectContaining({ registration_source: 'Auto' })
       )
     })
   })

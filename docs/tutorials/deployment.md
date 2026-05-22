@@ -115,8 +115,8 @@ bucket = "rmqtt-things"
 [herald]
 base_url = "http://herald:3000"              # Herald 容器名或地址
 api_key = "你的 Herald API Key"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 Redis 没有密码，因为 Docker 网络不对外暴露端口。如果你对外暴露了 Redis 端口，需要加密码。
@@ -467,4 +467,4 @@ docker network inspect rmqtt-things-net
 Herald 登录成功但管理后台一直跳回登录页。通常是 Cookie 没写成功：
 
 - 同域子域名模式：检查 Herald 的 `X-Auth` Cookie domain 是否设为 `.your-domain.com`
-- 跨域模式：检查 `/auth/callback` 页面是否正常接收 token 并写入 Cookie（浏览器 DevTools → Application → Cookies）
+- 同主机模式：确认 Herald 和 rmqtt-things 在同一主机，浏览器 Cookie 跨端口共享（DevTools → Application → Cookies 检查 `X-Auth` 是否存在）

@@ -166,7 +166,7 @@ function OtaCreatePage() {
         onError: (error) => {
           toast.error('Failed to create OTA version', { description: error.message })
         },
-      },
+      }
     )
   }
 

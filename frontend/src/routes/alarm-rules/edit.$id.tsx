@@ -83,7 +83,9 @@ function AlarmRuleEditPage() {
   }
 
   const productMap = new Map(products?.data?.map((p) => [p.model_no, p.name]) ?? [])
-  const productName = alarmRule ? (productMap.get(alarmRule.product_id) ?? alarmRule.product_id) : ''
+  const productName = alarmRule
+    ? (productMap.get(alarmRule.product_id) ?? alarmRule.product_id)
+    : ''
 
   const triggerTypeLabel =
     TRIGGER_TYPE_OPTIONS.find((t) => t.value === form.trigger_type)?.label ?? form.trigger_type
@@ -107,11 +109,17 @@ function AlarmRuleEditPage() {
     }
 
     // Trigger config required for property / event
-    if (form.trigger_type === 'property' && !(form.trigger_config as Record<string, unknown>).property_name) {
+    if (
+      form.trigger_type === 'property' &&
+      !(form.trigger_config as Record<string, unknown>).property_name
+    ) {
       toast.error('Property name is required')
       return
     }
-    if (form.trigger_type === 'event' && !(form.trigger_config as Record<string, unknown>).event_identifier) {
+    if (
+      form.trigger_type === 'event' &&
+      !(form.trigger_config as Record<string, unknown>).event_identifier
+    ) {
       toast.error('Event identifier is required')
       return
     }
@@ -170,7 +178,7 @@ function AlarmRuleEditPage() {
         onError: (error) => {
           toast.error('Failed to update alarm rule', { description: error.message })
         },
-      },
+      }
     )
   }
 
@@ -287,7 +295,9 @@ function AlarmRuleEditPage() {
             className={inputClass}
             data-testid="throttle-minutes-input"
           />
-          <p className="mt-1 text-xs text-slate-500">Dedup interval in minutes. 0 means no dedup.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Dedup interval in minutes. 0 means no dedup.
+          </p>
         </div>
 
         {/* Submit / Cancel */}

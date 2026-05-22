@@ -27,18 +27,29 @@ function ProductsEditPage() {
 
   if (product && product !== prevProduct) {
     setPrevProduct(product)
-    setForm({ name: product.name, description: product.description ?? '', auto_provisioning: product.auto_provisioning })
+    setForm({
+      name: product.name,
+      description: product.description ?? '',
+      auto_provisioning: product.auto_provisioning,
+    })
   }
 
   const isDirty =
     prevProduct !== undefined &&
     product !== undefined &&
-    (form.name !== product.name || form.description !== (product.description ?? '') || form.auto_provisioning !== product.auto_provisioning)
+    (form.name !== product.name ||
+      form.description !== (product.description ?? '') ||
+      form.auto_provisioning !== product.auto_provisioning)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     updateProduct.mutate(
-      { id, name: form.name, description: form.description, auto_provisioning: form.auto_provisioning },
+      {
+        id,
+        name: form.name,
+        description: form.description,
+        auto_provisioning: form.auto_provisioning,
+      },
       {
         onSuccess: () => {
           flushSync(() => setPrevProduct(undefined))
@@ -47,7 +58,7 @@ function ProductsEditPage() {
         onError: (error) => {
           toast.error('Failed to update product', { description: error.message })
         },
-      },
+      }
     )
   }
 
@@ -61,7 +72,10 @@ function ProductsEditPage() {
       <PageHeader title="Edit Product" />
       <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
         <div>
-          <label htmlFor="name" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="name"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -74,7 +88,10 @@ function ProductsEditPage() {
           />
         </div>
         <div>
-          <label htmlFor="model_no" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="model_no"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Model Number
           </label>
           <input
@@ -86,7 +103,10 @@ function ProductsEditPage() {
           />
         </div>
         <div>
-          <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="description"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Description
           </label>
           <textarea

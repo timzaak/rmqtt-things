@@ -20,7 +20,6 @@ import { otaIndexRoute } from './ota/index'
 import { otaCreateRoute } from './ota/create'
 import { otaEditRoute } from './ota/edit.$id'
 import { otaShowRoute } from './ota/show.$id'
-import { authCallbackRoute } from './auth/callback'
 
 export const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -44,5 +43,4 @@ export const routeTree = rootRoute.addChildren([
   otaCreateRoute,
   otaEditRoute,
   otaShowRoute,
-  authCallbackRoute,
 ])

@@ -42,7 +42,9 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
             >
               <option value="">All</option>
               {field.options?.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
             </select>
           ) : (

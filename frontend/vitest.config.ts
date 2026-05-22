@@ -21,13 +21,7 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, './src') },
   },
   optimizeDeps: {
-    include: [
-      'class-variance-authority',
-      'clsx',
-      'tailwind-merge',
-      'react',
-      'react-dom',
-    ],
+    include: ['class-variance-authority', 'clsx', 'tailwind-merge', 'react', 'react-dom'],
   },
   test: {
     environment: 'jsdom',
@@ -36,12 +30,7 @@ export default defineConfig({
     reporters: ['minimal'],
     testTimeout: 5000,
     include: ['**/__tests__/**/*.{test,spec}.{js,jsx,ts,tsx}'],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.git/**',
-      '**/.vscode/**',
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.git/**', '**/.vscode/**'],
     setupFiles: ['./src/test/setup.ts'],
   },
 })

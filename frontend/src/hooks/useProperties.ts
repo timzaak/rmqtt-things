@@ -1,6 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getPropertyLatest, getPropertyHistory, getPropertyCommands, createPropertyCommand, deletePropertyCommands } from '@/lib/api-generated/sdk.gen'
-import type { SimplePaginatedResponsePropertyLatest as PropertyLatestPage, SimplePaginatedResponsePropertyHistory as PropertyHistoryPage, PaginatedResponsePropertyCommand as PropertyCommandPage, CreatePropertyCommandRequest } from '@/lib/api-generated/types.gen'
+import {
+  getPropertyLatest,
+  getPropertyHistory,
+  getPropertyCommands,
+  createPropertyCommand,
+  deletePropertyCommands,
+} from '@/lib/api-generated/sdk.gen'
+import type {
+  SimplePaginatedResponsePropertyLatest as PropertyLatestPage,
+  SimplePaginatedResponsePropertyHistory as PropertyHistoryPage,
+  PaginatedResponsePropertyCommand as PropertyCommandPage,
+  CreatePropertyCommandRequest,
+} from '@/lib/api-generated/types.gen'
 
 interface PropertyLatestParams {
   product_id: string

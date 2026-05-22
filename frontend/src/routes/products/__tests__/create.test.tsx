@@ -12,8 +12,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__productsCreateComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
     useBlocker: () => ({ status: 'idle' }),
@@ -31,7 +41,8 @@ vi.mock('@/hooks/useProducts', () => ({
 import '../create'
 
 describe('ProductsCreatePage', () => {
-  const Page = (globalThis as Record<string, unknown>).__productsCreateComponent as React.ComponentType
+  const Page = (globalThis as Record<string, unknown>)
+    .__productsCreateComponent as React.ComponentType
 
   test('renders form fields', () => {
     mockUseCreateProduct.mockReturnValue({ mutate: mockMutate, isPending: false })
@@ -73,7 +84,7 @@ describe('ProductsCreatePage', () => {
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
-      }),
+      })
     )
   })
 })

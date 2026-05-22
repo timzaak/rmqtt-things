@@ -12,8 +12,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__otaCreateComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
     useBlocker: () => ({ status: 'idle' }),
@@ -58,7 +68,10 @@ describe('OtaCreatePage', () => {
   const Page = (globalThis as Record<string, unknown>).__otaCreateComponent as React.ComponentType
 
   function setupMocks() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseCreateOtaVersion.mockReturnValue({ mutate: mockMutate, isPending: false })
   }
 

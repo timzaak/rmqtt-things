@@ -55,7 +55,7 @@ function ValidTemplatesEditPage() {
         onError: (error) => {
           toast.error('Failed to update template', { description: error.message })
         },
-      },
+      }
     )
   }
 
@@ -74,10 +74,15 @@ function ValidTemplatesEditPage() {
       <PageHeader title="Edit Template" />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">Basic Info</h3>
+          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">
+            Basic Info
+          </h3>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div>
-              <label htmlFor="productId" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label
+                htmlFor="productId"
+                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
                 Product ID
               </label>
               <input
@@ -90,7 +95,10 @@ function ValidTemplatesEditPage() {
               />
             </div>
             <div>
-              <label htmlFor="event" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label
+                htmlFor="event"
+                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
                 Event
               </label>
               <input
@@ -103,7 +111,10 @@ function ValidTemplatesEditPage() {
               />
             </div>
             <div className="col-span-2">
-              <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              <label
+                htmlFor="description"
+                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              >
                 Description
               </label>
               <textarea

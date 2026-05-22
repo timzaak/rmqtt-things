@@ -47,5 +47,5 @@ expired_seconds = 600
 [herald]
 base_url = "http://127.0.0.1:13000"
 api_key = "rmqtt-things-test-api-key"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"

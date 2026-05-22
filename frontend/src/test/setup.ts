@@ -12,7 +12,9 @@ global.IntersectionObserver = class IntersectionObserver {
   constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
   disconnect() {}
   observe(_target: Element) {}
-  takeRecords(): IntersectionObserverEntry[] { return [] }
+  takeRecords(): IntersectionObserverEntry[] {
+    return []
+  }
   unobserve(_target: Element) {}
 } as unknown as typeof globalThis.IntersectionObserver
 

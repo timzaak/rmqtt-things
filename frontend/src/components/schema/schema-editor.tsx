@@ -1,13 +1,5 @@
 import { useState } from 'react'
-import {
-  ArrowDown,
-  ArrowUp,
-  Braces,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { ArrowDown, ArrowUp, Braces, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
 
 export type JSONSchema = {
   type: string
@@ -33,7 +25,8 @@ const selectClass =
 const disabledInputClass =
   'h-9 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'
 
-const labelClass = 'mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400'
+const labelClass =
+  'mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400'
 
 const cardClass =
   'rounded-md border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900'
@@ -206,7 +199,11 @@ function FieldEditor({
               className={`${iconButtonClass} mt-5`}
               title={expanded ? 'Collapse field' : 'Expand field'}
             >
-              {expanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              {expanded ? (
+                <ChevronDown className="h-5 w-5" />
+              ) : (
+                <ChevronRight className="h-5 w-5" />
+              )}
             </button>
           )}
 
@@ -285,7 +282,9 @@ function FieldEditor({
                   <input
                     type="number"
                     value={schema.minLength ?? ''}
-                    onChange={(e) => onChange({ ...schema, minLength: numericValue(e.target.value) })}
+                    onChange={(e) =>
+                      onChange({ ...schema, minLength: numericValue(e.target.value) })
+                    }
                     disabled={disabled}
                     className={disabled ? disabledInputClass : inputClass}
                     data-testid="schema-field-minlength-input"
@@ -296,7 +295,9 @@ function FieldEditor({
                   <input
                     type="number"
                     value={schema.maxLength ?? ''}
-                    onChange={(e) => onChange({ ...schema, maxLength: numericValue(e.target.value) })}
+                    onChange={(e) =>
+                      onChange({ ...schema, maxLength: numericValue(e.target.value) })
+                    }
                     disabled={disabled}
                     className={disabled ? disabledInputClass : inputClass}
                     data-testid="schema-field-maxlength-input"

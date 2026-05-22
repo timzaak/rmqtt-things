@@ -42,7 +42,7 @@ import '../__root'
 
 describe('root auth guard', () => {
   const options = (globalThis as Record<string, unknown>).__rootRouteOptions as {
-    beforeLoad: (args: { location: { pathname: string } }) => Promise<void>
+    beforeLoad: () => Promise<void>
   }
 
   beforeEach(() => {
@@ -53,17 +53,18 @@ describe('root auth guard', () => {
   test('delegates unauthenticated navigations to shared 401 handling', async () => {
     checkAuth.mockResolvedValue(false)
 
-    await expect(options.beforeLoad({ location: { pathname: '/devices' } }))
-      .rejects.toThrow('unauthenticated')
+    await expect(options.beforeLoad()).rejects.toThrow('unauthenticated')
 
     expect(checkAuth).toHaveBeenCalledTimes(1)
     expect(handle401).toHaveBeenCalledTimes(1)
   })
 
-  test('skips the callback route', async () => {
-    await options.beforeLoad({ location: { pathname: '/auth/callback' } })
+  test('allows authenticated navigations', async () => {
+    checkAuth.mockResolvedValue(true)
 
-    expect(checkAuth).not.toHaveBeenCalled()
+    await options.beforeLoad()
+
+    expect(checkAuth).toHaveBeenCalledTimes(1)
     expect(handle401).not.toHaveBeenCalled()
   })
 })

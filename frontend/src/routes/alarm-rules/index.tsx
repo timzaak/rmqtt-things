@@ -71,7 +71,7 @@ function AlarmRulesIndexPage() {
                 onError: (error) => {
                   toast.error('Failed to update alarm rule status', { description: error.message })
                 },
-              },
+              }
             )
           }}
           className="h-4 w-4 rounded border-slate-300"
@@ -133,47 +133,47 @@ function AlarmRulesIndexPage() {
         }
       />
       <div data-testid="alarm-rule-search-form">
-      <SearchForm
-        fields={[
-          {
-            name: 'product_id',
-            label: 'Product',
-            type: 'select',
-            options: products?.data?.map((p) => ({ label: p.name, value: p.model_no })) ?? [],
-          },
-        ]}
-        onSearch={(values) => {
-          setPage(1)
-          setProductId(values.product_id)
-        }}
-      />
+        <SearchForm
+          fields={[
+            {
+              name: 'product_id',
+              label: 'Product',
+              type: 'select',
+              options: products?.data?.map((p) => ({ label: p.name, value: p.model_no })) ?? [],
+            },
+          ]}
+          onSearch={(values) => {
+            setPage(1)
+            setProductId(values.product_id)
+          }}
+        />
       </div>
       <div data-testid="alarm-rule-table">
-      <DataTable
-        columns={columns}
-        data={items}
-        loading={isLoading}
-        emptyMessage="No alarm rules found"
-        pagination={
-          pagination
-            ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total }
-            : undefined
-        }
-        onPageChange={setPage}
-      />
+        <DataTable
+          columns={columns}
+          data={items}
+          loading={isLoading}
+          emptyMessage="No alarm rules found"
+          pagination={
+            pagination
+              ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total }
+              : undefined
+          }
+          onPageChange={setPage}
+        />
       </div>
       <div data-testid="delete-confirm-dialog">
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null)
-        }}
-        title="Delete Alarm Rule"
-        description={`Are you sure you want to delete alarm rule "${deleteTarget?.name}"?`}
-        onConfirm={handleDelete}
-        confirmText="Delete"
-        variant="danger"
-      />
+        <ConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null)
+          }}
+          title="Delete Alarm Rule"
+          description={`Are you sure you want to delete alarm rule "${deleteTarget?.name}"?`}
+          onConfirm={handleDelete}
+          confirmText="Delete"
+          variant="danger"
+        />
       </div>
     </div>
   )

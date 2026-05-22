@@ -296,7 +296,7 @@ mod tests {
                 "test-api-key".to_string(),
                 Some(Duration::from_secs(1)),
             )),
-            client_id: Arc::from("rmqtt-things-admin"),
+            client_id: Arc::from("admin-web-console"),
         };
 
         Router::new()

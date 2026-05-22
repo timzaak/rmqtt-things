@@ -50,7 +50,10 @@ function AlarmRuleCreatePage() {
   const navigate = useNavigate()
   const createAlarmRule = useCreateAlarmRule()
   const { data: products } = useProducts()
-  const [form, setForm] = useState<FormState>({ ...initialForm, actions: [{ ...INITIAL_ACTIONS[0] }] })
+  const [form, setForm] = useState<FormState>({
+    ...initialForm,
+    actions: [{ ...INITIAL_ACTIONS[0] }],
+  })
   const [justSaved, setJustSaved] = useState(false)
 
   useEffect(() => {
@@ -62,16 +65,16 @@ function AlarmRuleCreatePage() {
   const isDirty =
     !justSaved &&
     (form.product_id !== '' ||
-    form.name !== '' ||
-    form.description !== '' ||
-    form.trigger_type !== '' ||
-    Object.keys(form.trigger_config).length > 0 ||
-    form.condition.operator !== '' ||
-    form.condition.value !== undefined ||
-    form.condition.min !== undefined ||
-    form.condition.max !== undefined ||
-    form.actions.some((a) => a.message !== '' || a.url !== '') ||
-    form.throttle_minutes !== 0)
+      form.name !== '' ||
+      form.description !== '' ||
+      form.trigger_type !== '' ||
+      Object.keys(form.trigger_config).length > 0 ||
+      form.condition.operator !== '' ||
+      form.condition.value !== undefined ||
+      form.condition.min !== undefined ||
+      form.condition.max !== undefined ||
+      form.actions.some((a) => a.message !== '' || a.url !== '') ||
+      form.throttle_minutes !== 0)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -264,7 +267,9 @@ function AlarmRuleCreatePage() {
             className={inputClass}
             data-testid="throttle-minutes-input"
           />
-          <p className="mt-1 text-xs text-slate-500">Dedup interval in minutes. 0 means no dedup.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Dedup interval in minutes. 0 means no dedup.
+          </p>
         </div>
 
         {/* Submit / Cancel */}

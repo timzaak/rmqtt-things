@@ -11,11 +11,7 @@ type RouterContext = {
 }
 
 export const rootRoute = createRootRouteWithContext<RouterContext>()({
-  beforeLoad: async ({ location }) => {
-    if (location.pathname === '/auth/callback') {
-      return
-    }
-
+  beforeLoad: async () => {
     const authed = await checkAuth()
     if (!authed) {
       handle401()

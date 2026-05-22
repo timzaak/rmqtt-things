@@ -2,17 +2,26 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { checkAuth, getLoginUrl, handle401, resetAuthCheck } from '@/lib/auth'
 
 function mockFetch(responses: Record<string, { body?: string; status: number }>) {
-  vi.stubGlobal('fetch', vi.fn((url: string) => {
-    for (const [pattern, config] of Object.entries(responses)) {
-      if (url.startsWith(pattern)) {
-        return Promise.resolve(new Response(config.body ?? null, { status: config.status }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      for (const [pattern, config] of Object.entries(responses)) {
+        if (url.startsWith(pattern)) {
+          return Promise.resolve(new Response(config.body ?? null, { status: config.status }))
+        }
       }
-    }
-    return Promise.resolve(new Response(null, { status: 404 }))
-  }))
+      return Promise.resolve(new Response(null, { status: 404 }))
+    })
+  )
 }
 
-const authEnabled = { body: JSON.stringify({ enabled: true, herald_url: 'https://herald.example.com' }), status: 200 }
+const authEnabled = {
+  body: JSON.stringify({
+    enabled: true,
+    login_url: 'https://herald.example.com/default/auth/login',
+  }),
+  status: 200,
+}
 const authDisabled = { body: JSON.stringify({ enabled: false }), status: 200 }
 const ok = { status: 200 }
 
@@ -37,18 +46,12 @@ describe('auth helpers', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  test('builds Herald login URL with callback redirect retention', async () => {
+  test('returns the login_url from config', async () => {
     mockFetch({ '/api/auth/config': authEnabled, '/api/admin/product': ok })
 
     await checkAuth()
 
-    const loginUrl = new URL(getLoginUrl())
-    const callbackUrl = new URL(loginUrl.searchParams.get('redirect')!)
-
-    expect(loginUrl.toString()).toContain('https://herald.example.com/login?')
-    expect(callbackUrl.origin).toBe('https://app.example.com')
-    expect(callbackUrl.pathname).toBe('/auth/callback')
-    expect(callbackUrl.searchParams.get('redirect')).toBe(window.location.href)
+    expect(getLoginUrl()).toBe('https://herald.example.com/default/auth/login')
   })
 
   test('returns / for login URL when auth is disabled', async () => {

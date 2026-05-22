@@ -15,8 +15,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
         useParams: () => ({ id: '1' }),
       }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
     useBlocker: () => ({ status: 'idle' }),
@@ -38,7 +48,8 @@ import '../edit.$id'
 import { mockProduct } from '@/test/fixtures'
 
 describe('ProductsEditPage', () => {
-  const Page = (globalThis as Record<string, unknown>).__productsEditComponent as React.ComponentType
+  const Page = (globalThis as Record<string, unknown>)
+    .__productsEditComponent as React.ComponentType
 
   test('shows loading state', () => {
     mockUseProduct.mockReturnValue({ data: undefined, isLoading: true })
@@ -101,11 +112,16 @@ describe('ProductsEditPage', () => {
     await user.click(screen.getByRole('button', { name: /save/i }))
 
     expect(mockMutate).toHaveBeenCalledWith(
-      { id: 1, name: 'Updated Sensor', description: 'Temperature sensor', auto_provisioning: false },
+      {
+        id: 1,
+        name: 'Updated Sensor',
+        description: 'Temperature sensor',
+        auto_provisioning: false,
+      },
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
-      }),
+      })
     )
   })
 
@@ -148,7 +164,7 @@ describe('ProductsEditPage', () => {
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
-      }),
+      })
     )
   })
 })

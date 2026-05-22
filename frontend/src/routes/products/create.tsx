@@ -36,7 +36,7 @@ function ProductsCreatePage() {
         onError: (error) => {
           toast.error('Failed to create product', { description: error.message })
         },
-      },
+      }
     )
   }
 
@@ -46,7 +46,10 @@ function ProductsCreatePage() {
       <PageHeader title="Create Product" />
       <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
         <div>
-          <label htmlFor="name" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="name"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -59,7 +62,10 @@ function ProductsCreatePage() {
           />
         </div>
         <div>
-          <label htmlFor="model_no" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="model_no"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Model Number <span className="text-red-500">*</span>
           </label>
           <input
@@ -72,7 +78,10 @@ function ProductsCreatePage() {
           />
         </div>
         <div>
-          <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            htmlFor="description"
+            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+          >
             Description
           </label>
           <textarea

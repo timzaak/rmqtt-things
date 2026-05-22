@@ -31,12 +31,8 @@ function PropertyItem({
   return (
     <li style={{ paddingLeft: level * 20 }}>
       <div className="py-1">
-        <span className="font-medium text-slate-800 dark:text-slate-200">
-          {name}
-        </span>
-        {isRequired && (
-          <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>
-        )}
+        <span className="font-medium text-slate-800 dark:text-slate-200">{name}</span>
+        {isRequired && <span className="ml-0.5 text-red-600 dark:text-red-400">*</span>}
 
         <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">
           {property.type?.toUpperCase() ?? 'UNKNOWN'}
@@ -57,9 +53,7 @@ function PropertyItem({
 
         {property.type === 'array' && property.items && (
           <div className="mt-1">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              Items:{' '}
-            </span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">Items: </span>
             {property.items.type === 'object' && property.items.properties ? (
               <PropertyList schema={property.items} level={level + 1} />
             ) : (
@@ -97,11 +91,7 @@ function PropertyList({ schema, level }: { schema: JSONSchema; level: number }) 
 
 export function SchemaDisplay({ schema }: SchemaDisplayProps) {
   if (!schema) {
-    return (
-      <p className="text-sm text-slate-500 dark:text-slate-400">
-        No schema defined.
-      </p>
-    )
+    return <p className="text-sm text-slate-500 dark:text-slate-400">No schema defined.</p>
   }
 
   return <PropertyList schema={schema} level={0} />

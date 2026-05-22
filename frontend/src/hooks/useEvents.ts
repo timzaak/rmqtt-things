@@ -1,6 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getEventHistory, getEventValidTemplates, createEventValidTemplate, getEventValidTemplate, updateEventValidTemplate, updateEventValidTemplateStatus } from '@/lib/api-generated/sdk.gen'
-import type { SimplePaginatedResponseEventHistory as EventHistoryPage, PaginatedResponseEventValidTemplate as ValidTemplatePage, EventValidTemplate, CreateEventValidTemplateRequest, UpdateEventValidTemplateRequest, UpdateEventValidTemplateStatusRequest } from '@/lib/api-generated/types.gen'
+import {
+  getEventHistory,
+  getEventValidTemplates,
+  createEventValidTemplate,
+  getEventValidTemplate,
+  updateEventValidTemplate,
+  updateEventValidTemplateStatus,
+} from '@/lib/api-generated/sdk.gen'
+import type {
+  SimplePaginatedResponseEventHistory as EventHistoryPage,
+  PaginatedResponseEventValidTemplate as ValidTemplatePage,
+  EventValidTemplate,
+  CreateEventValidTemplateRequest,
+  UpdateEventValidTemplateRequest,
+  UpdateEventValidTemplateStatusRequest,
+} from '@/lib/api-generated/types.gen'
 
 interface EventHistoryParams {
   product_id: string

@@ -1,0 +1,10 @@
+dist
+build
+node_modules
+api.json
+src/api/
+pnpm-lock.yaml
+package-lock.json
+
+# Generated files
+src/routeTree.gen.ts

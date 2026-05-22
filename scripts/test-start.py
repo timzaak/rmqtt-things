@@ -442,7 +442,10 @@ log_level = "warn"
 app_env = "test"
 
 [frontend]
-url = "http://localhost:3000"
+url = "http://localhost:13000"
+
+[jwt]
+secret = "rmqtt-things-test-jwt-secret"
 """,
         encoding="utf-8",
     )
@@ -467,19 +470,16 @@ def _start_herald() -> bool:
             "--log-opt",
             "max-file=3",
             "-e",
-            "HERALD_CONFIG=/app/config/config.toml",
+            "HERALD_CONFIG=/app/config.toml",
+            "--mount",
+            f"type=bind,source={str((TEST_CONFIG_DIR / 'herald' / 'config.toml').resolve())},target=/app/config.toml,readonly",
             "-p",
             f"{HERALD_PORT}:3000",
-            "ghcr.io/timzaak/herald:0.1.4",
+            "ghcr.io/timzaak/herald:0.1.5",
         ]
     )
     if not cid:
         print("ERROR: Herald container create failed")
-        return False
-
-    config_file = str((TEST_CONFIG_DIR / "herald" / "config.toml").resolve())
-    if not docker.copy_into_container(cid, config_file, "/app/config/config.toml"):
-        print("ERROR: Herald config copy failed")
         return False
 
     if not docker.start_container(cid):

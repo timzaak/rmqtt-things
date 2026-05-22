@@ -40,8 +40,8 @@ impl AsyncTestContext for HeraldAuthTestContext {
         let herald_config = HeraldConfig {
             base_url: herald_url.clone(),
             api_key: "rmqtt-things-test-api-key".to_string(),
-            realm_id: "default".to_string(),
-            client_id: "rmqtt-things-admin".to_string(),
+            realm_id: "rmqtt".to_string(),
+            client_id: "admin-web-console".to_string(),
         };
 
         // Build app config with Herald enabled
@@ -119,13 +119,13 @@ impl AsyncTestContext for HeraldAuthTestContext {
 /// Log in to Herald and return the `X-Auth` cookie value.
 async fn login_to_herald(herald_url: &str) -> String {
     let client = reqwest::Client::new();
-    let login_url = format!("{herald_url}/api/auth/default/login");
+    let login_url = format!("{herald_url}/api/auth/rmqtt/login");
     let resp = client
         .post(&login_url)
         .json(&serde_json::json!({
             "email": "admin@rmqtt-things.local",
             "password": "password",
-            "clientId": "rmqtt-things-admin"
+            "clientId": "admin-web-console"
         }))
         .send()
         .await

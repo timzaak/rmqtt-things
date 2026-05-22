@@ -34,8 +34,8 @@ rmqtt-things 不直接连 Herald 的数据库。所有认证和权限查询走 H
 [herald]
 base_url = "http://127.0.0.1:3000"  # Herald 服务地址
 api_key = "your-api-key"            # 调用 Herald ext API 的密钥
-realm_id = "default"                # rmqtt-things 所属的 realm
-client_id = "rmqtt-things-admin"    # 客户端标识
+realm_id = "rmqtt"                # rmqtt-things 所属的 realm
+client_id = "admin-web-console"    # 客户端标识
 ```
 
 不配这个段，管理端 API 就没有认证保护（本地开发可以不配）。生产环境必须配。
@@ -133,8 +133,7 @@ let admin_routes = match (config.herald.as_ref(), herald_client) {
 用户打开管理后台时，`__root.tsx` 的 `beforeLoad` 钩子会检查认证状态：
 
 ```typescript
-beforeLoad: async ({ location }) => {
-    if (location.pathname === '/auth/callback') return
+beforeLoad: async () => {
     const authed = await checkAuth()
     if (!authed) {
         handle401()  // 跳转到 Herald 登录页
@@ -145,27 +144,17 @@ beforeLoad: async ({ location }) => {
 
 `checkAuth()` 先查 `/api/auth/config` 看有没有开 Herald。没开就直接通过。开了就发一个探测请求到 `/api/admin/product?page=1&page_size=1`，根据返回状态判断 session 是否有效。
 
-未登录时跳转到 Herald 的登录页，URL 格式：
+未登录时，浏览器直接跳转到 Herald 的登录页。后端 `GET /api/auth/config` 返回完整的登录 URL：
 
-```
-{herald_base_url}/login?redirect={app_base_url}/auth/callback?redirect={当前页面}
-```
-
-### 跨域回调
-
-登录成功后 Herald 重定向到 `/auth/callback?token=xxx&redirect=xxx`。`callback.tsx` 把 token 写入 Cookie 并跳转到原页面：
-
-```typescript
-export function completeAuthCallback(search = window.location.search): string {
-    const params = new URLSearchParams(search)
-    const token = params.get('token')
-    const redirect = params.get('redirect') || '/'
-    if (token) setAuthToken(token)
-    return redirect
-}
+```json
+{"enabled": true, "login_url": "http://herald.example.com/default/auth/login"}
 ```
 
-Cookie 格式：`X-Auth={token}; Path=/; SameSite=Lax`
+URL 由后端根据 `herald.base_url` 和 `herald.realm_id` 拼接，格式为 `{base_url}/{realm_id}/auth/login`。前端不做任何 URL 拼接。
+
+### 认证机制
+
+Herald 和 rmqtt-things 部署在同一主机（或同根域）时，浏览器 Cookie 跨端口/子域共享。用户在 Herald 登录后，Herald 设置的 `X-Auth` Cookie 会被浏览器自动带给 rmqtt-things 的请求。用户登录后手动返回 rmqtt-things 页面即可，不需要回调中转。
 
 ### 会话失效
 
@@ -182,10 +171,6 @@ apiClient.interceptors.response.use(
 ```
 
 `handle401()` 重置认证状态缓存，跳转到 Herald 登录页。用 `isRedirecting` 标记防止多个并发 401 触发多次跳转。
-
-### 同域子域名模式
-
-如果 Herald 和 rmqtt-things 在同一个根域下（比如 `auth.example.com` 和 `app.example.com`），Herald 可以把 `X-Auth` Cookie 的 domain 设为 `.example.com`，浏览器会自动在两个子域名之间共享。这种模式下不需要 `/auth/callback` 中转。
 
 ## 部署
 
@@ -206,18 +191,19 @@ apiClient.interceptors.response.use(
 [herald]
 base_url = "http://herald:3000"       # Docker 网络内用容器名
 api_key = "CHANGE_ME_HERALD_API_KEY"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 `base_url` 在 Docker 部署时用容器名或服务名，不要用 `localhost`。
 
-### 部署模式选择
+### 部署要求
 
-**同域子域名**（推荐）：Herald 和 rmqtt-things 部署在同一根域下，Cookie 自动共享。配置简单，不需要回调中转。前端环境变量设 `VITE_APP_BASE_URL` 为管理后台地址即可。
+Herald 和 rmqtt-things 必须部署在同一主机或同根域下，这样浏览器才能共享 Cookie。典型部署方式：
 
-**跨域**：Herald 和 rmqtt-things 部署在不同域名下。登录走回调页中转。前端需要额外配：
-- `VITE_APP_BASE_URL` — 管理后台的完整 URL
+- 同主机不同端口（如 `127.0.0.1:13000` 和 `127.0.0.1:3000`）
+- 反向代理统一入口（如 Caddy/Nginx 把 `/auth` 转发到 Herald，`/` 转发到 rmqtt-things）
+- 同根域子域名（如 `auth.example.com` 和 `app.example.com`）
 
 ### 不开 Herald 的场景
 

@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDeviceStatus, getDeviceStatusHistory } from '@/lib/api-generated/sdk.gen'
-import type { PaginatedResponseDeviceStatusWithSource, SimplePaginatedResponseDeviceStatusHistory as StatusHistoryPage, RegistrationSource } from '@/lib/api-generated/types.gen'
+import type {
+  PaginatedResponseDeviceStatusWithSource,
+  SimplePaginatedResponseDeviceStatusHistory as StatusHistoryPage,
+  RegistrationSource,
+} from '@/lib/api-generated/types.gen'
 
 export type DeviceRow = PaginatedResponseDeviceStatusWithSource['data'][number]
 

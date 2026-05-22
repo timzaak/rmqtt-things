@@ -34,8 +34,8 @@ Add a `[herald]` section to `config.toml`:
 [herald]
 base_url = "http://127.0.0.1:3000"  # Herald service address
 api_key = "your-api-key"            # API key for Herald ext API calls
-realm_id = "default"                # realm that rmqtt-things belongs to
-client_id = "rmqtt-things-admin"    # client identifier
+realm_id = "rmqtt"                # realm that rmqtt-things belongs to
+client_id = "admin-web-console"    # client identifier
 ```
 
 Without this section, the admin API runs without authentication. This is fine for local development but must be configured in production.
@@ -133,8 +133,7 @@ Routes that are not affected:
 When a user opens the admin backend, the `beforeLoad` hook in `__root.tsx` checks authentication status:
 
 ```typescript
-beforeLoad: async ({ location }) => {
-    if (location.pathname === '/auth/callback') return
+beforeLoad: async () => {
     const authed = await checkAuth()
     if (!authed) {
         handle401()  // Redirect to Herald login page
@@ -145,27 +144,17 @@ beforeLoad: async ({ location }) => {
 
 `checkAuth()` first queries `/api/auth/config` to see if Herald is enabled. If not, it passes through immediately. If Herald is enabled, it sends a probe request to `/api/admin/product?page=1&page_size=1` and checks the response status to determine whether the session is valid.
 
-When unauthenticated, the browser redirects to Herald's login page with this URL format:
+When unauthenticated, the browser redirects directly to Herald's login page. The backend `GET /api/auth/config` returns the complete login URL:
 
-```
-{herald_base_url}/login?redirect={app_base_url}/auth/callback?redirect={current page}
-```
-
-### Cross-Domain Callback
-
-After a successful login, Herald redirects to `/auth/callback?token=xxx&redirect=xxx`. The `callback.tsx` page writes the token into a Cookie and redirects back to the original page:
-
-```typescript
-export function completeAuthCallback(search = window.location.search): string {
-    const params = new URLSearchParams(search)
-    const token = params.get('token')
-    const redirect = params.get('redirect') || '/'
-    if (token) setAuthToken(token)
-    return redirect
-}
+```json
+{"enabled": true, "login_url": "http://herald.example.com/default/auth/login"}
 ```
 
-Cookie format: `X-Auth={token}; Path=/; SameSite=Lax`
+The URL is assembled by the backend from `herald.base_url` and `herald.realm_id` in the format `{base_url}/{realm_id}/auth/login`. The frontend does no URL construction.
+
+### Authentication Mechanism
+
+When Herald and rmqtt-things are deployed on the same host (or same root domain), browser cookies are shared across ports/subdomains. After the user logs in at Herald, the `X-Auth` cookie set by Herald is automatically included in requests to rmqtt-things. The user simply returns to the rmqtt-things page after logging in -- no callback intermediary is needed.
 
 ### Session Expiry
 
@@ -182,10 +171,6 @@ apiClient.interceptors.response.use(
 ```
 
 `handle401()` resets the auth state cache and redirects to the Herald login page. An `isRedirecting` flag prevents multiple concurrent 401 responses from triggering duplicate redirects.
-
-### Same-Domain Subdomain Mode
-
-When Herald and rmqtt-things share a root domain (for example, `auth.example.com` and `app.example.com`), Herald can set the `X-Auth` Cookie's domain to `.example.com`. The browser then shares the cookie across both subdomains automatically. This mode eliminates the need for the `/auth/callback` intermediary page.
 
 ## Deployment
 
@@ -206,18 +191,19 @@ For production, add the following to `config.toml` (or `config.production.toml`)
 [herald]
 base_url = "http://herald:3000"       # Use container name within Docker network
 api_key = "CHANGE_ME_HERALD_API_KEY"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 When deploying with Docker, use the container name or service name for `base_url`, not `localhost`.
 
-### Deployment Mode Selection
+### Deployment Requirements
 
-**Same-domain subdomain** (recommended): Deploy Herald and rmqtt-things under the same root domain. Cookies are shared automatically. Configuration is simpler since no callback intermediary is needed. Set `VITE_APP_BASE_URL` to the admin backend address in the frontend environment variables.
+Herald and rmqtt-things must be deployed on the same host or under the same root domain so that browsers share cookies. Typical deployment patterns:
 
-**Cross-domain**: Deploy Herald and rmqtt-things on different domains. Login goes through the callback page intermediary. The frontend needs one additional config:
-- `VITE_APP_BASE_URL` -- the full URL of the admin backend
+- Same host, different ports (e.g., `127.0.0.1:13000` and `127.0.0.1:3000`)
+- Reverse proxy with a unified entry point (e.g., Caddy/Nginx routing `/auth` to Herald and `/` to rmqtt-things)
+- Same root domain subdomains (e.g., `auth.example.com` and `app.example.com`)
 
 ### Running Without Herald
 

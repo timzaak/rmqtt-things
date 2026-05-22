@@ -35,14 +35,26 @@ const columns: Column<DeviceRow>[] = [
   {
     header: 'Status',
     accessor: (row) => (
-      <span className={row.status === 'Online' ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}>
+      <span
+        className={
+          row.status === 'Online'
+            ? 'text-green-600 dark:text-green-400'
+            : 'text-slate-400 dark:text-slate-500'
+        }
+      >
         {row.status}
       </span>
     ),
   },
   { header: 'IP Address', accessor: (row) => row.ip_address ?? '-' },
-  { header: 'Last Online', accessor: (row) => row.last_online_at ? formatDatetime(row.last_online_at) : '-' },
-  { header: 'Last Offline', accessor: (row) => row.last_offline_at ? formatDatetime(row.last_offline_at) : '-' },
+  {
+    header: 'Last Online',
+    accessor: (row) => (row.last_online_at ? formatDatetime(row.last_online_at) : '-'),
+  },
+  {
+    header: 'Last Offline',
+    accessor: (row) => (row.last_offline_at ? formatDatetime(row.last_offline_at) : '-'),
+  },
   {
     header: 'Registration',
     accessor: (row) => (
@@ -121,7 +133,11 @@ function DevicesIndexPage() {
         data={devices}
         loading={isLoading}
         emptyMessage="No devices found"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total } : undefined}
+        pagination={
+          pagination
+            ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total }
+            : undefined
+        }
         onPageChange={setPage}
       />
     </div>

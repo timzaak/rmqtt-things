@@ -1,6 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getOtaVersions, createOtaVersion, getOtaVersion, updateOtaVersion, deleteOtaVersion } from '@/lib/api-generated/sdk.gen'
-import type { PaginatedResponseOtaVersion as OtaVersionPage, OtaVersion, CreateOtaVersionRequest, UpdateOtaVersionRequest } from '@/lib/api-generated/types.gen'
+import {
+  getOtaVersions,
+  createOtaVersion,
+  getOtaVersion,
+  updateOtaVersion,
+  deleteOtaVersion,
+} from '@/lib/api-generated/sdk.gen'
+import type {
+  PaginatedResponseOtaVersion as OtaVersionPage,
+  OtaVersion,
+  CreateOtaVersionRequest,
+  UpdateOtaVersionRequest,
+} from '@/lib/api-generated/types.gen'
 
 interface OtaVersionsParams {
   product_id?: string | null

@@ -2,7 +2,13 @@ import { useState } from 'react'
 import { createRoute, Link } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
 import { useDevices, useDeviceStatusHistory, type DeviceRow } from '@/hooks/useDevices'
-import { usePropertyLatest, usePropertyHistory, usePropertyCommands, useCreatePropertyCommand, useDeletePropertyCommands } from '@/hooks/useProperties'
+import {
+  usePropertyLatest,
+  usePropertyHistory,
+  usePropertyCommands,
+  useCreatePropertyCommand,
+  useDeletePropertyCommands,
+} from '@/hooks/useProperties'
 import { useEventHistory } from '@/hooks/useEvents'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { PageHeader } from '@/components/ui/page-header'
@@ -49,7 +55,15 @@ function DevicesShowPage() {
   return <DeviceDetailContent id={id} productId={device.product_id} device={device} />
 }
 
-function DeviceDetailContent({ id, productId, device }: { id: string; productId: string; device: DeviceRow }) {
+function DeviceDetailContent({
+  id,
+  productId,
+  device,
+}: {
+  id: string
+  productId: string
+  device: DeviceRow
+}) {
   return (
     <div className="space-y-8">
       <PageHeader title="Device Detail" />
@@ -58,33 +72,47 @@ function DeviceDetailContent({ id, productId, device }: { id: string; productId:
       </Link>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Device Info</h2>
+        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Device Info
+        </h2>
         <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800 sm:grid-cols-3 lg:grid-cols-6">
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Device ID</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{device.device_id}</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {device.device_id}
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Product ID</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{device.product_id}</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {device.product_id}
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Status</p>
-            <p className={`text-sm font-medium ${device.status === 'Online' ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}>
+            <p
+              className={`text-sm font-medium ${device.status === 'Online' ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+            >
               {device.status}
             </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">IP Address</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{device.ip_address ?? '-'}</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {device.ip_address ?? '-'}
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Last Online</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{device.last_online_at ? formatDatetime(device.last_online_at) : '-'}</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {device.last_online_at ? formatDatetime(device.last_online_at) : '-'}
+            </p>
           </div>
           <div>
             <p className="text-xs text-slate-500 dark:text-slate-400">Last Offline</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{device.last_offline_at ? formatDatetime(device.last_offline_at) : '-'}</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {device.last_offline_at ? formatDatetime(device.last_offline_at) : '-'}
+            </p>
           </div>
         </div>
       </section>
@@ -105,14 +133,20 @@ function LatestPropertiesSection({ productId, deviceId }: { productId: string; d
   const columns: Column<Record<string, unknown>>[] = [
     {
       header: 'Properties',
-      accessor: (row) => <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.properties, null, 2)}</pre>,
+      accessor: (row) => (
+        <pre className="max-w-md overflow-auto text-xs">
+          {JSON.stringify(row.properties, null, 2)}
+        </pre>
+      ),
     },
     { header: 'Updated Time', accessor: (row) => formatDatetime(row.updated_time as string) },
   ]
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Latest Properties</h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        Latest Properties
+      </h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
@@ -125,7 +159,12 @@ function LatestPropertiesSection({ productId, deviceId }: { productId: string; d
 
 function PropertyHistorySection({ productId, deviceId }: { productId: string; deviceId: string }) {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = usePropertyHistory({ product_id: productId, device_id: deviceId, page, page_size: 10 })
+  const { data, isLoading } = usePropertyHistory({
+    product_id: productId,
+    device_id: deviceId,
+    page,
+    page_size: 10,
+  })
   const items = data?.data ?? []
   const pagination = data?.pagination
 
@@ -133,21 +172,33 @@ function PropertyHistorySection({ productId, deviceId }: { productId: string; de
     { header: 'ID', accessor: 'id' },
     {
       header: 'Properties',
-      accessor: (row) => <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.properties, null, 2)}</pre>,
+      accessor: (row) => (
+        <pre className="max-w-md overflow-auto text-xs">
+          {JSON.stringify(row.properties, null, 2)}
+        </pre>
+      ),
     },
-    { header: 'Reported Time', accessor: (row) => (row.reported_time as string | null) ? formatDatetime(row.reported_time as string) : '-' },
+    {
+      header: 'Reported Time',
+      accessor: (row) =>
+        (row.reported_time as string | null) ? formatDatetime(row.reported_time as string) : '-',
+    },
     { header: 'Created Time', accessor: (row) => formatDatetime(row.created_time as string) },
   ]
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Property History</h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        Property History
+      </h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
         loading={isLoading}
         emptyMessage="No property history"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined}
+        pagination={
+          pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined
+        }
         onPageChange={setPage}
       />
     </section>
@@ -156,7 +207,12 @@ function PropertyHistorySection({ productId, deviceId }: { productId: string; de
 
 function EventHistorySection({ productId, deviceId }: { productId: string; deviceId: string }) {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useEventHistory({ product_id: productId, device_id: deviceId, page, page_size: 10 })
+  const { data, isLoading } = useEventHistory({
+    product_id: productId,
+    device_id: deviceId,
+    page,
+    page_size: 10,
+  })
   const items = data?.data ?? []
   const pagination = data?.pagination
 
@@ -164,21 +220,31 @@ function EventHistorySection({ productId, deviceId }: { productId: string; devic
     { header: 'ID', accessor: 'id' },
     {
       header: 'Events',
-      accessor: (row) => <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.events, null, 2)}</pre>,
+      accessor: (row) => (
+        <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.events, null, 2)}</pre>
+      ),
     },
-    { header: 'Reported Time', accessor: (row) => (row.reported_time as string | null) ? formatDatetime(row.reported_time as string) : '-' },
+    {
+      header: 'Reported Time',
+      accessor: (row) =>
+        (row.reported_time as string | null) ? formatDatetime(row.reported_time as string) : '-',
+    },
     { header: 'Created Time', accessor: (row) => formatDatetime(row.created_time as string) },
   ]
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Event History</h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        Event History
+      </h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
         loading={isLoading}
         emptyMessage="No event history"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined}
+        pagination={
+          pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined
+        }
         onPageChange={setPage}
       />
     </section>
@@ -189,7 +255,12 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  const { data, isLoading } = usePropertyCommands({ product_id: productId, device_id: deviceId, page, page_size: 10 })
+  const { data, isLoading } = usePropertyCommands({
+    product_id: productId,
+    device_id: deviceId,
+    page,
+    page_size: 10,
+  })
   const items = data?.data ?? []
   const pagination = data?.pagination
 
@@ -204,7 +275,9 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
     { header: 'ID', accessor: 'id' },
     {
       header: 'Command',
-      accessor: (row) => <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.command, null, 2)}</pre>,
+      accessor: (row) => (
+        <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.command, null, 2)}</pre>
+      ),
     },
     {
       header: 'Status',
@@ -240,7 +313,9 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Property Commands</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Property Commands
+        </h2>
         <button
           onClick={() => setDialogOpen(true)}
           className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -253,7 +328,11 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
         data={items as unknown as Record<string, unknown>[]}
         loading={isLoading}
         emptyMessage="No commands"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total } : undefined}
+        pagination={
+          pagination
+            ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total }
+            : undefined
+        }
         onPageChange={setPage}
       />
       {dialogOpen && (
@@ -302,12 +381,23 @@ function CommandDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Send Command</h3>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Send Command
+        </h3>
         <textarea
           value={jsonInput}
-          onChange={(e) => { setJsonInput(e.target.value); setParseError(null) }}
+          onChange={(e) => {
+            setJsonInput(e.target.value)
+            setParseError(null)
+          }}
           placeholder='{"key": "value"}'
           rows={8}
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -333,9 +423,20 @@ function CommandDialog({
   )
 }
 
-function ConnectionHistorySection({ productId, deviceId }: { productId: string; deviceId: string }) {
+function ConnectionHistorySection({
+  productId,
+  deviceId,
+}: {
+  productId: string
+  deviceId: string
+}) {
   const [page, setPage] = useState(1)
-  const { data, isLoading } = useDeviceStatusHistory({ product_id: productId, device_id: deviceId, page, page_size: 10 })
+  const { data, isLoading } = useDeviceStatusHistory({
+    product_id: productId,
+    device_id: deviceId,
+    page,
+    page_size: 10,
+  })
   const items = data?.data ?? []
   const pagination = data?.pagination
 
@@ -346,27 +447,47 @@ function ConnectionHistorySection({ productId, deviceId }: { productId: string; 
       accessor: (row) => {
         const status = row.status as string
         return (
-          <span className={status === 'Online' ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}>
+          <span
+            className={
+              status === 'Online'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-slate-400 dark:text-slate-500'
+            }
+          >
             {status}
           </span>
         )
       },
     },
     { header: 'IP Address', accessor: (row) => (row.ip_address as string | null) ?? '-' },
-    { header: 'Connected At', accessor: (row) => (row.connected_at as string | null) ? formatDatetime(row.connected_at as string) : '-' },
-    { header: 'Disconnected At', accessor: (row) => (row.disconnected_at as string | null) ? formatDatetime(row.disconnected_at as string) : '-' },
+    {
+      header: 'Connected At',
+      accessor: (row) =>
+        (row.connected_at as string | null) ? formatDatetime(row.connected_at as string) : '-',
+    },
+    {
+      header: 'Disconnected At',
+      accessor: (row) =>
+        (row.disconnected_at as string | null)
+          ? formatDatetime(row.disconnected_at as string)
+          : '-',
+    },
     { header: 'Reason', accessor: (row) => (row.reason as string | null) ?? '-' },
   ]
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Connection History</h2>
+      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        Connection History
+      </h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
         loading={isLoading}
         emptyMessage="No connection history"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined}
+        pagination={
+          pagination ? { page: pagination.page, pageSize: pagination.page_size } : undefined
+        }
         onPageChange={setPage}
       />
     </section>

@@ -12,8 +12,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__certsCreateComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
     useBlocker: () => ({ status: 'idle' }),
@@ -45,15 +55,23 @@ describe('CertsCreatePage', () => {
   const Page = (globalThis as Record<string, unknown>).__certsCreateComponent as React.ComponentType
 
   function setupMocks() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 1 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 1 } },
+      isLoading: false,
+    })
     mockUseIssueCert.mockReturnValue({ mutate: mockMutate, isPending: false })
   }
 
   function setupMocksWithAutoSuccess() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 1 } }, isLoading: false })
-    mockMutate.mockImplementation((_data: unknown, options: { onSuccess: (data: unknown) => void }) => {
-      options.onSuccess(fakeIssuedCert)
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 1 } },
+      isLoading: false,
     })
+    mockMutate.mockImplementation(
+      (_data: unknown, options: { onSuccess: (data: unknown) => void }) => {
+        options.onSuccess(fakeIssuedCert)
+      }
+    )
     mockUseIssueCert.mockReturnValue({ mutate: mockMutate, isPending: false })
   }
 
@@ -115,18 +133,16 @@ describe('CertsCreatePage', () => {
     test('shows one-time key download warning', async () => {
       await submitForm()
 
-      expect(
-        screen.getByText(/private key is shown only once/i),
-      ).toBeInTheDocument()
-      expect(
-        screen.getByText(/will not be stored on the server/i),
-      ).toBeInTheDocument()
+      expect(screen.getByText(/private key is shown only once/i)).toBeInTheDocument()
+      expect(screen.getByText(/will not be stored on the server/i)).toBeInTheDocument()
     })
 
     function mockDownloadApi() {
       const mockClick = vi.fn()
       const mockAnchor = { href: '', download: '', click: mockClick, remove: vi.fn() }
-      const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(mockAnchor as unknown as HTMLAnchorElement)
+      const createElementSpy = vi
+        .spyOn(document, 'createElement')
+        .mockReturnValue(mockAnchor as unknown as HTMLAnchorElement)
       const createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:fake')
       const revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
       return {

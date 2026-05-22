@@ -46,5 +46,5 @@ domain = "*.fornetcode.com"
 # [herald]
 # base_url = "http://127.0.0.1:3000"
 # api_key = "your-api-key"
-# realm_id = "default"
-# client_id = "rmqtt-things-admin"
+# realm_id = "rmqtt"
+# client_id = "admin-web-console"

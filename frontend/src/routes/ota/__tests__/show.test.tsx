@@ -14,8 +14,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
         useParams: () => ({ id: '1' }),
       }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
   }
@@ -58,12 +68,18 @@ describe('OtaShowPage', () => {
   const Page = (globalThis as Record<string, unknown>).__otaShowComponent as React.ComponentType
 
   function setupMocks() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: mockOtaVersion, isLoading: false })
   }
 
   test('shows loading state', () => {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: undefined, isLoading: true })
 
     renderWithProviders(<Page />)
@@ -149,7 +165,10 @@ describe('OtaShowPage', () => {
   })
 
   test('shows not found when record is null', () => {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: undefined, isLoading: false })
 
     renderWithProviders(<Page />)

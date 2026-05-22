@@ -191,14 +191,14 @@ Herald 统一认证服务配置。可选。配了之后管理端 API 会经过 H
 | `base_url` | string | 无 | Herald 服务地址 |
 | `api_key` | string | 无 | 调用 Herald ext API 的密钥 |
 | `realm_id` | string | 无 | rmqtt-things 所属的 realm |
-| `client_id` | string | 无 | 客户端标识，如 `rmqtt-things-admin` |
+| `client_id` | string | 无 | 客户端标识，如 `admin-web-console` |
 
 ```toml
 [herald]
 base_url = "http://127.0.0.1:3000"
 api_key = "your-api-key"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 生产环境把 `base_url` 改成 Herald 的实际地址（Docker 部署用容器名）。`api_key` 在 Herald 管理端生成。所有字段都是必填的，缺任何一个 `[herald]` 段就不会生效。

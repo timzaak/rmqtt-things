@@ -191,14 +191,14 @@ Herald SSO configuration. Optional. When configured, Admin API endpoints require
 | `base_url` | string | none | Herald service URL |
 | `api_key` | string | none | API key for Herald ext API |
 | `realm_id` | string | none | Realm that rmqtt-things belongs to |
-| `client_id` | string | none | Client identifier, e.g. `rmqtt-things-admin` |
+| `client_id` | string | none | Client identifier, e.g. `admin-web-console` |
 
 ```toml
 [herald]
 base_url = "http://127.0.0.1:3000"
 api_key = "your-api-key"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 In production, change `base_url` to the actual Herald address (use container name for Docker). Generate `api_key` from the Herald admin panel. All fields are required — if any is missing, the `[herald]` section won't take effect.

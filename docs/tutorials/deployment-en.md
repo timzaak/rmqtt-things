@@ -115,8 +115,8 @@ bucket = "rmqtt-things"
 [herald]
 base_url = "http://herald:3000"              # Herald container name or address
 api_key = "your Herald API Key"
-realm_id = "default"
-client_id = "rmqtt-things-admin"
+realm_id = "rmqtt"
+client_id = "admin-web-console"
 ```
 
 Redis has no password because the Docker network does not expose its port externally. If you expose the Redis port to the outside, you must add a password.

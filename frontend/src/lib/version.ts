@@ -13,20 +13,20 @@ export function validateVersion(value: string, label: string): string | null {
 }
 
 export function formatVersion(version: number): string {
-  const major = Math.floor(version / 100000);
-  const minor = Math.floor((version % 100000) / 1000);
-  const patch = version % 1000;
-  return `${major}.${minor}.${patch}`;
+  const major = Math.floor(version / 100000)
+  const minor = Math.floor((version % 100000) / 1000)
+  const patch = version % 1000
+  return `${major}.${minor}.${patch}`
 }
 
 export function parseVersion(versionStr: string): number {
-  const parts = versionStr.split('.').map(Number);
+  const parts = versionStr.split('.').map(Number)
   if (parts.length !== 3 || parts.some(isNaN)) {
-    throw new Error("Invalid version string format. Expected 'major.minor.patch'");
+    throw new Error("Invalid version string format. Expected 'major.minor.patch'")
   }
-  const [major, minor, patch] = parts;
+  const [major, minor, patch] = parts
   if (major > 99 || minor > 99 || patch > 999) {
-    throw new Error("Version component out of valid range.");
+    throw new Error('Version component out of valid range.')
   }
-  return major * 100000 + minor * 1000 + patch;
+  return major * 100000 + minor * 1000 + patch
 }

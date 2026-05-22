@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { listProducts, createProduct, getProduct, updateProduct } from '@/lib/api-generated/sdk.gen'
-import type { Product, CreateProductRequest, UpdateProductRequest, PaginatedResponseProduct } from '@/lib/api-generated/types.gen'
+import type {
+  Product,
+  CreateProductRequest,
+  UpdateProductRequest,
+  PaginatedResponseProduct,
+} from '@/lib/api-generated/types.gen'
 
 export function useProducts(search?: string | null, page?: number, page_size?: number) {
   return useQuery({

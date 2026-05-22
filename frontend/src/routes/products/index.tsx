@@ -63,17 +63,22 @@ function ProductsIndexPage() {
         }
       />
       <SearchForm
-        fields={[
-          { name: 'search', label: 'Search', placeholder: 'Name or Model Number' },
-        ]}
-        onSearch={(values) => { setSearch(values.search); setPage(1) }}
+        fields={[{ name: 'search', label: 'Search', placeholder: 'Name or Model Number' }]}
+        onSearch={(values) => {
+          setSearch(values.search)
+          setPage(1)
+        }}
       />
       <DataTable
         columns={columns}
         data={products}
         loading={isLoading}
         emptyMessage="No products found"
-        pagination={pagination ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total } : undefined}
+        pagination={
+          pagination
+            ? { page: pagination.page, pageSize: pagination.page_size, total: pagination.total }
+            : undefined
+        }
         onPageChange={setPage}
       />
     </div>

@@ -15,8 +15,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
         useParams: () => ({ id: '1' }),
       }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
     useBlocker: () => ({ status: 'idle' }),
@@ -62,13 +72,19 @@ describe('OtaEditPage', () => {
   const Page = (globalThis as Record<string, unknown>).__otaEditComponent as React.ComponentType
 
   function setupMocks() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: mockOtaVersion, isLoading: false })
     mockUseUpdateOtaVersion.mockReturnValue({ mutate: vi.fn(), isPending: false })
   }
 
   test('shows loading state', () => {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: undefined, isLoading: true })
     mockUseUpdateOtaVersion.mockReturnValue({ mutate: vi.fn(), isPending: false })
 
@@ -122,20 +138,23 @@ describe('OtaEditPage', () => {
     })
 
     // The disabled fields use <input disabled>, find them by value
-    const productInput = await screen.findByDisplayValue('Sensor A') as HTMLInputElement
+    const productInput = (await screen.findByDisplayValue('Sensor A')) as HTMLInputElement
     expect(productInput.disabled).toBe(true)
 
-    const keyInput = await screen.findByDisplayValue('firmware-main') as HTMLInputElement
+    const keyInput = (await screen.findByDisplayValue('firmware-main')) as HTMLInputElement
     expect(keyInput.disabled).toBe(true)
 
-    const versionInput = await screen.findByDisplayValue('1.2.200') as HTMLInputElement
+    const versionInput = (await screen.findByDisplayValue('1.2.200')) as HTMLInputElement
     expect(versionInput.disabled).toBe(true)
   })
 
   test('editable fields can be modified and submitted', async () => {
     const user = userEvent.setup()
     const mockMutate = vi.fn()
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersion.mockReturnValue({ data: mockOtaVersion, isLoading: false })
     mockUseUpdateOtaVersion.mockReturnValue({ mutate: mockMutate, isPending: false })
 
@@ -166,7 +185,7 @@ describe('OtaEditPage', () => {
       expect.objectContaining({
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
-      }),
+      })
     )
   })
 

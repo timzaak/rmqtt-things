@@ -162,7 +162,8 @@ interface ConditionEditorProps {
 }
 
 export function ConditionEditor({ condition, onConditionChange }: ConditionEditorProps) {
-  const showValue = condition.operator && condition.operator !== 'between' && condition.operator !== 'always'
+  const showValue =
+    condition.operator && condition.operator !== 'between' && condition.operator !== 'always'
   const showBetween = condition.operator === 'between'
 
   return (
@@ -208,9 +209,7 @@ export function ConditionEditor({ condition, onConditionChange }: ConditionEdito
             type="text"
             required
             value={String(condition.value ?? '')}
-            onChange={(e) =>
-              onConditionChange({ ...condition, value: e.target.value })
-            }
+            onChange={(e) => onConditionChange({ ...condition, value: e.target.value })}
             className={inputClass}
             data-testid="condition-value-input"
           />
@@ -229,7 +228,10 @@ export function ConditionEditor({ condition, onConditionChange }: ConditionEdito
               required
               value={condition.min ?? ''}
               onChange={(e) =>
-                onConditionChange({ ...condition, min: e.target.value === '' ? undefined : Number(e.target.value) })
+                onConditionChange({
+                  ...condition,
+                  min: e.target.value === '' ? undefined : Number(e.target.value),
+                })
               }
               className={inputClass}
               data-testid="condition-min-input"
@@ -245,7 +247,10 @@ export function ConditionEditor({ condition, onConditionChange }: ConditionEdito
               required
               value={condition.max ?? ''}
               onChange={(e) =>
-                onConditionChange({ ...condition, max: e.target.value === '' ? undefined : Number(e.target.value) })
+                onConditionChange({
+                  ...condition,
+                  max: e.target.value === '' ? undefined : Number(e.target.value),
+                })
               }
               className={inputClass}
               data-testid="condition-max-input"
@@ -305,7 +310,9 @@ export function ActionsEditor({ actions, onActionsChange }: ActionsEditorProps) 
             <button
               type="button"
               onClick={() => removeAction(index)}
-              disabled={action.type === 'alarm' && actions.filter((a) => a.type === 'alarm').length <= 1}
+              disabled={
+                action.type === 'alarm' && actions.filter((a) => a.type === 'alarm').length <= 1
+              }
               className="text-sm text-red-600 hover:underline disabled:opacity-30 disabled:cursor-not-allowed dark:text-red-400"
               data-testid={`action-remove-button-${index}`}
             >
@@ -401,9 +408,7 @@ export const INITIAL_CONDITION: ConditionFormState = {
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
-export const INITIAL_ACTIONS: ActionFormState[] = [
-  { type: 'alarm', level: 'warning', message: '' },
-]
+export const INITIAL_ACTIONS: ActionFormState[] = [{ type: 'alarm', level: 'warning', message: '' }]
 
 export const TRIGGER_TYPE_OPTIONS = TRIGGER_TYPES
 export const OPERATOR_OPTIONS = OPERATORS

@@ -78,6 +78,9 @@ app_env = "development"
 
 [frontend]
 url = "http://localhost:3000"
+
+[jwt]
+secret = "rmqtt-things-dev-jwt-secret"
 """,
         encoding="utf-8",
     )
@@ -96,18 +99,16 @@ url = "http://localhost:3000"
             "--log-opt",
             "max-file=3",
             "-e",
-            "HERALD_CONFIG=/app/config/config.toml",
+            "HERALD_CONFIG=/app/config.toml",
+            "--mount",
+            f"type=bind,source={str((herald_conf_dir / 'config.toml').resolve())},target=/app/config.toml,readonly",
             "-p",
             "13000:3000",
-            "ghcr.io/timzaak/herald:0.1.4",
+            "ghcr.io/timzaak/herald:0.1.5",
         ]
     )
     if not cid:
         print("ERROR: Herald container create failed")
-        return 1
-
-    if not docker.copy_into_container(cid, str((herald_conf_dir / "config.toml").resolve()), "/app/config/config.toml"):
-        print("ERROR: Herald config copy failed")
         return 1
 
     if not docker.start_container(cid):

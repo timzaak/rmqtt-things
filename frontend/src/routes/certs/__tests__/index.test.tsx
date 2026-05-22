@@ -10,8 +10,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__certsIndexComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => vi.fn(),
   }
@@ -67,7 +77,9 @@ describe('CertsIndexPage', () => {
     mockUseProducts.mockReturnValue({ data: mockProducts, isLoading: false })
     mockUseCerts.mockReturnValue({ data: { data: mockCerts }, isLoading: false })
     mockUseUpdateCertStatus.mockReturnValue({ mutate: vi.fn() })
-    mockUseCaCert.mockReturnValue({ data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' } })
+    mockUseCaCert.mockReturnValue({
+      data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' },
+    })
   }
 
   test('renders PageHeader with title "Certificates"', () => {
@@ -114,7 +126,9 @@ describe('CertsIndexPage', () => {
     mockUseProducts.mockReturnValue({ data: mockProducts, isLoading: false })
     mockUseCerts.mockReturnValue({ data: { data: [] }, isLoading: false })
     mockUseUpdateCertStatus.mockReturnValue({ mutate: vi.fn() })
-    mockUseCaCert.mockReturnValue({ data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' } })
+    mockUseCaCert.mockReturnValue({
+      data: { ca_pem: '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----' },
+    })
 
     renderWithProviders(<Page />)
 

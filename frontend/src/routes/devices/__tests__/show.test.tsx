@@ -17,8 +17,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       }
       return routeObj
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => vi.fn(),
   }
@@ -77,9 +87,18 @@ function setupMocks(deviceData = mockDevice) {
     isLoading: false,
   })
   mockUsePropertyLatest.mockReturnValue({ data: { data: [] }, isLoading: false })
-  mockUsePropertyHistory.mockReturnValue({ data: { data: [], pagination: undefined }, isLoading: false })
-  mockUsePropertyCommands.mockReturnValue({ data: { data: [], pagination: undefined }, isLoading: false })
-  mockUseEventHistory.mockReturnValue({ data: { data: [], pagination: undefined }, isLoading: false })
+  mockUsePropertyHistory.mockReturnValue({
+    data: { data: [], pagination: undefined },
+    isLoading: false,
+  })
+  mockUsePropertyCommands.mockReturnValue({
+    data: { data: [], pagination: undefined },
+    isLoading: false,
+  })
+  mockUseEventHistory.mockReturnValue({
+    data: { data: [], pagination: undefined },
+    isLoading: false,
+  })
   mockUseCreatePropertyCommand.mockReturnValue({ mutate: vi.fn(), isPending: false })
   mockUseDeletePropertyCommands.mockReturnValue({ mutate: vi.fn(), isPending: false })
 }
@@ -199,7 +218,7 @@ describe('DevicesShowPage', () => {
       },
       expect.objectContaining({
         onSuccess: expect.any(Function),
-      }),
+      })
     )
   })
 

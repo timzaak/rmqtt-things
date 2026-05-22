@@ -13,14 +13,14 @@ const apiClient = axios.create({
 })
 
 apiClient.interceptors.response.use(
-  response => response,
-  error => {
+  (response) => response,
+  (error) => {
     if (error.response?.status === 401) {
       handle401()
     }
 
     return Promise.reject(error)
-  },
+  }
 )
 
 export default apiClient

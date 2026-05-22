@@ -9,8 +9,8 @@ import hashlib
 
 from . import docker
 
-_REALM_ID = "default"
-_CLIENT_ID = "rmqtt-things-admin"
+_REALM_ID = "rmqtt"
+_CLIENT_ID = "admin-web-console"
 _ROLE_NAME = "things-admin"
 _TEST_USER_EMAIL = "admin@rmqtt-things.local"
 _API_KEY_RAW = "rmqtt-things-test-api-key"

@@ -100,19 +100,22 @@ async function validateBackendHealth(options: {
 async function verifyHeraldConnection(logger?: UnifiedLogger): Promise<void> {
   const config = await fetchAuthConfig()
 
-  if (!config.enabled || !config.herald_url) {
+  if (!config.enabled || !config.login_url) {
     logger?.testCode.log('[Env] Herald SSO 未启用，跳过检查') ?? console.warn('[Env] Herald SSO 未启用，跳过检查')
     return
   }
 
+  // Derive Herald base URL from login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
+  const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+
   try {
-    const resp = await fetch(config.herald_url, {
+    const resp = await fetch(heraldBaseUrl, {
       method: 'GET',
       signal: AbortSignal.timeout(5000),
     })
     // 只要能连上即可，不要求特定状态码
     logger?.testCode.log(`[Env] Herald SSO 连接正常 (${resp.status})`) ?? console.warn(`[Env] Herald SSO 连接正常 (${resp.status})`)
   } catch (error) {
-    throw new Error(`Herald SSO service is not available at ${config.herald_url} but auth is enabled: ${error}`)
+    throw new Error(`Herald SSO service is not available at ${heraldBaseUrl} but auth is enabled: ${error}`)
   }
 }

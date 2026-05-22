@@ -49,7 +49,7 @@ RMQTT_IMAGE = "rmqtt/rmqtt:0.20.0"
 LOCALSTACK_CONTAINER = "t-demo-localstack"
 LOCALSTACK_PORT = 4566
 HERALD_CONTAINER = "t-demo-herald"
-HERALD_IMAGE = "ghcr.io/timzaak/herald:0.1.4"
+HERALD_IMAGE = "ghcr.io/timzaak/herald:0.1.5"
 HERALD_PORT = 13000
 HERALD_DB = "herald_demo"
 
@@ -385,7 +385,11 @@ log_level = "warn"
 app_env = "demo"
 
 [frontend]
-url = "http://localhost:3000"
+url = "http://localhost:13000"
+static_dir = "/app/frontend/dist"
+
+[jwt]
+secret = "rmqtt-things-demo-jwt-secret"
 """,
         encoding="utf-8",
     )
@@ -404,7 +408,9 @@ url = "http://localhost:3000"
             "--log-opt",
             "max-file=3",
             "-e",
-            "HERALD_CONFIG=/app/config/config.toml",
+            "HERALD_CONFIG=/app/config.toml",
+            "--mount",
+            f"type=bind,source={str((herald_conf_dir / 'config.toml').resolve())},target=/app/config.toml,readonly",
             "-p",
             f"{HERALD_PORT}:3000",
             HERALD_IMAGE,
@@ -412,10 +418,6 @@ url = "http://localhost:3000"
     )
     if not cid:
         logger.error("Herald container create failed")
-        return False
-
-    if not docker.copy_into_container(cid, str((herald_conf_dir / "config.toml").resolve()), "/app/config/config.toml"):
-        logger.error("Herald config copy failed")
         return False
 
     if not docker.start_container(cid):

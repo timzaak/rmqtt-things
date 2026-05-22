@@ -73,7 +73,7 @@ function OtaEditPage() {
       file_key: otaVersion.file_key,
       log: otaVersion.log != null ? String(otaVersion.log) : '',
       device_ids: otaVersion.device_ids ?? [],
-      bin_length: (otaVersion as Record<string, unknown>).bin_length as number ?? 0,
+      bin_length: ((otaVersion as Record<string, unknown>).bin_length as number) ?? 0,
       bin_md5: ((otaVersion as Record<string, unknown>).bin_md5 as string) ?? '',
     }
     setForm(initialized)
@@ -81,7 +81,9 @@ function OtaEditPage() {
   }
 
   const productMap = new Map(products?.data?.map((p) => [p.model_no, p.name]) ?? [])
-  const productName = otaVersion ? (productMap.get(otaVersion.product_id) ?? otaVersion.product_id) : ''
+  const productName = otaVersion
+    ? (productMap.get(otaVersion.product_id) ?? otaVersion.product_id)
+    : ''
 
   const isDirty =
     initialForm !== null &&
@@ -177,7 +179,7 @@ function OtaEditPage() {
         onError: (error) => {
           toast.error('Failed to update OTA version', { description: error.message })
         },
-      },
+      }
     )
   }
 
@@ -197,23 +199,13 @@ function OtaEditPage() {
         {/* Product (disabled) */}
         <div>
           <label className={labelClass}>Product</label>
-          <input
-            type="text"
-            disabled
-            value={productName}
-            className={disabledClass}
-          />
+          <input type="text" disabled value={productName} className={disabledClass} />
         </div>
 
         {/* Key (disabled) */}
         <div>
           <label className={labelClass}>Key</label>
-          <input
-            type="text"
-            disabled
-            value={otaVersion.key}
-            className={disabledClass}
-          />
+          <input type="text" disabled value={otaVersion.key} className={disabledClass} />
         </div>
 
         {/* Version (disabled) */}

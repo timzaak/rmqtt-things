@@ -64,18 +64,18 @@ function StatusActions({ row }: { row: CertIssue }) {
         </Link>
         {row.status === 'Normal' && (
           <>
-          <button
-            onClick={() => openConfirm('revoke')}
-            className="text-sm text-orange-600 hover:underline dark:text-orange-400"
-          >
-            Revoke
-          </button>
-          <button
-            onClick={() => openConfirm('invalidate')}
-            className="text-sm text-red-600 hover:underline dark:text-red-400"
-          >
-            Invalidate
-          </button>
+            <button
+              onClick={() => openConfirm('revoke')}
+              className="text-sm text-orange-600 hover:underline dark:text-orange-400"
+            >
+              Revoke
+            </button>
+            <button
+              onClick={() => openConfirm('invalidate')}
+              className="text-sm text-red-600 hover:underline dark:text-red-400"
+            >
+              Invalidate
+            </button>
           </>
         )}
       </div>

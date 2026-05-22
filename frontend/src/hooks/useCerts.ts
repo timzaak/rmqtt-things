@@ -1,7 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { listCertsHandler, issueCertHandler, updateCertStatusHandler } from '@/lib/api-generated/sdk.gen'
+import {
+  listCertsHandler,
+  issueCertHandler,
+  updateCertStatusHandler,
+} from '@/lib/api-generated/sdk.gen'
 import { client } from '@/lib/api-generated/client.gen'
-import type { CertIssue, SimplePaginatedResponseCertIssue as CertPage, IssueCertRequest, UpdateCertStatusRequest, DeviceConnectionStatus } from '@/lib/api-generated/types.gen'
+import type {
+  CertIssue,
+  SimplePaginatedResponseCertIssue as CertPage,
+  IssueCertRequest,
+  UpdateCertStatusRequest,
+  DeviceConnectionStatus,
+} from '@/lib/api-generated/types.gen'
 
 /** Backend will soon return this shape instead of a plain string. */
 export interface IssuedCert {

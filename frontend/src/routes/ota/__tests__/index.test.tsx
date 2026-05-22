@@ -12,8 +12,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__otaIndexComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => mockNavigate,
   }
@@ -76,7 +86,10 @@ describe('OtaIndexPage', () => {
   const Page = (globalThis as Record<string, unknown>).__otaIndexComponent as React.ComponentType
 
   function setupMocks() {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersions.mockReturnValue({
       data: { data: mockOtaData, pagination: { page: 1, page_size: 10, total: 2 } },
       isLoading: false,
@@ -131,7 +144,10 @@ describe('OtaIndexPage', () => {
   })
 
   test('shows empty state when no data', () => {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
     mockUseOtaVersions.mockReturnValue({
       data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } },
       isLoading: false,

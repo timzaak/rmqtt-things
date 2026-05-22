@@ -12,8 +12,18 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
       ;(globalThis as Record<string, unknown>).__productsIndexComponent = options.component
       return { options }
     },
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode; [k: string]: unknown }) => (
-      <a href={to} {...props}>{children}</a>
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+      [k: string]: unknown
+    }) => (
+      <a href={to} {...props}>
+        {children}
+      </a>
     ),
     useNavigate: () => vi.fn(),
   }
@@ -31,10 +41,14 @@ import '../index'
 import { mockProducts } from '@/test/fixtures'
 
 describe('ProductsIndexPage', () => {
-  const Page = (globalThis as Record<string, unknown>).__productsIndexComponent as React.ComponentType
+  const Page = (globalThis as Record<string, unknown>)
+    .__productsIndexComponent as React.ComponentType
 
   test('renders product table when data loaded', () => {
-    mockUseProducts.mockReturnValue({ data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: mockProducts, pagination: { page: 1, page_size: 10, total: 2 } },
+      isLoading: false,
+    })
 
     renderWithProviders(<Page />)
 
@@ -47,7 +61,10 @@ describe('ProductsIndexPage', () => {
   })
 
   test('shows empty state when no products', () => {
-    mockUseProducts.mockReturnValue({ data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } },
+      isLoading: false,
+    })
 
     renderWithProviders(<Page />)
 
@@ -56,7 +73,10 @@ describe('ProductsIndexPage', () => {
 
   test('search form triggers refetch with search term', async () => {
     const user = userEvent.setup()
-    mockUseProducts.mockReturnValue({ data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } }, isLoading: false })
+    mockUseProducts.mockReturnValue({
+      data: { data: [], pagination: { page: 1, page_size: 10, total: 0 } },
+      isLoading: false,
+    })
 
     renderWithProviders(<Page />)
 

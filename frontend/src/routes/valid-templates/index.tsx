@@ -7,7 +7,10 @@ import { useEventValidTemplates, useUpdateEventValidTemplateStatus } from '@/hoo
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
-import type { PaginatedResponseEventValidTemplate, EventValidTemplateStatus } from '@/lib/api-generated/types.gen'
+import type {
+  PaginatedResponseEventValidTemplate,
+  EventValidTemplateStatus,
+} from '@/lib/api-generated/types.gen'
 import { formatDatetime } from '@/lib/utils'
 import { toast } from '@/components/ui/sonner'
 
@@ -33,7 +36,7 @@ function useColumns() {
   const handleStatusChange = (id: number, status: EventValidTemplateStatus) => {
     updateStatus.mutate(
       { id, status },
-      { onError: (error) => toast.error('Failed to update status', { description: error.message }) },
+      { onError: (error) => toast.error('Failed to update status', { description: error.message }) }
     )
   }
 

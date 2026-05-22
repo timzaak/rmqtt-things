@@ -28,7 +28,9 @@ export function DataTable<T extends Record<string, unknown>>({
   loading,
   emptyMessage = 'No data',
 }: DataTableProps<T>) {
-  const totalPages = pagination?.total ? Math.ceil(pagination.total / pagination.pageSize) : undefined
+  const totalPages = pagination?.total
+    ? Math.ceil(pagination.total / pagination.pageSize)
+    : undefined
   const showPrev = pagination && pagination.page > 1
   const showNext = pagination && (totalPages ? pagination.page < totalPages : pagination.hasMore)
   const showPagination = pagination && (showPrev || showNext)
@@ -39,7 +41,10 @@ export function DataTable<T extends Record<string, unknown>>({
         <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
           <tr>
             {columns.map((col, i) => (
-              <th key={i} className={`px-4 py-3 font-medium text-slate-600 dark:text-slate-400 ${col.className ?? ''}`}>
+              <th
+                key={i}
+                className={`px-4 py-3 font-medium text-slate-600 dark:text-slate-400 ${col.className ?? ''}`}
+              >
                 {col.header}
               </th>
             ))}
@@ -62,7 +67,10 @@ export function DataTable<T extends Record<string, unknown>>({
             data.map((row, rowIndex) => (
               <tr key={rowIndex} className="bg-white dark:bg-slate-950">
                 {columns.map((col, colIndex) => (
-                  <td key={colIndex} className={`px-4 py-3 text-slate-700 dark:text-slate-300 ${col.className ?? ''}`}>
+                  <td
+                    key={colIndex}
+                    className={`px-4 py-3 text-slate-700 dark:text-slate-300 ${col.className ?? ''}`}
+                  >
                     {typeof col.accessor === 'function'
                       ? col.accessor(row)
                       : (row[col.accessor] as React.ReactNode)}
@@ -76,7 +84,8 @@ export function DataTable<T extends Record<string, unknown>>({
       {showPagination && (
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 dark:border-slate-800">
           <span className="text-sm text-slate-500">
-            Page {pagination!.page}{totalPages ? ` of ${totalPages}` : ''}
+            Page {pagination!.page}
+            {totalPages ? ` of ${totalPages}` : ''}
           </span>
           <div className="flex gap-1">
             <button

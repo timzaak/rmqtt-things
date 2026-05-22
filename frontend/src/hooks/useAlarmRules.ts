@@ -1,6 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { listAlarmRules, createAlarmRule, getAlarmRule, updateAlarmRule, updateAlarmRuleStatus, deleteAlarmRule } from '@/lib/api-generated/sdk.gen'
-import type { PaginatedResponseAlarmRule, AlarmRuleResponse, CreateAlarmRuleRequest, UpdateAlarmRuleRequest } from '@/lib/api-generated/types.gen'
+import {
+  listAlarmRules,
+  createAlarmRule,
+  getAlarmRule,
+  updateAlarmRule,
+  updateAlarmRuleStatus,
+  deleteAlarmRule,
+} from '@/lib/api-generated/sdk.gen'
+import type {
+  PaginatedResponseAlarmRule,
+  AlarmRuleResponse,
+  CreateAlarmRuleRequest,
+  UpdateAlarmRuleRequest,
+} from '@/lib/api-generated/types.gen'
 
 interface AlarmRulesParams {
   product_id?: string | null
@@ -68,8 +80,12 @@ export function useUpdateAlarmRule() {
 export function useUpdateAlarmRuleStatus() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, enabled }: { id: number, enabled: boolean }) => {
-      const res = await updateAlarmRuleStatus({ path: { id }, body: { enabled }, throwOnError: true })
+    mutationFn: async ({ id, enabled }: { id: number; enabled: boolean }) => {
+      const res = await updateAlarmRuleStatus({
+        path: { id },
+        body: { enabled },
+        throwOnError: true,
+      })
       return res.data
     },
     onSuccess: () => {

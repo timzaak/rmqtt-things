@@ -16,7 +16,7 @@ type HmacSha1 = Hmac<Sha1>;
 pub struct AuthConfigResponse {
     pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub herald_url: Option<String>,
+    pub login_url: Option<String>,
 }
 
 #[utoipa::path(
@@ -29,7 +29,13 @@ pub async fn get_auth_config(State(state): State<Arc<ApiState>>) -> Json<AuthCon
     let herald = &state.admin.config.herald;
     Json(AuthConfigResponse {
         enabled: herald.is_some(),
-        herald_url: herald.as_ref().map(|h| h.base_url.clone()),
+        login_url: herald.as_ref().map(|h| {
+            format!(
+                "{}/{}/auth/login",
+                h.base_url.trim_end_matches('/'),
+                h.realm_id
+            )
+        }),
     })
 }
 
