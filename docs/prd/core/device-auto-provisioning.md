@@ -1,7 +1,6 @@
 # 设备自动注册 (Device Auto-Provisioning) 产品需求文档 (PRD)
 
 **创建时间**: 2026-05-19
-**状态**: Draft
 **优先级**: P0
 
 ---
@@ -97,23 +96,7 @@
 
 ---
 
-## 4. 当前实现状态
-
-| 功能模块 | 状态 | 备注 |
-|---------|------|------|
-| HMAC 设备认证 | ✅ 已实现 | auth webhook 验证 HMAC 签名，返回 allow/deny |
-| TLS 证书签发 | ✅ 已实现 | 管理员签发/吊销证书，cert_issue 表 |
-| 设备连接状态 UPSERT | ✅ 已实现 | connect webhook 中 upsert device_status |
-| 产品 CRUD | ✅ 已实现 | 产品创建/列表/编辑，无自动注册字段 |
-| 设备身份注册表（devices 表） | ❌ 未实现 | 当前无独立设备身份表 |
-| 产品自动注册开关 | ❌ 未实现 | 产品表无 auto_provisioning 字段 |
-| Auth webhook 设备准入 + 自动注册 | ❌ 未实现 | 当前 auth handler 仅做签名验证，不查设备注册 |
-| 证书签发时创建设备记录 | ❌ 未实现 | 签发证书仅写 cert_issue 表 |
-| 设备列表注册来源展示 | ❌ 未实现 | 当前设备列表仅展示连接状态信息 |
-
----
-
-## 5. 功能需求
+## 4. 功能需求
 
 ### 5.1 核心需求
 
@@ -138,10 +121,9 @@
 
 ---
 
-## 6. API 相关约束
+## 5. API 相关约束
 
-**状态**: 必填
-
+**适用性**: 必填
 ### 接口能力范围
 - 产品管理接口需扩展：支持读取和更新产品的自动注册开关（`auto_provisioning` 字段）
 - 证书签发接口需扩展：签发证书时同时创建设备身份记录
@@ -160,10 +142,9 @@
 
 ---
 
-## 7. 前端/交互约束
+## 6. 前端/交互约束
 
-**状态**: 必填
-
+**适用性**: 必填
 ### 页面入口
 - `/products/edit/$id` — 产品编辑页，需增加"设备自动注册"开关
 
@@ -179,10 +160,9 @@
 
 ---
 
-## 8. 技术设计承接
+## 7. 技术设计承接
 
-**状态**: 必填
-
+**适用性**: 必填
 技术预研报告：`.ai/tech-research/device-auto-provisioning.md`
 
 预研报告中的关键设计决策：
@@ -195,7 +175,7 @@
 
 ---
 
-## 9. 已确认决策与待确认假设
+## 8. 已确认决策与待确认假设
 
 ### 9.1 已确认决策
 - 新建 `devices` 表作为设备身份注册表，与 `device_status`（连接状态）职责分离
@@ -212,7 +192,7 @@
 
 ---
 
-## 10. 相关文件索引
+## 9. 相关文件索引
 
 ### 10.1 后端文件
 - `backend/src/api/auth_handlers.rs` — HMAC 认证回调处理器（需修改：增加设备准入检查和自动注册逻辑）
@@ -230,7 +210,7 @@
 
 ---
 
-## 11. 参考资料
+## 10. 参考资料
 - 用户故事：`docs/user-stories/01-platform-admin-user-stories.md`（US-PA-036、US-PA-037），`docs/user-stories/02-iot-device-user-stories.md`（US-DV-010）
 - 相关 PRD：`docs/prd/integration/cert-management.md`，`docs/prd/integration/rmqtt-webhook.md`，`docs/prd/core/product-device-management.md`
 - 技术预研：`.ai/tech-research/device-auto-provisioning.md`

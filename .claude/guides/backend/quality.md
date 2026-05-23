@@ -51,11 +51,7 @@ npx jscpd --pattern "**/*.rs" --reporters console backend
 
 ## 5. 环境验证（MANDATORY）
 
-```bash
-uv run scripts/dev-start.py
-```
-
-健康检查（PowerShell 示例）：
+启动后端服务（确保 PostgreSQL 和 Redis 可用），然后进行健康检查：
 
 ```powershell
 Start-Sleep -Seconds 5
@@ -71,12 +67,6 @@ if ($response.StatusCode -ne 200) { exit 1 }
   "database": true,
   "redis": true
 }
-```
-
-清理：
-
-```bash
-uv run scripts/dev-stop.py
 ```
 
 规则：环境验证失败时，即使测试通过也必须拒绝验收。

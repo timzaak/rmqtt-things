@@ -111,7 +111,7 @@
 
 ## Related Documentation
 
-- 诊断协议：[diagnostic-report-v3-minimal.md](/protocols/diagnostic-report-v3-minimal.md)
+- 诊断协议：[diagnostic-report-v3-minimal.md](/.claude/protocols/diagnostic-report-v3-minimal.md)
 - Demo E2E Testing Guide：`e2e-testing.md`
 - Environment and Testing Guide：`.claude/guides/core/environment-and-testing-guide.md`
-- Diagnostic Report Template：[diagnose-report-template-v3-minimal.md](/guides/demo/templates/diagnose-report-template-v3-minimal.md)
+- Diagnostic Report Template：[diagnose-report-template-v3-minimal.md](/.claude/guides/demo/templates/diagnose-report-template-v3-minimal.md)

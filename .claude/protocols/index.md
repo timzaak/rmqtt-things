@@ -4,15 +4,15 @@
 
 | 你要确认的问题 | 对应协议 |
 | --- | --- |
-| 实现类 agent 的通用结构化输出 | [agent-task-output-contract.md](/protocols/agent-task-output-contract.md) |
-| 修复后补测集合的字段与允许命令 | [tests-to-run-contract.md](/protocols/tests-to-run-contract.md) |
-| `.ai/task/.../.state.json` 的唯一结构真相 | [task-state-contract.md](/protocols/task-state-contract.md) |
-| phase/slot/item 的执行顺序与前置规则 | [task-phase-execution.md](/protocols/task-phase-execution.md) |
-| backend-test 的默认收敛与升级策略 | [backend-test-execution.md](/protocols/backend-test-execution.md) |
-| 设计检查评分标准 | [design-check-rubric.md](/protocols/design-check-rubric.md) |
-| PRD / user story 检查评分标准 | [prd-check-rubric.md](/protocols/prd-check-rubric.md) |
-| 任务检查评分与阻塞规则 | [task-check-rubric.md](/protocols/task-check-rubric.md) |
-| Demo 诊断报告结构与分类映射 | [diagnostic-report-v3-minimal.md](/protocols/diagnostic-report-v3-minimal.md) |
+| 实现类 agent 的通用结构化输出 | [agent-task-output-contract.md](/.claude/protocols/agent-task-output-contract.md) |
+| 修复后补测集合的字段与允许命令 | [tests-to-run-contract.md](/.claude/protocols/tests-to-run-contract.md) |
+| `.ai/task/.../.state.json` 的唯一结构真相 | [task-state-contract.md](/.claude/protocols/task-state-contract.md) |
+| phase/slot/item 的执行顺序与前置规则 | [task-phase-execution.md](/.claude/protocols/task-phase-execution.md) |
+| backend-test 的默认收敛与升级策略 | [backend-test-execution.md](/.claude/protocols/backend-test-execution.md) |
+| 设计检查评分标准 | [design-check-rubric.md](/.claude/protocols/design-check-rubric.md) |
+| PRD / user story 检查评分标准 | [prd-check-rubric.md](/.claude/protocols/prd-check-rubric.md) |
+| 任务检查评分与阻塞规则 | [task-check-rubric.md](/.claude/protocols/task-check-rubric.md) |
+| Demo 诊断报告结构与分类映射 | [diagnostic-report-v3-minimal.md](/.claude/protocols/diagnostic-report-v3-minimal.md) |
 
 ## 使用规则
 

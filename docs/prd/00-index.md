@@ -10,17 +10,17 @@
 
 ## PRD 列表
 
-| PRD | 域 | 优先级 | 状态 | 说明 |
-|-----|----|--------|------|------|
-| [product-device-management.md](core/product-device-management.md) | core | P0 | Draft | 产品 CRUD、设备状态/属性/事件管理、属性命令下发、设备列表/详情前端页面 |
-| [alarm-rule-engine.md](core/alarm-rule-engine.md) | core | P0 | Draft | 告警规则引擎：属性阈值/事件/设备状态触发、规则 CRUD、告警记录管理 |
-| [device-auto-provisioning.md](core/device-auto-provisioning.md) | core | P0 | Draft | 设备自动注册：产品级自动注册开关、首次 HMAC 认证自动创建设备身份记录、注册来源标记 |
-| [cert-management.md](integration/cert-management.md) | integration | P0 | Active | TLS 证书签发/吊销、HMAC 设备认证、ACL 控制 |
-| [ota-management.md](integration/ota-management.md) | integration | P1 | Active | OTA 固件版本管理、设备版本上报与升级推送 |
-| [validation-template.md](integration/validation-template.md) | integration | P0 | Active | 事件/属性校验模板管理、JSON Schema 校验 |
-| [rmqtt-webhook.md](integration/rmqtt-webhook.md) | integration | P0 | Active | RMQTT WebHook 回调集成：认证、ACL、属性/事件上报、连接管理、MQTT 推送 |
-| [file-upload.md](integration/file-upload.md) | integration | P2 | Active | 管理端和设备端文件上传服务（S3 预签名） |
-| [auth.md](auth/auth.md) | auth | P0 | Draft | Admin 认证与权限管理：Herald 集成、session 校验、权限控制、前端登录流程 |
+| PRD | 域 | 优先级 | 说明 |
+|-----|----|--------|------|
+| [product-device-management.md](core/product-device-management.md) | core | P0 | 产品 CRUD、设备状态/属性/事件管理、属性命令下发、设备列表/详情前端页面 |
+| [alarm-rule-engine.md](core/alarm-rule-engine.md) | core | P0 | 告警规则引擎：属性阈值/事件/设备状态触发、规则 CRUD、告警记录管理 |
+| [device-auto-provisioning.md](core/device-auto-provisioning.md) | core | P0 | 设备自动注册：产品级自动注册开关、首次 HMAC 认证自动创建设备身份记录、注册来源标记 |
+| [cert-management.md](integration/cert-management.md) | integration | P0 | TLS 证书签发/吊销、HMAC 设备认证、ACL 控制 |
+| [ota-management.md](integration/ota-management.md) | integration | P1 | OTA 固件版本管理、设备版本上报与升级推送 |
+| [validation-template.md](integration/validation-template.md) | integration | P0 | 事件/属性校验模板管理、JSON Schema 校验 |
+| [rmqtt-webhook.md](integration/rmqtt-webhook.md) | integration | P0 | RMQTT WebHook 回调集成：认证、ACL、属性/事件上报、连接管理、MQTT 推送 |
+| [file-upload.md](integration/file-upload.md) | integration | P2 | 管理端和设备端文件上传服务（S3 预签名） |
+| [auth.md](auth/auth.md) | auth | P0 | Admin 认证与权限管理：Herald 集成、session 校验、权限控制、前端登录流程 |
 
 ## 关联关系
 
