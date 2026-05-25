@@ -69,6 +69,8 @@ pub fn create_router(
 
     let webhook_routes = Router::new()
         .route("/auth/config", get(auth_handlers::get_auth_config))
+        .route("/auth/oauth/start", get(auth_handlers::oauth_start))
+        .route("/auth/oauth/callback", get(auth_handlers::oauth_callback))
         .route("/access/auth", post(auth_handlers::auth))
         .route("/access/acl", post(auth_handlers::acl))
         .route(

@@ -48,6 +48,8 @@ pub async fn herald_auth_middleware(
             request.extensions_mut().insert(CurrentUser { user_id });
             next.run(request).await
         }
+        // Herald 0.1.6: session not found/expired returns allowed=false with no user_id
+        Ok(permission) if permission.user_id.is_none() => ApiError::unauthorized().into_response(),
         Ok(_) => ApiError::forbidden().into_response(),
         Err(error) => classify_auth_error(&error).into_response(),
     }
@@ -268,8 +270,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn auth_rejects_request_when_herald_denies_permission() {
+    async fn auth_returns_unauthorized_when_session_not_found() {
         let base_url = spawn_herald_mock(StatusCode::OK, Json(json!({"allowed": false}))).await;
+        let app = protected_admin_router(base_url);
+        let response = app.oneshot(admin_request()).await.unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn auth_returns_forbidden_when_user_lacks_permission() {
+        let base_url = spawn_herald_mock(
+            StatusCode::OK,
+            Json(json!({"allowed": false, "userId": "user-1"})),
+        )
+        .await;
         let app = protected_admin_router(base_url);
         let response = app.oneshot(admin_request()).await.unwrap();
 

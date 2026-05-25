@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { checkAuth, getLoginUrl, handle401, resetAuthCheck } from '@/lib/auth'
+import {
+  buildLoginRedirectUrl,
+  checkAuth,
+  getLoginUrl,
+  handle401,
+  resetAuthCheck,
+} from '@/lib/auth'
 
 function mockFetch(responses: Record<string, { body?: string; status: number }>) {
   vi.stubGlobal(
@@ -18,7 +24,8 @@ function mockFetch(responses: Record<string, { body?: string; status: number }>)
 const authEnabled = {
   body: JSON.stringify({
     enabled: true,
-    login_url: 'https://herald.example.com/default/auth/login',
+    login_url: '/api/auth/oauth/start',
+    herald_login_url: 'https://herald.example.com/default/auth/login',
   }),
   status: 200,
 }
@@ -51,7 +58,7 @@ describe('auth helpers', () => {
 
     await checkAuth()
 
-    expect(getLoginUrl()).toBe('https://herald.example.com/default/auth/login')
+    expect(getLoginUrl()).toBe('/api/auth/oauth/start')
   })
 
   test('returns / for login URL when auth is disabled', async () => {
@@ -70,6 +77,26 @@ describe('auth helpers', () => {
 
     // config fetch x2 (handle401 resets) + probe x2
     expect(fetch).toHaveBeenCalledTimes(4)
+  })
+
+  test('adds the current page as redirect to the login URL', async () => {
+    mockFetch({
+      '/api/auth/config': {
+        body: JSON.stringify({
+          enabled: true,
+          login_url: '/api/auth/oauth/start',
+          herald_login_url: 'http://127.0.0.1:13000/rmqtt/auth/login',
+        }),
+        status: 200,
+      },
+      '/api/admin/product': ok,
+    })
+
+    await expect(checkAuth()).resolves.toBe(true)
+
+    expect(buildLoginRedirectUrl()).toBe(
+      'http://localhost:3000/api/auth/oauth/start?redirect=http%3A%2F%2Flocalhost%3A3000%2Fdevices%3Fstatus%3DOnline'
+    )
   })
 
   test('caches the auth probe result during one navigation pass', async () => {

@@ -5,6 +5,7 @@ Demo 环境管理模块。
 """
 
 import os
+import json
 import subprocess
 import sys
 import time
@@ -49,7 +50,7 @@ RMQTT_IMAGE = "rmqtt/rmqtt:0.20.0"
 LOCALSTACK_CONTAINER = "t-demo-localstack"
 LOCALSTACK_PORT = 4566
 HERALD_CONTAINER = "t-demo-herald"
-HERALD_IMAGE = "ghcr.io/timzaak/herald:0.1.5"
+HERALD_IMAGE = os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.1.7")
 HERALD_PORT = 13000
 HERALD_DB = "herald_demo"
 
@@ -367,6 +368,91 @@ def _create_herald_database(logger: "Logger") -> bool:
     return False
 
 
+def _docker_command_output(args: list[str]) -> tuple[int, str]:
+    result = subprocess.run(["docker", *args], text=True, capture_output=True)
+    output = result.stdout.strip()
+    if result.stderr.strip():
+        output = f"{output}\n{result.stderr.strip()}".strip()
+    return result.returncode, output
+
+
+def _herald_container_health() -> str:
+    code, out = _docker_command_output(
+        [
+            "inspect",
+            HERALD_CONTAINER,
+            "--format",
+            "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+        ]
+    )
+    if code != 0:
+        return "unknown"
+    return out.strip() or "none"
+
+
+def _log_herald_diagnostics(logger: "Logger") -> None:
+    code, out = _docker_command_output(
+        [
+            "inspect",
+            HERALD_CONTAINER,
+            "--format",
+            "state={{.State.Status}} exit={{.State.ExitCode}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} error={{.State.Error}}",
+        ]
+    )
+    if code == 0 and out:
+        logger.error(f"Herald container status: {out}")
+
+    code, out = _docker_command_output(["inspect", HERALD_CONTAINER, "--format", "{{json .State.Health.Log}}"])
+    if code == 0 and out:
+        try:
+            entries = json.loads(out)
+        except json.JSONDecodeError:
+            entries = []
+        for entry in entries[-3:]:
+            output = str(entry.get("Output", "")).strip()
+            if output:
+                logger.error(f"Herald health log: {output}")
+
+    code, out = _docker_command_output(["logs", "--tail", "80", HERALD_CONTAINER])
+    if code == 0 and out:
+        logger.error(f"Herald container logs:\n{out}")
+
+
+def wait_for_herald_ready(logger: "Logger", timeout_seconds: int) -> bool:
+    """Wait until Herald is reachable from the host, with Docker diagnostics on failure."""
+    url = f"http://127.0.0.1:{HERALD_PORT}/health"
+    deadline = time.time() + timeout_seconds
+    start_time = time.time()
+    check_count = 0
+    last_health = "unknown"
+
+    logger.verbose_info(f"{url} to be healthy...")
+    while time.time() < deadline:
+        if wait_for_http_ok(url, 1):
+            elapsed = time.time() - start_time
+            logger.verbose_info(f"{url} healthy after {elapsed:.1f}s ({check_count} checks)")
+            return True
+
+        if not docker.container_running(HERALD_CONTAINER):
+            logger.error("Herald container stopped while waiting for readiness")
+            _log_herald_diagnostics(logger)
+            return False
+
+        health = _herald_container_health()
+        if health != last_health:
+            logger.verbose_info(f"Herald Docker health status: {health}")
+            last_health = health
+
+        time.sleep(1)
+        check_count += 1
+        if check_count % 5 == 0 or check_count == 1:
+            logger.progress("Herald", check_count, timeout_seconds)
+
+    logger.error(f"Herald did not become reachable at {url} within {timeout_seconds} seconds")
+    _log_herald_diagnostics(logger)
+    return False
+
+
 def start_herald_container(logger: "Logger") -> bool:
     """Start Herald auth service container."""
     # Generate Herald config with correct DB and Redis URLs
@@ -572,7 +658,7 @@ def start_environment(
         if not start_herald_container(logger):
             return False
 
-        if not wait_for_http_ok(f"http://127.0.0.1:{HERALD_PORT}/health", 60, logger=logger):
+        if not wait_for_herald_ready(logger, max(timeout, 120)):
             logger.error("Herald failed to start")
             return False
 

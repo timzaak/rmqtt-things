@@ -34,6 +34,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls", "multipart"], de
 rand = "0.9"
 hmac = "0.12"
 sha1 = "0.10"
+sha2 = "0.10"
 hex = "0.4"
 jsonschema = "0.33"
 dashmap = "6.1"
@@ -41,7 +42,7 @@ redis = { version = "0.32", features = ["tokio-comp", "json"] }
 rust-s3 = "0.37"
 time = { version = "0.3.36", features = ["serde-well-known", "macros", "serde"] }
 rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
-herald-sdk = "0.1.5"
+herald-sdk = "0.1.6"
 
 
 [dev-dependencies]

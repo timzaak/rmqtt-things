@@ -1211,9 +1211,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "herald-sdk"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f000e5bd80ea51688a4d3dfb4198f2665fd52775b0c4e624dd06c0a4c031e27e"
+checksum = "843313a9e5bfeaab4fb434d8078c9c596d04a6e2ab98d7fd2918089100df0c5f"
 dependencies = [
  "dashmap",
  "futures",
@@ -2730,6 +2730,7 @@ dependencies = [
  "serde_repr",
  "serial_test",
  "sha1",
+ "sha2",
  "sqlx",
  "tempfile",
  "test-context",

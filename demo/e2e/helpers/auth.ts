@@ -22,6 +22,7 @@ export const DEMO_ADMIN = {
 export interface AuthConfig {
   enabled: boolean
   login_url?: string | null
+  herald_login_url?: string | null
 }
 
 /**
@@ -98,12 +99,12 @@ export async function ensureAuthCookie(
   const { logger } = options
   const config = await fetchAuthConfig()
 
-  if (!config.enabled || !config.login_url) {
+  if (!config.enabled || !config.herald_login_url) {
     return
   }
 
-  // Derive Herald API base URL from login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
-  const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+  // Derive Herald API base URL from herald_login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
+  const heraldBaseUrl = config.herald_login_url.replace(/\/[^/]*\/auth\/login$/, '')
   const loginUrl = `${heraldBaseUrl}/api/auth/rmqtt/login`
   logger?.testCode.log(`[Auth] 注入认证 cookie: ${loginUrl}`) ?? console.warn(`[Auth] 注入认证 cookie: ${loginUrl}`)
 
@@ -157,8 +158,8 @@ export async function loginAsAdmin(
 
   const config = await fetchAuthConfig()
 
-  if (config.enabled && config.login_url) {
-    const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+  if (config.enabled && config.herald_login_url) {
+    const heraldBaseUrl = config.herald_login_url.replace(/\/[^/]*\/auth\/login$/, '')
     await loginViaHeraldApi(page, heraldBaseUrl, { logger })
     // 导航到后台页面验证会话生效
     await page.goto(`${BASE_URL}/admin/devices`, { waitUntil: 'domcontentloaded' })

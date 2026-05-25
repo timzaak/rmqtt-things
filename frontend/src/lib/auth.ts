@@ -6,6 +6,7 @@ let isRedirecting = false
 interface AuthConfig {
   enabled: boolean
   login_url: string | null
+  herald_login_url?: string | null
 }
 
 async function getAuthConfig(): Promise<AuthConfig> {
@@ -36,12 +37,20 @@ export function resetAuthCheck(): void {
   isRedirecting = false
 }
 
+export function buildLoginRedirectUrl(currentHref: string = window.location.href): string {
+  const loginUrl = new URL(getLoginUrl(), window.location.origin)
+  if (!loginUrl.searchParams.has('redirect')) {
+    loginUrl.searchParams.set('redirect', currentHref)
+  }
+  return loginUrl.toString()
+}
+
 export function handle401(): void {
   if (isRedirecting) return
   isRedirecting = true
-  const loginUrl = getLoginUrl()
+  const redirectUrl = buildLoginRedirectUrl()
   resetAuthCheck()
-  window.location.href = loginUrl
+  window.location.href = redirectUrl
 }
 
 export async function checkAuth(): Promise<boolean> {

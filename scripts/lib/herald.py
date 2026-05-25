@@ -6,6 +6,7 @@ into Herald's PostgreSQL database after the service has started.
 """
 
 import hashlib
+import json
 
 from . import docker
 
@@ -14,6 +15,14 @@ _CLIENT_ID = "admin-web-console"
 _ROLE_NAME = "things-admin"
 _TEST_USER_EMAIL = "admin@rmqtt-things.local"
 _API_KEY_RAW = "rmqtt-things-test-api-key"
+_REDIRECT_URIS = [
+    "http://localhost:3000/api/auth/oauth/callback",
+    "http://127.0.0.1:3000/api/auth/oauth/callback",
+    "http://localhost:8080/api/auth/oauth/callback",
+    "http://127.0.0.1:8080/api/auth/oauth/callback",
+    "http://localhost:18080/api/auth/oauth/callback",
+    "http://127.0.0.1:18080/api/auth/oauth/callback",
+]
 
 _PERMISSIONS = [
     ("product", "read", "View products and validation templates"),
@@ -37,9 +46,11 @@ BEGIN
         ON CONFLICT (id) DO NOTHING;
 
     -- 2. Create client app
-    INSERT INTO client_app (id, realm_id, client_id, name)
-    VALUES (uuidv7(), '{realm}', '{client}', 'RMQTT Things Admin')
-        ON CONFLICT (realm_id, client_id) DO NOTHING;
+    INSERT INTO client_app (id, realm_id, client_id, name, redirect_uris)
+    VALUES (uuidv7(), '{realm}', '{client}', 'RMQTT Things Admin', '{redirect_uris}'::jsonb)
+        ON CONFLICT (realm_id, client_id) DO UPDATE SET
+            redirect_uris = EXCLUDED.redirect_uris,
+            updated_at = CURRENT_TIMESTAMP;
 
     -- 3. Create role
     INSERT INTO roles (id, name, description, realm_id, client_id, is_builtin)
@@ -89,10 +100,10 @@ BEGIN
     VALUES (v_user_id, '{realm}', 'Test Admin')
         ON CONFLICT (id, realm_id) DO NOTHING;
 
-    -- 9. Assign role to user
-    INSERT INTO user_roles (id, user_id, role_id, realm_id, client_id)
-    VALUES (uuidv7(), v_user_id, v_role_id, '{realm}', '{client}')
-        ON CONFLICT (user_id, role_id, realm_id) DO NOTHING;
+    -- 9. Assign role to user (0.1.6: includes principal_type/principal_id)
+    INSERT INTO user_roles (id, user_id, role_id, realm_id, client_id, principal_type, principal_id)
+    VALUES (uuidv7(), v_user_id, v_role_id, '{realm}', '{client}', 'user', v_user_id::text)
+        ON CONFLICT (realm_id, principal_type, principal_id, role_id) DO NOTHING;
 
     -- 10. Insert API key for backend herald_sdk client
     SELECT id INTO v_client_app_id FROM client_app
@@ -130,6 +141,7 @@ def init_permissions(pg_container: str, pg_user: str, herald_db: str) -> bool:
         f"('{res}', '{act}')"
         for res, act, _ in _PERMISSIONS
     )
+    redirect_uris = json.dumps(_REDIRECT_URIS)
 
     salted = f"{_API_KEY_RAW}:herald-api-key-salt-v1"
     api_key_hash = f"sha256:{hashlib.sha256(salted.encode()).hexdigest()}"
@@ -140,6 +152,7 @@ def init_permissions(pg_container: str, pg_user: str, herald_db: str) -> bool:
         role=_ROLE_NAME,
         email=_TEST_USER_EMAIL,
         api_key_hash=api_key_hash,
+        redirect_uris=redirect_uris,
         permission_defs=permission_defs,
         policies=policy_values,
         permission_pairs=permission_pairs,
