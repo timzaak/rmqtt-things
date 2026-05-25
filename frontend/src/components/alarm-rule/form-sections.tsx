@@ -60,6 +60,25 @@ const OPERATORS = [
   { value: 'always', label: 'always' },
 ] as const
 
+const OPERATORS_BY_TRIGGER: Record<string, string[]> = {
+  property: ['>', '>=', '<', '<=', '==', '!=', 'between'],
+  event: ['contains', '==', '!=', 'always'],
+  device_online: ['always'],
+  device_offline: ['always'],
+}
+
+const OPERATOR_HINTS: Record<string, string> = {
+  '>': 'Fire when the value is greater than the threshold',
+  '>=': 'Fire when the value is greater than or equal to the threshold',
+  '<': 'Fire when the value is less than the threshold',
+  '<=': 'Fire when the value is less than or equal to the threshold',
+  '==': 'Fire when the value equals the target',
+  '!=': 'Fire when the value differs from the target',
+  between: 'Fire when the value falls within the min-max range',
+  contains: 'Fire when the event data contains the given text',
+  always: 'Fire every time the trigger activates',
+}
+
 const ALARM_LEVELS = [
   { value: 'info', label: 'Info' },
   { value: 'warning', label: 'Warning' },
@@ -159,12 +178,20 @@ export function TriggerConfigSection({
 interface ConditionEditorProps {
   condition: ConditionFormState
   onConditionChange: (condition: ConditionFormState) => void
+  trigger_type: string
 }
 
-export function ConditionEditor({ condition, onConditionChange }: ConditionEditorProps) {
+export function ConditionEditor({
+  condition,
+  onConditionChange,
+  trigger_type,
+}: ConditionEditorProps) {
   const showValue =
     condition.operator && condition.operator !== 'between' && condition.operator !== 'always'
   const showBetween = condition.operator === 'between'
+  const allowedOperators = trigger_type
+    ? (OPERATORS_BY_TRIGGER[trigger_type] ?? OPERATORS.map((o) => o.value))
+    : OPERATORS.map((o) => o.value)
 
   return (
     <div className="space-y-4">
@@ -191,12 +218,15 @@ export function ConditionEditor({ condition, onConditionChange }: ConditionEdito
           data-testid="condition-operator-select"
         >
           <option value="">Select operator</option>
-          {OPERATORS.map((op) => (
+          {OPERATORS.filter((op) => allowedOperators.includes(op.value)).map((op) => (
             <option key={op.value} value={op.value}>
               {op.label}
             </option>
           ))}
         </select>
+        {condition.operator && OPERATOR_HINTS[condition.operator] && (
+          <p className="mt-1 text-xs text-slate-500">{OPERATOR_HINTS[condition.operator]}</p>
+        )}
       </div>
 
       {showValue && (
@@ -412,4 +442,5 @@ export const INITIAL_ACTIONS: ActionFormState[] = [{ type: 'alarm', level: 'warn
 
 export const TRIGGER_TYPE_OPTIONS = TRIGGER_TYPES
 export const OPERATOR_OPTIONS = OPERATORS
+export const OPERATORS_BY_TRIGGER_MAP = OPERATORS_BY_TRIGGER
 export const ALARM_LEVEL_OPTIONS = ALARM_LEVELS

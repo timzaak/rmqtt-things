@@ -12,6 +12,7 @@ import {
   ActionsEditor,
   INITIAL_CONDITION,
   INITIAL_ACTIONS,
+  OPERATORS_BY_TRIGGER_MAP,
   type FormState,
 } from '@/components/alarm-rule/form-sections'
 
@@ -159,52 +160,60 @@ function AlarmRuleCreatePage() {
     })
   }
 
-  // Trigger type change handler: reset trigger_config
+  // Trigger type change handler: reset trigger_config and condition
   const handleTriggerTypeChange = (type: string) => {
-    setForm((f) => ({ ...f, trigger_type: type, trigger_config: {} }))
+    const allowedOps = OPERATORS_BY_TRIGGER_MAP[type]
+    const defaultOperator = allowedOps?.length === 1 ? allowedOps[0] : ''
+    setForm((f) => ({
+      ...f,
+      trigger_type: type,
+      trigger_config: {},
+      condition: { operator: defaultOperator },
+    }))
   }
 
   return (
     <div>
       <UnsavedGuard isDirty={isDirty} />
       <PageHeader title="Create Alarm Rule" />
-      <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-        {/* Product */}
-        <div>
-          <label htmlFor="product_id" className={labelClass}>
-            Product <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="product_id"
-            required
-            value={form.product_id}
-            onChange={(e) => setForm((f) => ({ ...f, product_id: e.target.value }))}
-            className={inputClass}
-            data-testid="product-select"
-          >
-            <option value="">Select a product</option>
-            {products?.data?.map((p) => (
-              <option key={p.id} value={p.model_no}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4">
+        {/* Product + Name */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="product_id" className={labelClass}>
+              Product <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="product_id"
+              required
+              value={form.product_id}
+              onChange={(e) => setForm((f) => ({ ...f, product_id: e.target.value }))}
+              className={inputClass}
+              data-testid="product-select"
+            >
+              <option value="">Select a product</option>
+              {products?.data?.map((p) => (
+                <option key={p.id} value={p.model_no}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* Name */}
-        <div>
-          <label htmlFor="name" className={labelClass}>
-            Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="name"
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className={inputClass}
-            data-testid="name-input"
-          />
+          <div>
+            <label htmlFor="name" className={labelClass}>
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="name"
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className={inputClass}
+              data-testid="name-input"
+            />
+          </div>
         </div>
 
         {/* Description */}
@@ -236,6 +245,7 @@ function AlarmRuleCreatePage() {
           <ConditionEditor
             condition={form.condition}
             onConditionChange={(condition) => setForm((f) => ({ ...f, condition }))}
+            trigger_type={form.trigger_type}
           />
         </div>
 

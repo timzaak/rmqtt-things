@@ -194,33 +194,34 @@ function AlarmRuleEditPage() {
     <div>
       <UnsavedGuard isDirty={isDirty} />
       <PageHeader title="Edit Alarm Rule" />
-      <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-        {/* Product (disabled) */}
-        <div>
-          <label className={labelClass}>Product</label>
-          <input
-            type="text"
-            disabled
-            value={productName}
-            className={disabledClass}
-            data-testid="product-input-disabled"
-          />
-        </div>
+      <form onSubmit={handleSubmit} className="max-w-4xl space-y-4">
+        {/* Product (disabled) + Name */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Product</label>
+            <input
+              type="text"
+              disabled
+              value={productName}
+              className={disabledClass}
+              data-testid="product-input-disabled"
+            />
+          </div>
 
-        {/* Name */}
-        <div>
-          <label htmlFor="name" className={labelClass}>
-            Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="name"
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className={inputClass}
-            data-testid="name-input"
-          />
+          <div>
+            <label htmlFor="name" className={labelClass}>
+              Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="name"
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className={inputClass}
+              data-testid="name-input"
+            />
+          </div>
         </div>
 
         {/* Description */}
@@ -264,6 +265,7 @@ function AlarmRuleEditPage() {
           <ConditionEditor
             condition={form.condition}
             onConditionChange={(condition) => setForm((f) => ({ ...f, condition }))}
+            trigger_type={form.trigger_type}
           />
         </div>
 
