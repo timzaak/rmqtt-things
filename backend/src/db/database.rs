@@ -11,6 +11,10 @@ use time::OffsetDateTime;
 
 const UNIX_TIMESTAMP_MS_THRESHOLD: i64 = 9_999_999_999;
 
+/// Error message returned when attempting to update the schema of an active validation template.
+/// Referenced from the API handler to avoid fragile string matching.
+pub const ACTIVE_TEMPLATE_SCHEMA_ERR: &str = "Cannot update schema of active template";
+
 fn timestamp_to_datetime(ts: i64) -> OffsetDateTime {
     let seconds = if ts > UNIX_TIMESTAMP_MS_THRESHOLD {
         ts / 1000
@@ -796,7 +800,7 @@ impl DatabaseService {
 
         if let Some(schema) = schema {
             if template.status == EventValidTemplateStatus::Active {
-                return Err(anyhow::anyhow!("Cannot update schema of active template"));
+                return Err(anyhow::anyhow!(ACTIVE_TEMPLATE_SCHEMA_ERR));
             }
             query_builder.push("schema = ");
             query_builder.push_bind(schema);

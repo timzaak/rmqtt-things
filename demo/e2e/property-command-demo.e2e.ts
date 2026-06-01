@@ -38,7 +38,7 @@ test.describe('Property Command (US-PA-016)', () => {
     await verifyTestEnvironment(null)
   })
 
-  test('[Scenario 1] sends command via UI while device is online, status becomes Sent', async ({ page, request: _request, demoLogger: _demoLogger }) => {
+  test('[Scenario 1] Send command online, device replies and status becomes Success', async ({ page, request: _request, demoLogger: _demoLogger }) => {
     const deviceId = `e2e-cmd-online-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 

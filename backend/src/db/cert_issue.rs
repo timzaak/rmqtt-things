@@ -34,7 +34,7 @@ impl CertIssueRepo {
         device_id: &str,
     ) -> Result<Option<CertIssue>, sqlx::Error> {
         sqlx::query_as::<_, CertIssue>(
-            "SELECT * FROM cert_issue WHERE product_id = $1 AND device_id = $2",
+            "SELECT * FROM cert_issue WHERE product_id = $1 AND device_id = $2 ORDER BY id DESC",
         )
         .bind(product_id)
         .bind(device_id)
@@ -48,10 +48,19 @@ impl CertIssueRepo {
         device_id: &str,
         status: i16,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE cert_issue SET status = $1 WHERE product_id = $2 AND device_id = $3")
+        sqlx::query("UPDATE cert_issue SET status = $1 WHERE product_id = $2 AND device_id = $3 AND status = 0")
             .bind(status)
             .bind(product_id)
             .bind(device_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn update_status_by_id(&self, id: i64, status: i16) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE cert_issue SET status = $1 WHERE id = $2 AND status = 0")
+            .bind(status)
+            .bind(id)
             .execute(&self.pool)
             .await?;
         Ok(())

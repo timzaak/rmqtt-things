@@ -151,7 +151,7 @@
 
 ### 访问控制原则
 - 设备端回调接口由 RMQTT Broker 调用，不做额外鉴权
-- 管理端接口当前不做鉴权（单租户部署模式），后续可扩展
+- 管理端接口在 Herald 配置时受认证保护，未配置时不做鉴权（单租户部署模式）
 - 设备只能访问自己 client_id 对应的主题空间（通过 ACL 控制）
 
 ### 数据边界
@@ -168,8 +168,8 @@
 - `/products` - 产品列表页（已实现）
 - `/products/create` - 创建产品页（已实现）
 - `/products/edit/$id` - 编辑产品页（已实现）
-- `/devices` - 设备列表页（占位页面，待实现）
-- `/devices/show/$id` - 设备详情页（占位页面，待实现）
+- `/devices` - 设备列表页（已实现）
+- `/devices/show/$id` - 设备详情页（已实现）
 
 ### 关键交互
 - 产品列表支持按名称或型号编号搜索
@@ -177,14 +177,13 @@
 - 创建和编辑表单提交后跳转到列表页
 - 表单未保存时离开页面需提示确认（Unsaved Guard）
 
-### 设备页面待实现交互
-- 设备列表页需支持按产品筛选、按在线/离线状态筛选
-- 设备列表页需展示 device_id、product_id、状态、IP 地址、最后在线时间，支持分页
+### 设备页面交互（已实现）
+- 设备列表页支持按产品筛选、按在线/离线状态筛选
+- 设备列表页展示 device_id、product_id、状态、IP 地址、最后在线时间，支持分页
 - 设备列表页点击 device_id 可跳转到设备详情页
-- 设备详情页需展示设备基本信息（device_id、product_id、状态、IP、最后在线/离线时间）
-- 设备详情页需分区展示最新属性、属性上报历史、事件上报历史、属性命令历史、连接状态变更历史
-- 各历史区域需支持独立分页浏览
-- 前端 hooks（useDevices、useProperties、useEvents）已封装就绪，可直接使用
+- 设备详情页展示设备基本信息（device_id、product_id、状态、IP、最后在线/离线时间）
+- 设备详情页分区展示最新属性、属性上报历史、事件上报历史、属性命令历史、连接状态变更历史
+- 各历史区域支持独立分页浏览
 
 ---
 
@@ -211,8 +210,8 @@
 - `frontend/src/routes/products/index.tsx` - 产品列表页（已实现）
 - `frontend/src/routes/products/create.tsx` - 创建产品页（已实现）
 - `frontend/src/routes/products/edit.$id.tsx` - 编辑产品页（已实现）
-- `frontend/src/routes/devices/index.tsx` - 设备列表页（占位页面，待实现）
-- `frontend/src/routes/devices/show.$id.tsx` - 设备详情页（占位页面，待实现）
+- `frontend/src/routes/devices/index.tsx` - 设备列表页（已实现）
+- `frontend/src/routes/devices/show.$id.tsx` - 设备详情页（已实现）
 - `frontend/src/hooks/useProducts.ts` - 产品相关 React Query hooks（已实现）
 - `frontend/src/hooks/useDevices.ts` - 设备状态和状态历史 hooks（已实现）
 - `frontend/src/hooks/useProperties.ts` - 属性最新值、历史和命令 hooks（已实现）

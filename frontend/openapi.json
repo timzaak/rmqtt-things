@@ -11,9 +11,7 @@
   "paths": {
     "/api/access/acl": {
       "post": {
-        "tags": [
-          "access"
-        ],
+        "tags": ["access"],
         "operationId": "acl",
         "requestBody": {
           "content": {
@@ -41,9 +39,7 @@
     },
     "/api/access/auth": {
       "post": {
-        "tags": [
-          "access"
-        ],
+        "tags": ["access"],
         "operationId": "auth",
         "requestBody": {
           "content": {
@@ -71,9 +67,7 @@
     },
     "/api/admin/alarm": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "list_alarms",
         "parameters": [
           {
@@ -157,9 +151,7 @@
     },
     "/api/admin/alarm-rule": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "list_alarm_rules",
         "parameters": [
           {
@@ -223,9 +215,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "create_alarm_rule",
         "requestBody": {
           "content": {
@@ -264,9 +254,7 @@
     },
     "/api/admin/alarm-rule/{id}": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_alarm_rule",
         "parameters": [
           {
@@ -305,9 +293,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "delete_alarm_rule",
         "parameters": [
           {
@@ -339,9 +325,7 @@
         ]
       },
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_alarm_rule",
         "parameters": [
           {
@@ -392,9 +376,7 @@
     },
     "/api/admin/alarm-rule/{id}/status": {
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_alarm_rule_status",
         "parameters": [
           {
@@ -445,9 +427,7 @@
     },
     "/api/admin/alarm/{id}/ack": {
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "ack_alarm",
         "parameters": [
           {
@@ -491,9 +471,7 @@
     },
     "/api/admin/ca/cert": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "list_certs_handler",
         "parameters": [
           {
@@ -575,9 +553,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "issue_cert_handler",
         "requestBody": {
           "content": {
@@ -616,9 +592,7 @@
     },
     "/api/admin/ca/cert/status": {
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_cert_status_handler",
         "requestBody": {
           "content": {
@@ -647,9 +621,7 @@
     },
     "/api/admin/ca/pem": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_ca_cert_handler",
         "responses": {
           "200": {
@@ -675,9 +647,7 @@
     },
     "/api/admin/device/status": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_device_status",
         "parameters": [
           {
@@ -758,9 +728,7 @@
     },
     "/api/admin/device/status/history": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_device_status_history",
         "parameters": [
           {
@@ -823,9 +791,7 @@
     },
     "/api/admin/event": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_event_history",
         "parameters": [
           {
@@ -888,9 +854,7 @@
     },
     "/api/admin/file/upload": {
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "admin_file_upload_handler",
         "requestBody": {
           "content": {
@@ -923,9 +887,7 @@
     },
     "/api/admin/ota/version": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_ota_versions",
         "parameters": [
           {
@@ -974,9 +936,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "create_ota_version",
         "requestBody": {
           "content": {
@@ -1002,9 +962,7 @@
     },
     "/api/admin/ota/version/{id}": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_ota_version",
         "parameters": [
           {
@@ -1037,9 +995,7 @@
         ]
       },
       "put": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_ota_version",
         "parameters": [
           {
@@ -1075,9 +1031,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "delete_ota_version",
         "parameters": [
           {
@@ -1105,9 +1059,7 @@
     },
     "/api/admin/product": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "list_products",
         "parameters": [
           {
@@ -1162,9 +1114,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "create_product",
         "requestBody": {
           "content": {
@@ -1200,9 +1150,7 @@
     },
     "/api/admin/product/{id}": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_product",
         "parameters": [
           {
@@ -1241,9 +1189,7 @@
         ]
       },
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_product",
         "parameters": [
           {
@@ -1294,9 +1240,7 @@
     },
     "/api/admin/property": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_property_latest",
         "parameters": [
           {
@@ -1359,9 +1303,7 @@
     },
     "/api/admin/property/command": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_property_commands",
         "parameters": [
           {
@@ -1431,9 +1373,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "create_property_command",
         "requestBody": {
           "content": {
@@ -1457,9 +1397,7 @@
         ]
       },
       "delete": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "delete_property_commands",
         "parameters": [
           {
@@ -1489,9 +1427,7 @@
     },
     "/api/admin/property/history": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_property_history",
         "parameters": [
           {
@@ -1554,9 +1490,7 @@
     },
     "/api/admin/valid/event": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_event_valid_templates",
         "parameters": [
           {
@@ -1613,9 +1547,7 @@
         ]
       },
       "post": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "create_event_valid_template",
         "requestBody": {
           "content": {
@@ -1641,9 +1573,7 @@
     },
     "/api/admin/valid/event/{id}": {
       "get": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "get_event_valid_template",
         "parameters": [
           {
@@ -1676,9 +1606,7 @@
         ]
       },
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_event_valid_template",
         "parameters": [
           {
@@ -1716,9 +1644,7 @@
     },
     "/api/admin/valid/event/{id}/status": {
       "patch": {
-        "tags": [
-          "admin"
-        ],
+        "tags": ["admin"],
         "operationId": "update_event_valid_template_status",
         "parameters": [
           {
@@ -1756,9 +1682,7 @@
     },
     "/api/auth/config": {
       "get": {
-        "tags": [
-          "system"
-        ],
+        "tags": ["system"],
         "operationId": "get_auth_config",
         "responses": {
           "200": {
@@ -1776,9 +1700,7 @@
     },
     "/api/device/connect": {
       "post": {
-        "tags": [
-          "device"
-        ],
+        "tags": ["device"],
         "operationId": "device_connect",
         "requestBody": {
           "content": {
@@ -1802,9 +1724,7 @@
     },
     "/api/device/disconnect": {
       "post": {
-        "tags": [
-          "device"
-        ],
+        "tags": ["device"],
         "operationId": "device_disconnect",
         "requestBody": {
           "content": {
@@ -1828,9 +1748,7 @@
     },
     "/api/health": {
       "get": {
-        "tags": [
-          "system"
-        ],
+        "tags": ["system"],
         "operationId": "health_check",
         "responses": {
           "200": {
@@ -1841,9 +1759,7 @@
     },
     "/api/ota/version": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "ota_version_post",
         "requestBody": {
           "content": {
@@ -1870,9 +1786,7 @@
     },
     "/api/thing/event/post": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "event_post",
         "requestBody": {
           "content": {
@@ -1899,9 +1813,7 @@
     },
     "/api/thing/file/upload": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "file_upload_handler",
         "requestBody": {
           "content": {
@@ -1928,9 +1840,7 @@
     },
     "/api/thing/property/post": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "property_post",
         "requestBody": {
           "content": {
@@ -1957,9 +1867,7 @@
     },
     "/api/thing/property/set_reply": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "property_set_reply",
         "requestBody": {
           "content": {
@@ -1986,9 +1894,7 @@
     },
     "/api/thing/property/set_subscribe": {
       "post": {
-        "tags": [
-          "thing"
-        ],
+        "tags": ["thing"],
         "operationId": "property_set_subscribe",
         "requestBody": {
           "content": {
@@ -2018,27 +1924,15 @@
     "schemas": {
       "Access": {
         "type": "string",
-        "enum": [
-          "1",
-          "2"
-        ]
+        "enum": ["1", "2"]
       },
       "AckStatus": {
         "type": "string",
-        "enum": [
-          "No",
-          "Yes"
-        ]
+        "enum": ["No", "Yes"]
       },
       "AclPayload": {
         "type": "object",
-        "required": [
-          "access",
-          "client_id",
-          "ip",
-          "topic",
-          "protocol"
-        ],
+        "required": ["access", "client_id", "ip", "topic", "protocol"],
         "properties": {
           "access": {
             "$ref": "#/components/schemas/Access"
@@ -2054,10 +1948,7 @@
             "type": "string"
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
@@ -2066,24 +1957,15 @@
         "description": "Query parameters for listing alarm records",
         "properties": {
           "acknowledged": {
-            "type": [
-              "boolean",
-              "null"
-            ],
+            "type": ["boolean", "null"],
             "description": "Filter by acknowledged status"
           },
           "device_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Filter by device ID"
           },
           "level": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Filter by level: info / warning / critical"
           },
           "page": {
@@ -2097,10 +1979,7 @@
             "description": "Page size, default 10"
           },
           "product_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Filter by product ID"
           }
         }
@@ -2108,9 +1987,7 @@
       "AlarmRecordResponse": {
         "type": "object",
         "description": "Single alarm record response wrapper",
-        "required": [
-          "data"
-        ],
+        "required": ["data"],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ApiAlarmRecord"
@@ -2144,10 +2021,7 @@
             "format": "date-time"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "enabled": {
             "type": "boolean"
@@ -2183,10 +2057,7 @@
         "description": "Query parameters for listing alarm rules",
         "properties": {
           "enabled": {
-            "type": [
-              "boolean",
-              "null"
-            ],
+            "type": ["boolean", "null"],
             "description": "Filter by enabled status"
           },
           "page": {
@@ -2200,10 +2071,7 @@
             "description": "Page size, default 10"
           },
           "product_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Filter by product ID"
           }
         }
@@ -2211,9 +2079,7 @@
       "AlarmRuleResponse": {
         "type": "object",
         "description": "Single alarm rule response wrapper",
-        "required": [
-          "data"
-        ],
+        "required": ["data"],
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AlarmRule"
@@ -2253,10 +2119,7 @@
             "description": "Alarm level: \"info\" / \"warning\" / \"critical\""
           },
           "message": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "product_id": {
             "type": "string"
@@ -2279,19 +2142,14 @@
             ]
           },
           "webhook_status": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
           }
         }
       },
       "ApiErrorResponse": {
         "type": "object",
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "properties": {
           "error": {
             "type": "string"
@@ -2300,34 +2158,22 @@
       },
       "AuthConfigResponse": {
         "type": "object",
-        "required": [
-          "enabled"
-        ],
+        "required": ["enabled"],
         "properties": {
           "enabled": {
             "type": "boolean"
           },
           "herald_login_url": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "login_url": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "AuthPayload": {
         "type": "object",
-        "required": [
-          "client_id",
-          "protocol",
-          "ipaddress"
-        ],
+        "required": ["client_id", "protocol", "ipaddress"],
         "properties": {
           "client_id": {
             "type": "string"
@@ -2340,18 +2186,13 @@
           },
           "protocol": {},
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "CaCertResponse": {
         "type": "object",
-        "required": [
-          "ca_pem"
-        ],
+        "required": ["ca_pem"],
         "properties": {
           "ca_pem": {
             "type": "string"
@@ -2403,33 +2244,18 @@
       },
       "CertStatus": {
         "type": "string",
-        "enum": [
-          "Normal",
-          "InValid",
-          "Revoked"
-        ]
+        "enum": ["Normal", "InValid", "Revoked"]
       },
       "CommandStatus": {
         "type": "string",
-        "enum": [
-          "Pending",
-          "Sent",
-          "Success",
-          "Failed",
-          "Deleted"
-        ]
+        "enum": ["Pending", "Sent", "Success", "Failed", "Deleted"]
       },
       "CommonQuery": {
         "type": "object",
-        "required": [
-          "product_id"
-        ],
+        "required": ["product_id"],
         "properties": {
           "device_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "设备ID，可选"
           },
           "page": {
@@ -2452,10 +2278,7 @@
         "type": "object",
         "properties": {
           "device_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "设备ID，可选"
           },
           "page": {
@@ -2469,10 +2292,7 @@
             "description": "每页大小，默认为10"
           },
           "product_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "产品ID"
           },
           "registration_source": {
@@ -2502,13 +2322,7 @@
       "CreateAlarmRuleRequest": {
         "type": "object",
         "description": "Request body for creating an alarm rule",
-        "required": [
-          "product_id",
-          "name",
-          "trigger_type",
-          "condition",
-          "actions"
-        ],
+        "required": ["product_id", "name", "trigger_type", "condition", "actions"],
         "properties": {
           "actions": {
             "$ref": "#/components/schemas/Value",
@@ -2519,10 +2333,7 @@
             "description": "Condition expression"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Rule description"
           },
           "name": {
@@ -2550,17 +2361,10 @@
       },
       "CreateEventValidTemplateRequest": {
         "type": "object",
-        "required": [
-          "product_id",
-          "event",
-          "schema"
-        ],
+        "required": ["product_id", "event", "schema"],
         "properties": {
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "event": {
             "type": "string"
@@ -2593,10 +2397,7 @@
             "type": "string"
           },
           "device_ids": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             }
@@ -2618,10 +2419,7 @@
             ]
           },
           "max_version": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "min_version": {
             "type": "string"
@@ -2636,16 +2434,10 @@
       },
       "CreateProductRequest": {
         "type": "object",
-        "required": [
-          "name",
-          "model_no"
-        ],
+        "required": ["name", "model_no"],
         "properties": {
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "model_no": {
             "type": "string"
@@ -2657,11 +2449,7 @@
       },
       "CreatePropertyCommandRequest": {
         "type": "object",
-        "required": [
-          "product_id",
-          "device_id",
-          "command"
-        ],
+        "required": ["product_id", "device_id", "command"],
         "properties": {
           "command": {
             "$ref": "#/components/schemas/Value",
@@ -2679,9 +2467,7 @@
       },
       "DeletePropertyCommandsQuery": {
         "type": "object",
-        "required": [
-          "ids"
-        ],
+        "required": ["ids"],
         "properties": {
           "ids": {
             "type": "array",
@@ -2707,10 +2493,7 @@
             "type": "boolean"
           },
           "clientid": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "connected_at": {
             "type": "integer",
@@ -2743,33 +2526,20 @@
             "type": "boolean"
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "DeviceConnectionStatus": {
         "type": "string",
-        "enum": [
-          "Offline",
-          "Online"
-        ]
+        "enum": ["Offline", "Online"]
       },
       "DeviceDisconnectRequest": {
         "type": "object",
-        "required": [
-          "node",
-          "disconnected_at",
-          "reason"
-        ],
+        "required": ["node", "disconnected_at", "reason"],
         "properties": {
           "clientid": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "device_id": {
             "type": "string"
@@ -2779,10 +2549,7 @@
             "format": "int64"
           },
           "ipaddress": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "node": {
             "type": "integer",
@@ -2801,19 +2568,10 @@
       },
       "DeviceStatusHistory": {
         "type": "object",
-        "required": [
-          "id",
-          "product_id",
-          "device_id",
-          "status",
-          "created_at"
-        ],
+        "required": ["id", "product_id", "device_id", "status", "created_at"],
         "properties": {
           "connected_at": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "created_at": {
@@ -2824,10 +2582,7 @@
             "type": "string"
           },
           "disconnected_at": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "id": {
@@ -2835,19 +2590,13 @@
             "format": "int64"
           },
           "ip_address": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "product_id": {
             "type": "string"
           },
           "reason": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "status": {
             "$ref": "#/components/schemas/DeviceConnectionStatus"
@@ -2856,13 +2605,7 @@
       },
       "DeviceStatusWithSource": {
         "type": "object",
-        "required": [
-          "product_id",
-          "device_id",
-          "registration_source",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["product_id", "device_id", "registration_source", "created_at", "updated_at"],
         "properties": {
           "created_at": {
             "type": "string",
@@ -2872,23 +2615,14 @@
             "type": "string"
           },
           "ip_address": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "last_offline_at": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "last_online_at": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           },
           "product_id": {
@@ -2916,13 +2650,7 @@
       },
       "EventHistory": {
         "type": "object",
-        "required": [
-          "id",
-          "product_id",
-          "device_id",
-          "events",
-          "created_time"
-        ],
+        "required": ["id", "product_id", "device_id", "events", "created_time"],
         "properties": {
           "created_time": {
             "type": "string",
@@ -2942,35 +2670,21 @@
             "type": "string"
           },
           "reported_time": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           }
         }
       },
       "EventValidTemplate": {
         "type": "object",
-        "required": [
-          "id",
-          "product_id",
-          "event",
-          "schema",
-          "status",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["id", "product_id", "event", "schema", "status", "created_at", "updated_at"],
         "properties": {
           "created_at": {
             "type": "string",
             "format": "date-time"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "event": {
             "type": "string"
@@ -2998,10 +2712,7 @@
         "type": "object",
         "properties": {
           "event": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "page": {
             "type": "integer",
@@ -3012,29 +2723,17 @@
             "format": "int64"
           },
           "product_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "EventValidTemplateStatus": {
         "type": "string",
-        "enum": [
-          "Draft",
-          "Active",
-          "Inactive"
-        ]
+        "enum": ["Draft", "Active", "Inactive"]
       },
       "FileUploadRequest": {
         "type": "object",
-        "required": [
-          "fileName",
-          "directory",
-          "useOriginName",
-          "fileType"
-        ],
+        "required": ["fileName", "directory", "useOriginName", "fileType"],
         "properties": {
           "directory": {
             "type": "string"
@@ -3052,10 +2751,7 @@
       },
       "FileUploadResponse": {
         "type": "object",
-        "required": [
-          "url",
-          "fields"
-        ],
+        "required": ["url", "fields"],
         "properties": {
           "fields": {
             "type": "object",
@@ -3073,13 +2769,7 @@
       },
       "IssueCertRequest": {
         "type": "object",
-        "required": [
-          "product_id",
-          "device_id",
-          "force",
-          "start_at",
-          "end_at"
-        ],
+        "required": ["product_id", "device_id", "force", "start_at", "end_at"],
         "properties": {
           "device_id": {
             "type": "string"
@@ -3102,10 +2792,7 @@
       },
       "IssueCertResponse": {
         "type": "object",
-        "required": [
-          "cert_pem",
-          "key_pem"
-        ],
+        "required": ["cert_pem", "key_pem"],
         "properties": {
           "cert_pem": {
             "type": "string"
@@ -3117,10 +2804,7 @@
       },
       "MqttPayload": {
         "type": "object",
-        "required": [
-          "id",
-          "ack"
-        ],
+        "required": ["id", "ack"],
         "properties": {
           "ack": {
             "$ref": "#/components/schemas/AckStatus"
@@ -3142,18 +2826,11 @@
       },
       "MqttProtocol": {
         "type": "string",
-        "enum": [
-          "3",
-          "4",
-          "5"
-        ]
+        "enum": ["3", "4", "5"]
       },
       "MqttResponse": {
         "type": "object",
-        "required": [
-          "id",
-          "code"
-        ],
+        "required": ["id", "code"],
         "properties": {
           "code": {
             "type": "integer",
@@ -3176,10 +2853,7 @@
       },
       "OtaReport": {
         "type": "object",
-        "required": [
-          "key",
-          "version"
-        ],
+        "required": ["key", "version"],
         "properties": {
           "key": {
             "type": "string"
@@ -3210,10 +2884,7 @@
             "format": "date-time"
           },
           "device_ids": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             }
@@ -3239,10 +2910,7 @@
             ]
           },
           "max_version": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int32"
           },
           "min_version": {
@@ -3282,19 +2950,13 @@
             "format": "int64"
           },
           "product_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "PaginatedResponse": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3311,10 +2973,7 @@
       },
       "PaginatedResponse_AlarmRule": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3345,10 +3004,7 @@
                   "format": "date-time"
                 },
                 "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "enabled": {
                   "type": "boolean"
@@ -3389,10 +3045,7 @@
       },
       "PaginatedResponse_ApiAlarmRecord": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3429,10 +3082,7 @@
                   "description": "Alarm level: \"info\" / \"warning\" / \"critical\""
                 },
                 "message": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "product_id": {
                   "type": "string"
@@ -3455,10 +3105,7 @@
                   ]
                 },
                 "webhook_status": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
                 }
               }
@@ -3473,10 +3120,7 @@
       },
       "PaginatedResponse_DeviceStatusWithSource": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3498,23 +3142,14 @@
                   "type": "string"
                 },
                 "ip_address": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "last_offline_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 },
                 "last_online_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 },
                 "product_id": {
@@ -3550,10 +3185,7 @@
       },
       "PaginatedResponse_EventValidTemplate": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3574,10 +3206,7 @@
                   "format": "date-time"
                 },
                 "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "event": {
                   "type": "string"
@@ -3611,10 +3240,7 @@
       },
       "PaginatedResponse_OtaVersion": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3638,10 +3264,7 @@
                   "format": "date-time"
                 },
                 "device_ids": {
-                  "type": [
-                    "array",
-                    "null"
-                  ],
+                  "type": ["array", "null"],
                   "items": {
                     "type": "string"
                   }
@@ -3667,10 +3290,7 @@
                   ]
                 },
                 "max_version": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "format": "int32"
                 },
                 "min_version": {
@@ -3708,10 +3328,7 @@
       },
       "PaginatedResponse_Product": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3735,10 +3352,7 @@
                   "format": "date-time"
                 },
                 "description": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "id": {
                   "type": "integer",
@@ -3769,10 +3383,7 @@
       },
       "PaginatedResponse_PropertyCommand": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -3824,11 +3435,7 @@
       },
       "PaginationInfo": {
         "type": "object",
-        "required": [
-          "page",
-          "page_size",
-          "total"
-        ],
+        "required": ["page", "page_size", "total"],
         "properties": {
           "page": {
             "type": "integer",
@@ -3867,10 +3474,7 @@
             "format": "date-time"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "id": {
             "type": "integer",
@@ -3905,20 +3509,14 @@
             "description": "每页大小，默认为10"
           },
           "search": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "搜索关键字，模糊匹配产品名称或型号"
           }
         }
       },
       "ProductStatus": {
         "type": "string",
-        "enum": [
-          "Online",
-          "Offline"
-        ]
+        "enum": ["Online", "Offline"]
       },
       "PropertyCommand": {
         "type": "object",
@@ -3960,15 +3558,10 @@
       },
       "PropertyCommandQuery": {
         "type": "object",
-        "required": [
-          "product_id"
-        ],
+        "required": ["product_id"],
         "properties": {
           "device_id": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "设备ID，可选"
           },
           "page": {
@@ -4000,13 +3593,7 @@
       },
       "PropertyHistory": {
         "type": "object",
-        "required": [
-          "id",
-          "product_id",
-          "device_id",
-          "properties",
-          "created_time"
-        ],
+        "required": ["id", "product_id", "device_id", "properties", "created_time"],
         "properties": {
           "created_time": {
             "type": "string",
@@ -4026,22 +3613,14 @@
             "$ref": "#/components/schemas/Value"
           },
           "reported_time": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "format": "date-time"
           }
         }
       },
       "PropertyLatest": {
         "type": "object",
-        "required": [
-          "product_id",
-          "device_id",
-          "properties",
-          "updated_time"
-        ],
+        "required": ["product_id", "device_id", "properties", "updated_time"],
         "properties": {
           "device_id": {
             "type": "string"
@@ -4060,11 +3639,7 @@
       },
       "PropertySetReplyPayload": {
         "type": "object",
-        "required": [
-          "data",
-          "id",
-          "code"
-        ],
+        "required": ["data", "id", "code"],
         "properties": {
           "code": {
             "type": "integer",
@@ -4143,92 +3718,54 @@
       },
       "RMqttSubscribeMessage": {
         "type": "object",
-        "required": [
-          "clientid"
-        ],
+        "required": ["clientid"],
         "properties": {
           "clean_start": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "clientid": {
             "type": "string"
           },
           "connected_at": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "ipaddress": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "keepalive": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int32"
           },
           "node": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int32"
           },
           "proto_ver": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int32"
           },
           "session_present": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "time": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "topic": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "username": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "RegistrationSource": {
         "type": "string",
-        "enum": [
-          "Auto",
-          "Manual"
-        ]
+        "enum": ["Auto", "Manual"]
       },
       "SimplePaginatedResponse": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -4245,10 +3782,7 @@
       },
       "SimplePaginatedResponse_CertIssue": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
@@ -4305,28 +3839,16 @@
       },
       "SimplePaginatedResponse_DeviceStatusHistory": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "id",
-                "product_id",
-                "device_id",
-                "status",
-                "created_at"
-              ],
+              "required": ["id", "product_id", "device_id", "status", "created_at"],
               "properties": {
                 "connected_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 },
                 "created_at": {
@@ -4337,10 +3859,7 @@
                   "type": "string"
                 },
                 "disconnected_at": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 },
                 "id": {
@@ -4348,19 +3867,13 @@
                   "format": "int64"
                 },
                 "ip_address": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "product_id": {
                   "type": "string"
                 },
                 "reason": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": ["string", "null"]
                 },
                 "status": {
                   "$ref": "#/components/schemas/DeviceConnectionStatus"
@@ -4377,22 +3890,13 @@
       },
       "SimplePaginatedResponse_EventHistory": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "id",
-                "product_id",
-                "device_id",
-                "events",
-                "created_time"
-              ],
+              "required": ["id", "product_id", "device_id", "events", "created_time"],
               "properties": {
                 "created_time": {
                   "type": "string",
@@ -4412,10 +3916,7 @@
                   "type": "string"
                 },
                 "reported_time": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 }
               }
@@ -4430,22 +3931,13 @@
       },
       "SimplePaginatedResponse_PropertyHistory": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "id",
-                "product_id",
-                "device_id",
-                "properties",
-                "created_time"
-              ],
+              "required": ["id", "product_id", "device_id", "properties", "created_time"],
               "properties": {
                 "created_time": {
                   "type": "string",
@@ -4465,10 +3957,7 @@
                   "$ref": "#/components/schemas/Value"
                 },
                 "reported_time": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
+                  "type": ["string", "null"],
                   "format": "date-time"
                 }
               }
@@ -4483,21 +3972,13 @@
       },
       "SimplePaginatedResponse_PropertyLatest": {
         "type": "object",
-        "required": [
-          "data",
-          "pagination"
-        ],
+        "required": ["data", "pagination"],
         "properties": {
           "data": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": [
-                "product_id",
-                "device_id",
-                "properties",
-                "updated_time"
-              ],
+              "required": ["product_id", "device_id", "properties", "updated_time"],
               "properties": {
                 "device_id": {
                   "type": "string"
@@ -4524,10 +4005,7 @@
       },
       "SimplePaginationInfo": {
         "type": "object",
-        "required": [
-          "page",
-          "page_size"
-        ],
+        "required": ["page", "page_size"],
         "properties": {
           "page": {
             "type": "integer",
@@ -4568,24 +4046,15 @@
             ]
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Rule description"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": ["string", "null"],
             "description": "Rule name"
           },
           "throttle_minutes": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int32",
             "description": "Dedup interval in minutes"
           },
@@ -4605,9 +4074,7 @@
       "UpdateAlarmRuleStatusRequest": {
         "type": "object",
         "description": "Request body for enabling/disabling an alarm rule",
-        "required": [
-          "enabled"
-        ],
+        "required": ["enabled"],
         "properties": {
           "enabled": {
             "type": "boolean",
@@ -4617,20 +4084,13 @@
       },
       "UpdateCertStatusRequest": {
         "type": "object",
-        "required": [
-          "product_id",
-          "device_id",
-          "status"
-        ],
+        "required": ["product_id", "device_id", "status"],
         "properties": {
           "device_id": {
             "type": "string"
           },
           "id": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "product_id": {
@@ -4646,10 +4106,7 @@
         "type": "object",
         "properties": {
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "schema": {
             "oneOf": [
@@ -4665,9 +4122,7 @@
       },
       "UpdateEventValidTemplateStatusRequest": {
         "type": "object",
-        "required": [
-          "status"
-        ],
+        "required": ["status"],
         "properties": {
           "status": {
             "$ref": "#/components/schemas/EventValidTemplateStatus"
@@ -4678,32 +4133,20 @@
         "type": "object",
         "properties": {
           "bin_length": {
-            "type": [
-              "integer",
-              "null"
-            ],
+            "type": ["integer", "null"],
             "format": "int64"
           },
           "bin_md5": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "device_ids": {
-            "type": [
-              "array",
-              "null"
-            ],
+            "type": ["array", "null"],
             "items": {
               "type": "string"
             }
           },
           "file_key": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "log": {
             "oneOf": [
@@ -4716,26 +4159,16 @@
             ]
           },
           "max_version": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "min_version": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           }
         }
       },
       "UpdateProductRequest": {
         "type": "object",
-        "required": [
-          "name",
-          "description",
-          "auto_provisioning"
-        ],
+        "required": ["name", "description", "auto_provisioning"],
         "properties": {
           "auto_provisioning": {
             "type": "boolean"

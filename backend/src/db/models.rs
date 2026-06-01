@@ -162,6 +162,19 @@ pub enum CertStatus {
     Revoked = 2,
 }
 
+impl TryFrom<i16> for CertStatus {
+    type Error = ();
+
+    fn try_from(value: i16) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(CertStatus::Normal),
+            1 => Ok(CertStatus::InValid),
+            2 => Ok(CertStatus::Revoked),
+            _ => Err(()),
+        }
+    }
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize, ToSchema,
 )]

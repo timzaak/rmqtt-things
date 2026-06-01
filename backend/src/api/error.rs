@@ -67,3 +67,10 @@ impl IntoResponse for ApiError {
             .into_response()
     }
 }
+
+/// Helper to map database errors into a consistent 500 response.
+/// Use via `.map_err(map_db_err)?` in handler code.
+pub fn map_db_err(e: impl std::fmt::Display) -> ApiError {
+    tracing::error!("Database error: {e}");
+    ApiError::internal("Database operation failed")
+}

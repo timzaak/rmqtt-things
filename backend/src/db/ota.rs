@@ -75,7 +75,7 @@ impl OtaRepo {
               AND key = $2
               AND status = 0
               AND $3 >= min_version
-              AND (max_version IS NULL OR max_version >= $3)
+              AND (max_version IS NULL OR max_version > $3)
               AND released_at <= NOW()
               AND (device_ids IS NULL OR $4 = ANY(device_ids))
             ORDER BY version DESC

@@ -4,6 +4,7 @@ use crate::api::error::ApiError;
 use crate::api::utils::{send_property_command_to_device, validate_identifier};
 use crate::api::web_models::{FileUploadRequest, FileUploadResponse};
 use crate::cache::SchemaCacheManager;
+use crate::db::database::ACTIVE_TEMPLATE_SCHEMA_ERR;
 use crate::db::models::OtaVersion;
 use axum::Json;
 use axum::extract::{Path, State};
@@ -294,9 +295,7 @@ pub async fn update_event_valid_template(
         .update_event_valid_template(id, request.schema.as_ref(), request.description.as_deref())
         .await
         .map_err(|e| {
-            if e.to_string()
-                .contains("Cannot update schema of active template")
-            {
+            if e.to_string().contains(ACTIVE_TEMPLATE_SCHEMA_ERR) {
                 return ApiError::bad_request(e.to_string());
             }
             error!("Database error: {}", e);

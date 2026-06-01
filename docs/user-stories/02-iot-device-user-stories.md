@@ -60,15 +60,15 @@ Then 认证被拒绝
 
 **场景 1：设备访问自己的事件/服务主题**
 ```gherkin
-Given 设备 client_id 为 "sensor-001"
-When 设备发布或订阅主题 "/sensor-001/thing/event/*" 或 "/sensor-001/thing/service/*"
+Given 设备 client_id 为 "sensor-001"，所属产品为 "product-a"
+When 设备发布或订阅主题 "/product-a/sensor-001/thing/event/*" 或 "/product-a/sensor-001/thing/service/*"
 Then ACL 允许操作
 ```
 
 **场景 2：设备访问其他设备的主题**
 ```gherkin
 Given 设备 client_id 为 "sensor-001"
-When 设备尝试发布或订阅 "/sensor-002/thing/event/*"
+When 设备尝试发布或订阅 "/product-a/sensor-002/thing/event/*"
 Then ACL 拒绝操作
 ```
 

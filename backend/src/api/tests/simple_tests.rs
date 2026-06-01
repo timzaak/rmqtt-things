@@ -415,6 +415,7 @@ async fn test_certificate_issue_and_revoke(ctx: &mut TestContext) {
 
     // 2. Revoke the certificate
     let update_req = UpdateCertStatusRequest {
+        id: None,
         product_id: product_id.clone(),
         device_id: client_id.clone(),
         status: CertStatus::Revoked as i16,

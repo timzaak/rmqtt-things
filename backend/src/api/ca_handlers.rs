@@ -1,6 +1,6 @@
 use crate::api::ApiState;
 use crate::api::admin_models::{CertificatesListResponse, CommonQuery2, SimplePaginationInfo};
-use crate::api::error::ApiError;
+use crate::api::error::{ApiError, map_db_err};
 use crate::api::utils::validate_identifier;
 use crate::ca;
 use crate::db::models::{CertIssue, CertStatus, RegistrationSource};
@@ -34,6 +34,7 @@ pub struct IssueCertResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateCertStatusRequest {
+    pub id: Option<i64>,
     pub product_id: String,
     pub device_id: String,
     pub status: i16,
@@ -63,10 +64,7 @@ pub async fn issue_cert_handler(
             .cert_issue()
             .find_by_device_id(&issue_req.product_id, &issue_req.device_id)
             .await
-            .map_err(|e| {
-                error!("Database error: {e}");
-                ApiError::internal("Database operation failed")
-            })?
+            .map_err(map_db_err)?
         && cert.status == CertStatus::Normal
         && cert.end_at > OffsetDateTime::now_utc()
     {
@@ -115,10 +113,7 @@ pub async fn issue_cert_handler(
         .cert_issue()
         .create(&new_cert)
         .await
-        .map_err(|e| {
-            error!("Database error: {e}");
-            ApiError::internal("Database operation failed")
-        })?;
+        .map_err(map_db_err)?;
 
     if let Err(e) = app_state
         .db
@@ -156,21 +151,56 @@ pub async fn update_cert_status_handler(
     Json(update_req): Json<UpdateCertStatusRequest>,
 ) -> Result<StatusCode, ApiError> {
     let app_state = &state.admin;
-    validate_identifier(&update_req.product_id, "product_id")?;
-    validate_identifier(&update_req.device_id, "device_id")?;
-    app_state
-        .db
-        .cert_issue()
-        .update_status(
-            &update_req.product_id,
-            &update_req.device_id,
-            update_req.status,
-        )
-        .await
-        .map_err(|e| {
-            error!("Database error: {e}");
-            ApiError::internal("Database operation failed")
-        })?;
+    let cert_repo = app_state.db.cert_issue();
+
+    // Validate the target status is a valid transition target
+    let target_status = CertStatus::try_from(update_req.status)
+        .map_err(|_| ApiError::bad_request("无效的证书状态"))?;
+    if target_status == CertStatus::Normal {
+        return Err(ApiError::bad_request("不允许将证书状态设置为 Normal"));
+    }
+
+    if let Some(cert_id) = update_req.id {
+        // ID-based: fetch current cert, enforce state machine, update by ID
+        let cert = cert_repo
+            .find_by_id(cert_id)
+            .await
+            .map_err(map_db_err)?
+            .ok_or_else(|| ApiError::not_found("证书不存在"))?;
+
+        if cert.status != CertStatus::Normal {
+            return Err(ApiError::bad_request("只能操作 Normal 状态的证书"));
+        }
+
+        cert_repo
+            .update_status_by_id(cert_id, update_req.status)
+            .await
+            .map_err(map_db_err)?;
+    } else {
+        // Legacy batch mode: validate identifiers, enforce state machine on the found cert
+        validate_identifier(&update_req.product_id, "product_id")?;
+        validate_identifier(&update_req.device_id, "device_id")?;
+
+        let cert = cert_repo
+            .find_by_device_id(&update_req.product_id, &update_req.device_id)
+            .await
+            .map_err(map_db_err)?
+            .ok_or_else(|| ApiError::not_found("证书不存在"))?;
+
+        if cert.status != CertStatus::Normal {
+            return Err(ApiError::bad_request("只能操作 Normal 状态的证书"));
+        }
+
+        cert_repo
+            .update_status(
+                &update_req.product_id,
+                &update_req.device_id,
+                update_req.status,
+            )
+            .await
+            .map_err(map_db_err)?;
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -205,10 +235,7 @@ pub async fn list_certs_handler(
             req.page_size,
         )
         .await
-        .map_err(|e| {
-            error!("Database error: {e}");
-            ApiError::internal("Database operation failed")
-        })?;
+        .map_err(map_db_err)?;
     Ok(Json(CertificatesListResponse {
         data: certs,
         pagination: SimplePaginationInfo {
@@ -238,10 +265,7 @@ pub async fn get_cert_handler(
         .cert_issue()
         .find_by_id(id)
         .await
-        .map_err(|e| {
-            error!("Database error: {e}");
-            ApiError::internal("Database operation failed")
-        })?;
+        .map_err(map_db_err)?;
     match cert {
         Some(c) => Ok(Json(c)),
         None => Err(ApiError::not_found("Certificate not found")),

@@ -8,6 +8,9 @@ use axum::http::StatusCode;
 use std::sync::Arc;
 use tracing::error;
 
+/// PostgreSQL error code for unique constraint violation.
+const PG_UNIQUE_VIOLATION: &str = "23505";
+
 #[utoipa::path(
     post,
     path = "/api/admin/product",
@@ -26,6 +29,12 @@ pub async fn create_product(
     match state.db.product().create_product(&req).await {
         Ok(product) => Ok((StatusCode::CREATED, Json(product))),
         Err(e) => {
+            if let Some(db_err) = e.downcast_ref::<sqlx::Error>()
+                && let sqlx::Error::Database(db_err_inner) = db_err
+                && db_err_inner.code().as_deref() == Some(PG_UNIQUE_VIOLATION)
+            {
+                return Err(ApiError::conflict("产品型号编号已存在"));
+            }
             error!("Database error: {}", e);
             Err(ApiError::internal("Database operation failed"))
         }
