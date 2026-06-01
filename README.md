@@ -34,7 +34,7 @@ Prerequisites: Docker, Rust toolchain, Node.js. See [getting started](docs/tutor
 
 ```shell
 docker run postgres:18-alpine
-docker run rmqtt/rmqtt:0.20.0
+docker run rmqtt/rmqtt:0.21.0
 cd backend && cargo run
 cd frontend && npm install && npm run dev
 ```

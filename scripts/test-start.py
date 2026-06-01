@@ -522,7 +522,7 @@ def _start_rmqtt() -> bool:
             f"{RMQTT_MQTT_PORT}:1883",
             "-p",
             f"{RMQTT_HTTP_PORT}:6060",
-            "rmqtt/rmqtt:0.20.0",
+            "rmqtt/rmqtt:0.21.0",
             "-f",
             "conf/rmqtt.toml",
         ]

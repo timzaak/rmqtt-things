@@ -34,7 +34,7 @@ Skill 配置也是独立的：[web-dev-skills](https://github.com/timzaak/web-de
 
 ```shell
 docker run postgres:18-alpine
-docker run rmqtt/rmqtt:0.20.0
+docker run rmqtt/rmqtt:0.21.0
 cd backend && cargo run
 cd frontend && npm install && npm run dev
 ```

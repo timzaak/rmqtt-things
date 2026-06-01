@@ -194,7 +194,7 @@ docker run -d \
     --restart unless-stopped \
     -p 1883:1883 \
     -v /opt/rmqtt-things/conf:/app/rmqtt/conf \
-    rmqtt/rmqtt:0.20
+    rmqtt/rmqtt:0.21.0
 ```
 
 Port 1883 is mapped to the host so MQTT devices can connect through it. The RMQTT management API port (6060) is not exposed externally; only the App container accesses it through the Docker network.

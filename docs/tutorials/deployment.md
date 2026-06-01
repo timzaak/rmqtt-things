@@ -194,7 +194,7 @@ docker run -d \
     --restart unless-stopped \
     -p 1883:1883 \
     -v /opt/rmqtt-things/conf:/app/rmqtt/conf \
-    rmqtt/rmqtt:0.20
+    rmqtt/rmqtt:0.21.0
 ```
 
 1883 端口映射到宿主机，MQTT 设备通过这个端口连接。RMQTT 的管理 API 端口（6060）不对外暴露，只有 App 容器通过 Docker 网络访问。

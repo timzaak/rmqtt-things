@@ -30,7 +30,7 @@ docker run --rm --name rmqtt \
   -p 1883:1883 \
   -p 6060:6060 \
   -v ${PWD}/conf:/app/rmqtt/conf \
-  rmqtt/rmqtt:0.20.0 \
+  rmqtt/rmqtt:0.21.0 \
   -f conf/rmqtt.toml
 ```
 
