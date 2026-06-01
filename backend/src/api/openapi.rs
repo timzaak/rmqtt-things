@@ -7,6 +7,11 @@ use utoipa::{Modify, OpenApi};
 
 #[derive(OpenApi)]
 #[openapi(
+    info(
+        title = "RMQTT Things API",
+        version = env!("CARGO_PKG_VERSION"),
+        description = "RMQTT IoT Things Management API"
+    ),
     modifiers(&SecurityAddon),
     paths(
         auth_handlers::get_auth_config,
