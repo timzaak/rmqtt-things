@@ -53,10 +53,10 @@ function AlarmsIndexPage() {
   const items: AlarmRecordRow[] = (data?.data ?? []) as AlarmRecordRow[]
   const pagination = data?.pagination
 
-  const levelColorMap: Record<string, string> = {
-    info: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    warning: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-    critical: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  const levelStyleMap: Record<string, React.CSSProperties> = {
+    info: { background: '#dbeafe', color: '#1e40af' },
+    warning: { background: '#fef3c7', color: '#92400e' },
+    critical: { background: '#fee2e2', color: '#991b1b' },
   }
 
   const columns: Column<AlarmRecordRow>[] = [
@@ -74,7 +74,17 @@ function AlarmsIndexPage() {
       header: 'Level',
       accessor: (row) => (
         <span
-          className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${levelColorMap[row.level] ?? 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'}`}
+          style={{
+            display: 'inline-flex',
+            borderRadius: '4px',
+            padding: '2px 8px',
+            fontSize: '12px',
+            fontWeight: 500,
+            ...(levelStyleMap[row.level] ?? {
+              background: 'var(--color-surface-2)',
+              color: 'var(--color-text-secondary)',
+            }),
+          }}
         >
           {row.level}
         </span>
@@ -89,11 +99,16 @@ function AlarmsIndexPage() {
       accessor: (row) => (
         <span
           data-testid={`alarm-acknowledged-tag-${row.id}`}
-          className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-            row.acknowledged
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-          }`}
+          style={{
+            display: 'inline-flex',
+            borderRadius: '4px',
+            padding: '2px 8px',
+            fontSize: '12px',
+            fontWeight: 500,
+            ...(row.acknowledged
+              ? { background: '#dcfce7', color: '#166534' }
+              : { background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)' }),
+          }}
         >
           {row.acknowledged ? 'Yes' : 'No'}
         </span>
@@ -103,7 +118,7 @@ function AlarmsIndexPage() {
       header: 'Actions',
       accessor: (row) =>
         row.acknowledged ? (
-          <span className="text-sm text-slate-400">Acknowledged</span>
+          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Acknowledged</span>
         ) : (
           <button
             data-testid={`ack-alarm-button-${row.id}`}
@@ -114,7 +129,15 @@ function AlarmsIndexPage() {
                 },
               })
             }}
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            style={{
+              fontSize: '13px',
+              color: 'var(--color-accent)',
+              textDecoration: 'underline',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+            }}
           >
             Acknowledge
           </button>

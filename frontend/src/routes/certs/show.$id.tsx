@@ -22,8 +22,12 @@ const statusLabel: Record<CertStatus, string> = {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">{label}</dt>
-      <dd className="text-sm text-slate-900 dark:text-slate-100">{children}</dd>
+      <dt className="mb-1 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </dt>
+      <dd className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+        {children}
+      </dd>
     </div>
   )
 }
@@ -34,11 +38,19 @@ function CertsShowPage() {
   const { data: cert, isLoading } = useCert(id)
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+        Loading...
+      </div>
+    )
   }
 
   if (!cert) {
-    return <div className="text-sm text-slate-500">Certificate not found.</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+        Certificate not found.
+      </div>
+    )
   }
 
   return (
@@ -48,7 +60,12 @@ function CertsShowPage() {
         actions={
           <Link
             to="/certs"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-md px-4 py-2 text-sm font-medium"
+            style={{
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              background: 'var(--color-surface-2)',
+            }}
           >
             Back to Certificates
           </Link>
@@ -59,7 +76,15 @@ function CertsShowPage() {
         <Field label="Product">{cert.product_id}</Field>
         <Field label="Device ID">{cert.device_id}</Field>
         <Field label="Certificate">
-          <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-100 p-3 font-mono text-xs text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+          <pre
+            className="overflow-x-auto whitespace-pre-wrap rounded-md p-3"
+            style={{
+              background: 'var(--color-surface-2)',
+              color: 'var(--color-text-primary)',
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '12px',
+            }}
+          >
             {cert.pub_cert}
           </pre>
         </Field>

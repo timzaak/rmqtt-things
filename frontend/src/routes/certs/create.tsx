@@ -74,12 +74,22 @@ function CertsCreatePage() {
       <PageHeader title="Issue Certificate" />
 
       {issued ? (
-        <div className="max-w-lg rounded-md border border-green-400 bg-green-50 p-6 dark:border-green-600 dark:bg-green-950">
-          <h2 className="text-lg font-semibold text-green-800 dark:text-green-300">
+        <div
+          className="max-w-lg rounded-md p-6"
+          style={{ background: 'var(--color-surface-1)', border: '1px solid #22c55e' }}
+        >
+          <h2 className="text-lg font-semibold" style={{ color: '#059669' }}>
             Certificate Issued Successfully
           </h2>
 
-          <div className="mt-3 rounded border border-amber-400 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-300">
+          <div
+            className="mt-3 rounded p-3 text-sm"
+            style={{
+              border: '1px solid #d97706',
+              background: 'var(--color-surface-2)',
+              color: '#d97706',
+            }}
+          >
             Private key is shown only once. Please download it now as it will not be stored on the
             server.
           </div>
@@ -88,14 +98,16 @@ function CertsCreatePage() {
             <button
               type="button"
               onClick={() => downloadPem(issued.cert.cert_pem, `${issued.deviceId}.pem`)}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="rounded-md px-4 py-2 text-sm font-medium"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
             >
               Download Certificate
             </button>
             <button
               type="button"
               onClick={() => downloadPem(issued.cert.key_pem, `${issued.deviceId}.key`)}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="rounded-md px-4 py-2 text-sm font-medium"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
             >
               Download Private Key
             </button>
@@ -103,18 +115,40 @@ function CertsCreatePage() {
 
           <div className="mt-4 space-y-3">
             <div>
-              <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <dt
+                className="mb-1 text-sm font-medium"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
                 Certificate
               </dt>
-              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-100 p-3 font-mono text-xs text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+              <pre
+                className="overflow-x-auto whitespace-pre-wrap rounded-md p-3"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '12px',
+                }}
+              >
                 {issued.cert.cert_pem}
               </pre>
             </div>
             <div>
-              <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+              <dt
+                className="mb-1 text-sm font-medium"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
                 Private Key
               </dt>
-              <pre className="overflow-x-auto whitespace-pre-wrap rounded-md bg-slate-100 p-3 font-mono text-xs text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+              <pre
+                className="overflow-x-auto whitespace-pre-wrap rounded-md p-3"
+                style={{
+                  background: 'var(--color-surface-2)',
+                  color: 'var(--color-text-primary)',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '12px',
+                }}
+              >
                 {issued.cert.key_pem}
               </pre>
             </div>
@@ -122,7 +156,8 @@ function CertsCreatePage() {
 
           <Link
             to="/certs"
-            className="mt-4 inline-block text-sm font-medium text-slate-700 underline hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100"
+            className="mt-4 inline-block text-sm font-medium underline"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             Back to Certificates
           </Link>
@@ -132,16 +167,24 @@ function CertsCreatePage() {
           <div>
             <label
               htmlFor="product_id"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              Product <span className="text-red-500">*</span>
+              Product <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <select
               id="product_id"
               required
               value={form.product_id}
               onChange={(e) => setForm((f) => ({ ...f, product_id: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full px-3 py-2"
+              style={{
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface-1)',
+                color: 'var(--color-text-primary)',
+                borderRadius: '8px',
+                fontSize: '13px',
+              }}
             >
               <option value="">Select a product</option>
               {(products?.data ?? []).map((p) => (
@@ -154,9 +197,10 @@ function CertsCreatePage() {
           <div>
             <label
               htmlFor="device_id"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              Device ID <span className="text-red-500">*</span>
+              Device ID <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <input
               id="device_id"
@@ -164,7 +208,14 @@ function CertsCreatePage() {
               required
               value={form.device_id}
               onChange={(e) => setForm((f) => ({ ...f, device_id: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full px-3 py-2"
+              style={{
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface-1)',
+                color: 'var(--color-text-primary)',
+                borderRadius: '8px',
+                fontSize: '13px',
+              }}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -173,11 +224,13 @@ function CertsCreatePage() {
               type="checkbox"
               checked={form.force}
               onChange={(e) => setForm((f) => ({ ...f, force: e.target.checked }))}
-              className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+              className="h-4 w-4"
+              style={{ borderColor: 'var(--color-border)' }}
             />
             <label
               htmlFor="force"
-              className="text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
               Force re-issue
             </label>
@@ -185,9 +238,10 @@ function CertsCreatePage() {
           <div>
             <label
               htmlFor="start_at"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              Start At <span className="text-red-500">*</span>
+              Start At <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <input
               id="start_at"
@@ -195,15 +249,23 @@ function CertsCreatePage() {
               required
               value={form.start_at}
               onChange={(e) => setForm((f) => ({ ...f, start_at: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full px-3 py-2"
+              style={{
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface-1)',
+                color: 'var(--color-text-primary)',
+                borderRadius: '8px',
+                fontSize: '13px',
+              }}
             />
           </div>
           <div>
             <label
               htmlFor="end_at"
-              className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+              className="mb-1 block text-sm font-medium"
+              style={{ color: 'var(--color-text-secondary)' }}
             >
-              End At <span className="text-red-500">*</span>
+              End At <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <input
               id="end_at"
@@ -211,20 +273,33 @@ function CertsCreatePage() {
               required
               value={form.end_at}
               onChange={(e) => setForm((f) => ({ ...f, end_at: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              className="w-full px-3 py-2"
+              style={{
+                border: '1px solid var(--color-border)',
+                background: 'var(--color-surface-1)',
+                color: 'var(--color-text-primary)',
+                borderRadius: '8px',
+                fontSize: '13px',
+              }}
             />
           </div>
           <div className="flex gap-2 pt-2">
             <button
               type="submit"
               disabled={issueCert.isPending}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
             >
               {issueCert.isPending ? 'Issuing...' : 'Issue'}
             </button>
             <Link
               to="/certs"
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="rounded-md px-4 py-2 text-sm font-medium"
+              style={{
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+                background: 'var(--color-surface-2)',
+              }}
             >
               Cancel
             </Link>

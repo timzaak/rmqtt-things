@@ -17,8 +17,17 @@ export const Route = validTemplatesShowRoute
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">{label}</dt>
-      <dd className="text-sm text-slate-900 dark:text-slate-100">{children}</dd>
+      <dt
+        style={{
+          marginBottom: '4px',
+          fontSize: '13px',
+          fontWeight: 500,
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        {label}
+      </dt>
+      <dd style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}>{children}</dd>
     </div>
   )
 }
@@ -29,17 +38,28 @@ function ValidTemplatesShowPage() {
   const { data: template, isLoading } = useEventValidTemplate(id)
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Loading...</div>
   }
 
   if (!template) {
-    return <div className="text-sm text-slate-500">Template not found.</div>
+    return (
+      <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Template not found.</div>
+    )
   }
 
   return (
     <div>
       <PageHeader title="Template Detail" />
-      <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">Basic Info</h3>
+      <h3
+        style={{
+          marginBottom: '12px',
+          fontSize: '15px',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
+        }}
+      >
+        Basic Info
+      </h3>
       <dl className="grid grid-cols-3 gap-x-6 gap-y-3">
         <Field label="ID">{template.id}</Field>
         <Field label="Product ID">{template.product_id}</Field>
@@ -49,8 +69,17 @@ function ValidTemplatesShowPage() {
         <Field label="Created At">{formatDatetime(template.created_at)}</Field>
         <Field label="Updated At">{formatDatetime(template.updated_at)}</Field>
       </dl>
-      <hr className="my-6 border-slate-200 dark:border-slate-700" />
-      <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">Schema</h3>
+      <hr style={{ margin: '24px 0', borderColor: 'var(--color-border)' }} />
+      <h3
+        style={{
+          marginBottom: '12px',
+          fontSize: '15px',
+          fontWeight: 600,
+          color: 'var(--color-text-primary)',
+        }}
+      >
+        Schema
+      </h3>
       <div>
         <SchemaDisplay schema={template.schema as JSONSchema} />
       </div>
@@ -59,7 +88,14 @@ function ValidTemplatesShowPage() {
           <Link
             to="/valid-templates/edit/$id"
             params={{ id: String(id) }}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+            }}
             data-testid="template-show-edit-button"
           >
             Edit
@@ -67,7 +103,14 @@ function ValidTemplatesShowPage() {
         )}
         <Link
           to="/valid-templates"
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+          style={{
+            borderRadius: '6px',
+            border: '1px solid var(--color-border)',
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--color-text-secondary)',
+          }}
           data-testid="template-show-back-link"
         >
           Back to List

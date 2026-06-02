@@ -25,11 +25,31 @@ export const alarmRulesEditIdRoute = createRoute({
 
 export const Route = alarmRulesEditIdRoute
 
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-const labelClass = 'mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300'
-const disabledClass =
-  'w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400'
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  borderRadius: '6px',
+  border: '1px solid var(--color-border)',
+  padding: '8px 12px',
+  fontSize: '13px',
+  background: 'var(--color-surface-1)',
+  color: 'var(--color-text-primary)',
+}
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: '4px',
+  fontSize: '13px',
+  fontWeight: 500,
+  color: 'var(--color-text-secondary)',
+}
+const disabledStyle: React.CSSProperties = {
+  width: '100%',
+  borderRadius: '6px',
+  border: '1px solid var(--color-border)',
+  padding: '8px 12px',
+  fontSize: '13px',
+  background: 'var(--color-surface-2)',
+  color: 'var(--color-text-muted)',
+}
 
 const emptyForm: FormState = {
   product_id: '',
@@ -183,11 +203,11 @@ function AlarmRuleEditPage() {
   }
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Loading...</div>
   }
 
   if (!alarmRule) {
-    return <div className="text-sm text-red-500">Alarm rule not found</div>
+    return <div style={{ fontSize: '13px', color: '#dc2626' }}>Alarm rule not found</div>
   }
 
   return (
@@ -198,19 +218,19 @@ function AlarmRuleEditPage() {
         {/* Product (disabled) + Name */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Product</label>
+            <label style={labelStyle}>Product</label>
             <input
               type="text"
               disabled
               value={productName}
-              className={disabledClass}
+              style={disabledStyle}
               data-testid="product-input-disabled"
             />
           </div>
 
           <div>
-            <label htmlFor="name" className={labelClass}>
-              Name <span className="text-red-500">*</span>
+            <label htmlFor="name" style={labelStyle}>
+              Name <span style={{ color: '#dc2626' }}>*</span>
             </label>
             <input
               id="name"
@@ -218,7 +238,7 @@ function AlarmRuleEditPage() {
               required
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={inputClass}
+              style={inputStyle}
               data-testid="name-input"
             />
           </div>
@@ -226,7 +246,7 @@ function AlarmRuleEditPage() {
 
         {/* Description */}
         <div>
-          <label htmlFor="description" className={labelClass}>
+          <label htmlFor="description" style={labelStyle}>
             Description
           </label>
           <textarea
@@ -234,19 +254,19 @@ function AlarmRuleEditPage() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             rows={3}
-            className={inputClass}
+            style={inputStyle}
             data-testid="description-input"
           />
         </div>
 
         {/* Trigger Type (disabled) */}
         <div>
-          <label className={labelClass}>Trigger Type</label>
+          <label style={labelStyle}>Trigger Type</label>
           <input
             type="text"
             disabled
             value={triggerTypeLabel}
-            className={disabledClass}
+            style={disabledStyle}
             data-testid="trigger-type-input-disabled"
           />
         </div>
@@ -260,8 +280,13 @@ function AlarmRuleEditPage() {
         />
 
         {/* Condition editor */}
-        <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700 space-y-3">
-          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">Condition</h3>
+        <div
+          style={{ borderRadius: '6px', border: '1px solid var(--color-border)', padding: '16px' }}
+          className="space-y-3"
+        >
+          <h3 style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+            Condition
+          </h3>
           <ConditionEditor
             condition={form.condition}
             onConditionChange={(condition) => setForm((f) => ({ ...f, condition }))}
@@ -270,8 +295,13 @@ function AlarmRuleEditPage() {
         </div>
 
         {/* Actions editor */}
-        <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700 space-y-3">
-          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">Actions</h3>
+        <div
+          style={{ borderRadius: '6px', border: '1px solid var(--color-border)', padding: '16px' }}
+          className="space-y-3"
+        >
+          <h3 style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+            Actions
+          </h3>
           <ActionsEditor
             actions={form.actions}
             onActionsChange={(actions) => setForm((f) => ({ ...f, actions }))}
@@ -280,7 +310,7 @@ function AlarmRuleEditPage() {
 
         {/* Throttle */}
         <div>
-          <label htmlFor="throttle_minutes" className={labelClass}>
+          <label htmlFor="throttle_minutes" style={labelStyle}>
             Throttle (minutes)
           </label>
           <input
@@ -294,10 +324,10 @@ function AlarmRuleEditPage() {
                 throttle_minutes: e.target.value === '' ? 0 : Number(e.target.value),
               }))
             }
-            className={inputClass}
+            style={inputStyle}
             data-testid="throttle-minutes-input"
           />
-          <p className="mt-1 text-xs text-slate-500">
+          <p style={{ marginTop: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
             Dedup interval in minutes. 0 means no dedup.
           </p>
         </div>
@@ -307,14 +337,29 @@ function AlarmRuleEditPage() {
           <button
             type="submit"
             disabled={updateMutation.isPending}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+              opacity: updateMutation.isPending ? 0.5 : 1,
+            }}
             data-testid="submit-button"
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}
           </button>
           <Link
             to="/alarm-rules"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            style={{
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+            }}
             data-testid="cancel-button"
           >
             Cancel

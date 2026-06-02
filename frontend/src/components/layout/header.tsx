@@ -5,14 +5,33 @@ export function Header() {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <header className="flex h-14 items-center justify-end gap-4 border-b border-slate-200 bg-white px-6 dark:border-slate-700 dark:bg-slate-900">
+    <header
+      className="flex h-12 items-center justify-end gap-3 border-b px-6"
+      style={{
+        background: 'var(--color-surface-1)',
+        borderColor: 'var(--sidebar-border)',
+      }}
+    >
       <button
         type="button"
         onClick={toggleTheme}
-        className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+        className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-150"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--color-surface-2)'
+          e.currentTarget.style.color = 'var(--color-text-primary)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.color = 'var(--color-text-muted)'
+        }}
         aria-label="Toggle theme"
       >
-        {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+        {theme === 'light' ? (
+          <Moon className="h-[15px] w-[15px]" />
+        ) : (
+          <Sun className="h-[15px] w-[15px]" />
+        )}
       </button>
     </header>
   )

@@ -23,22 +23,56 @@ export function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={() => onOpenChange(false)} />
-      <div className="relative w-full max-w-md rounded-lg bg-white p-6 shadow-lg dark:bg-slate-900">
+      <div
+        className="fixed inset-0"
+        style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+        onClick={() => onOpenChange(false)}
+      />
+      <div
+        className="relative w-full max-w-md rounded-xl p-6 shadow-2xl"
+        style={{
+          background: 'var(--color-surface-1)',
+          border: '1px solid var(--color-border)',
+        }}
+      >
         <button
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          className="absolute right-4 top-4 transition-colors"
+          style={{ color: 'var(--color-text-muted)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-primary)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--color-text-muted)'
+          }}
         >
           <X className="h-4 w-4" />
         </button>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+        <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          {title}
+        </h2>
         {description && (
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+          <p
+            className="mt-2 text-[13px] leading-relaxed"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            {description}
+          </p>
         )}
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={() => onOpenChange(false)}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg px-4 py-2 text-[13px] font-medium transition-colors duration-150"
+            style={{
+              color: 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface-2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+            }}
           >
             Cancel
           </button>
@@ -47,11 +81,16 @@ export function ConfirmDialog({
               onConfirm()
               onOpenChange(false)
             }}
-            className={`rounded-md px-4 py-2 text-sm font-medium text-white ${
-              variant === 'danger'
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200'
-            }`}
+            className="rounded-lg px-4 py-2 text-[13px] font-medium text-white transition-all duration-150"
+            style={{
+              background: variant === 'danger' ? '#dc2626' : 'var(--color-accent)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.9'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1'
+            }}
           >
             {confirmText}
           </button>

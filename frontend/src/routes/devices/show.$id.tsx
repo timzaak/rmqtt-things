@@ -22,6 +22,35 @@ export const devicesShowRoute = createRoute({
 
 export const Route = devicesShowRoute
 
+const sectionHeading: React.CSSProperties = {
+  color: 'var(--color-text-primary)',
+  fontSize: '15px',
+  fontWeight: 600,
+  marginBottom: '16px',
+}
+
+const labelStyle: React.CSSProperties = {
+  color: 'var(--color-text-muted)',
+  fontSize: '11px',
+  fontWeight: 500,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+}
+
+const valueStyle: React.CSSProperties = {
+  color: 'var(--color-text-primary)',
+  fontSize: '13px',
+  fontWeight: 500,
+  fontFamily: "'JetBrains Mono', monospace",
+}
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--color-surface-1)',
+  border: '1px solid var(--color-border)',
+  borderRadius: '12px',
+  padding: '16px',
+}
+
 function DevicesShowPage() {
   const { id } = devicesShowRoute.useParams()
 
@@ -38,7 +67,7 @@ function DevicesShowPage() {
     return (
       <div>
         <PageHeader title="Device Detail" />
-        <p className="text-slate-500">Loading...</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Loading...</p>
       </div>
     )
   }
@@ -47,7 +76,7 @@ function DevicesShowPage() {
     return (
       <div>
         <PageHeader title="Device Detail" />
-        <p className="text-slate-500">Device not found.</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>Device not found.</p>
       </div>
     )
   }
@@ -67,50 +96,52 @@ function DeviceDetailContent({
   return (
     <div className="space-y-8">
       <PageHeader title="Device Detail" />
-      <Link to="/devices" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+      <Link
+        to="/devices"
+        className="text-[13px] font-medium hover:underline transition-opacity hover:opacity-80"
+        style={{ color: 'var(--color-accent)' }}
+      >
         &larr; Back to Devices
       </Link>
 
       <section>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Device Info
-        </h2>
-        <div className="grid grid-cols-2 gap-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800 sm:grid-cols-3 lg:grid-cols-6">
+        <h2 style={sectionHeading}>Device Info</h2>
+        <div
+          className="grid grid-cols-2 gap-4 rounded-xl sm:grid-cols-3 lg:grid-cols-6"
+          style={cardStyle}
+        >
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Device ID</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {device.device_id}
-            </p>
+            <p style={labelStyle}>Device ID</p>
+            <p style={valueStyle}>{device.device_id}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Product ID</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {device.product_id}
-            </p>
+            <p style={labelStyle}>Product ID</p>
+            <p style={valueStyle}>{device.product_id}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Status</p>
+            <p style={labelStyle}>Status</p>
             <p
-              className={`text-sm font-medium ${device.status === 'Online' ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}`}
+              style={{
+                ...valueStyle,
+                color: device.status === 'Online' ? '#059669' : 'var(--color-text-muted)',
+              }}
             >
               {device.status}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">IP Address</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {device.ip_address ?? '-'}
-            </p>
+            <p style={labelStyle}>IP Address</p>
+            <p style={valueStyle}>{device.ip_address ?? '-'}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Last Online</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            <p style={labelStyle}>Last Online</p>
+            <p style={valueStyle}>
               {device.last_online_at ? formatDatetime(device.last_online_at) : '-'}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Last Offline</p>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            <p style={labelStyle}>Last Offline</p>
+            <p style={valueStyle}>
               {device.last_offline_at ? formatDatetime(device.last_offline_at) : '-'}
             </p>
           </div>
@@ -134,7 +165,10 @@ function LatestPropertiesSection({ productId, deviceId }: { productId: string; d
     {
       header: 'Properties',
       accessor: (row) => (
-        <pre className="max-w-md overflow-auto text-xs">
+        <pre
+          className="max-w-md overflow-auto text-[11px]"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
           {JSON.stringify(row.properties, null, 2)}
         </pre>
       ),
@@ -144,9 +178,7 @@ function LatestPropertiesSection({ productId, deviceId }: { productId: string; d
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-        Latest Properties
-      </h2>
+      <h2 style={sectionHeading}>Latest Properties</h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
@@ -173,7 +205,10 @@ function PropertyHistorySection({ productId, deviceId }: { productId: string; de
     {
       header: 'Properties',
       accessor: (row) => (
-        <pre className="max-w-md overflow-auto text-xs">
+        <pre
+          className="max-w-md overflow-auto text-[11px]"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
           {JSON.stringify(row.properties, null, 2)}
         </pre>
       ),
@@ -188,9 +223,7 @@ function PropertyHistorySection({ productId, deviceId }: { productId: string; de
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-        Property History
-      </h2>
+      <h2 style={sectionHeading}>Property History</h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
@@ -221,7 +254,12 @@ function EventHistorySection({ productId, deviceId }: { productId: string; devic
     {
       header: 'Events',
       accessor: (row) => (
-        <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.events, null, 2)}</pre>
+        <pre
+          className="max-w-md overflow-auto text-[11px]"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {JSON.stringify(row.events, null, 2)}
+        </pre>
       ),
     },
     {
@@ -234,9 +272,7 @@ function EventHistorySection({ productId, deviceId }: { productId: string; devic
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-        Event History
-      </h2>
+      <h2 style={sectionHeading}>Event History</h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}
@@ -271,26 +307,39 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
     deleteCommands.mutate([commandId])
   }
 
+  const statusColors: Record<string, string> = {
+    Pending: '#d97706',
+    Sent: 'var(--color-accent)',
+    Success: '#059669',
+    Failed: '#dc2626',
+    Deleted: 'var(--color-text-muted)',
+  }
+
   const columns: Column<Record<string, unknown>>[] = [
     { header: 'ID', accessor: 'id' },
     {
       header: 'Command',
       accessor: (row) => (
-        <pre className="max-w-md overflow-auto text-xs">{JSON.stringify(row.command, null, 2)}</pre>
+        <pre
+          className="max-w-md overflow-auto text-[11px]"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          {JSON.stringify(row.command, null, 2)}
+        </pre>
       ),
     },
     {
       header: 'Status',
       accessor: (row) => {
         const status = row.status as string
-        const colorMap: Record<string, string> = {
-          Pending: 'text-yellow-600 dark:text-yellow-400',
-          Sent: 'text-blue-600 dark:text-blue-400',
-          Success: 'text-green-600 dark:text-green-400',
-          Failed: 'text-red-600 dark:text-red-400',
-          Deleted: 'text-slate-400 dark:text-slate-500',
-        }
-        return <span className={colorMap[status] ?? ''}>{status}</span>
+        return (
+          <span
+            className="text-[12px] font-semibold"
+            style={{ color: statusColors[status] ?? 'var(--color-text-secondary)' }}
+          >
+            {status}
+          </span>
+        )
       },
     },
     { header: 'Created Time', accessor: (row) => formatDatetime(row.created_time as string) },
@@ -302,7 +351,8 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
           <button
             onClick={() => handleDelete(row.id as number)}
             disabled={deleteCommands.isPending}
-            className="text-sm text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+            className="text-[12px] font-medium hover:underline disabled:opacity-50"
+            style={{ color: '#dc2626' }}
           >
             Delete
           </button>
@@ -313,12 +363,11 @@ function CommandHistorySection({ productId, deviceId }: { productId: string; dev
   return (
     <section>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Property Commands
-        </h2>
+        <h2 style={sectionHeading}>Property Commands</h2>
         <button
           onClick={() => setDialogOpen(true)}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
+          style={{ background: 'var(--color-accent)' }}
         >
           Send Command
         </button>
@@ -382,14 +431,16 @@ function CommandDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900"
+        className="w-full max-w-lg rounded-xl p-6 shadow-2xl"
+        style={{ background: 'var(--color-surface-1)', border: '1px solid var(--color-border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h3 className="text-[15px] font-semibold" style={{ color: 'var(--color-text-primary)' }}>
           Send Command
         </h3>
         <textarea
@@ -400,20 +451,41 @@ function CommandDialog({
           }}
           placeholder='{"key": "value"}'
           rows={8}
-          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          className="mt-4 w-full rounded-lg px-3 py-2 text-[12px] placeholder:opacity-40 focus:outline-none"
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface-2)',
+            color: 'var(--color-text-primary)',
+          }}
         />
-        {parseError && <p className="mt-1 text-sm text-red-600">{parseError}</p>}
+        {parseError && (
+          <p className="mt-1 text-[12px]" style={{ color: '#dc2626' }}>
+            {parseError}
+          </p>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors"
+            style={{
+              color: 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-surface-2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+            }}
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || !jsonInput.trim()}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className="rounded-lg px-3 py-1.5 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ background: 'var(--color-accent)' }}
           >
             {isSubmitting ? 'Sending...' : 'Send'}
           </button>
@@ -448,11 +520,10 @@ function ConnectionHistorySection({
         const status = row.status as string
         return (
           <span
-            className={
-              status === 'Online'
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-slate-400 dark:text-slate-500'
-            }
+            className="text-[12px] font-semibold"
+            style={{
+              color: status === 'Online' ? '#059669' : 'var(--color-text-muted)',
+            }}
           >
             {status}
           </span>
@@ -477,9 +548,7 @@ function ConnectionHistorySection({
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">
-        Connection History
-      </h2>
+      <h2 style={sectionHeading}>Connection History</h2>
       <DataTable
         columns={columns}
         data={items as unknown as Record<string, unknown>[]}

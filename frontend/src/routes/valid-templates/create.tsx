@@ -64,8 +64,22 @@ function ValidTemplatesCreatePage() {
     )
   }
 
-  const inputClass =
-    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    padding: '8px 12px',
+    fontSize: '13px',
+    background: 'var(--color-surface-1)',
+    color: 'var(--color-text-primary)',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '4px',
+    fontSize: '13px',
+    fontWeight: 500,
+    color: 'var(--color-text-secondary)',
+  }
 
   return (
     <div>
@@ -73,23 +87,27 @@ function ValidTemplatesCreatePage() {
       <PageHeader title="Create Template" />
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">
+          <h3
+            style={{
+              marginBottom: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+            }}
+          >
             Basic Info
           </h3>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div>
-              <label
-                htmlFor="productId"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
-                Product <span className="text-red-500">*</span>
+              <label htmlFor="productId" style={labelStyle}>
+                Product <span style={{ color: '#dc2626' }}>*</span>
               </label>
               <select
                 id="productId"
                 required
                 value={form.productId}
                 onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))}
-                className={inputClass}
+                style={inputStyle}
                 data-testid="template-create-product-select"
               >
                 <option value="">Select a product</option>
@@ -101,11 +119,8 @@ function ValidTemplatesCreatePage() {
               </select>
             </div>
             <div>
-              <label
-                htmlFor="event"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
-                Event <span className="text-red-500">*</span>
+              <label htmlFor="event" style={labelStyle}>
+                Event <span style={{ color: '#dc2626' }}>*</span>
               </label>
               <input
                 id="event"
@@ -113,15 +128,12 @@ function ValidTemplatesCreatePage() {
                 required
                 value={form.event}
                 onChange={(e) => setForm((f) => ({ ...f, event: e.target.value }))}
-                className={inputClass}
+                style={inputStyle}
                 data-testid="template-create-event-input"
               />
             </div>
             <div className="col-span-2">
-              <label
-                htmlFor="description"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
+              <label htmlFor="description" style={labelStyle}>
                 Description
               </label>
               <textarea
@@ -129,29 +141,53 @@ function ValidTemplatesCreatePage() {
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 rows={3}
-                className={inputClass}
+                style={inputStyle}
                 data-testid="template-create-description-input"
               />
             </div>
           </div>
         </div>
-        <hr className="border-slate-200 dark:border-slate-700" />
+        <hr style={{ borderColor: 'var(--color-border)' }} />
         <div>
-          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">Schema</h3>
+          <h3
+            style={{
+              marginBottom: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            Schema
+          </h3>
           <SchemaEditor value={schema} onChange={setSchema} />
         </div>
         <div className="flex gap-2 pt-2">
           <button
             type="submit"
             disabled={createTemplate.isPending}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+              opacity: createTemplate.isPending ? 0.5 : 1,
+            }}
             data-testid="template-create-submit-button"
           >
             {createTemplate.isPending ? 'Creating...' : 'Create'}
           </button>
           <Link
             to="/valid-templates"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            style={{
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+            }}
           >
             Cancel
           </Link>

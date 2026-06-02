@@ -18,8 +18,12 @@ export const Route = otaShowRoute
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="mb-1 text-sm font-medium text-slate-700 dark:text-slate-300">{label}</dt>
-      <dd className="text-sm text-slate-900 dark:text-slate-100">{children}</dd>
+      <dt className="mb-1 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+        {label}
+      </dt>
+      <dd className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+        {children}
+      </dd>
     </div>
   )
 }
@@ -33,11 +37,19 @@ function OtaShowPage() {
   const productMap = new Map(products?.data?.map((p) => [p.model_no, p.name]) ?? [])
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        Loading...
+      </div>
+    )
   }
 
   if (!record) {
-    return <div className="text-sm text-slate-500">OTA version not found.</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        OTA version not found.
+      </div>
+    )
   }
 
   const extendedRecord = record as typeof record & {
@@ -52,7 +64,12 @@ function OtaShowPage() {
         actions={
           <Link
             to="/ota"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-md border px-4 py-2 text-sm font-medium"
+            style={{
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              background: 'var(--color-surface-1)',
+            }}
             data-testid="ota-show-back-link"
           >
             Back to List
@@ -77,7 +94,9 @@ function OtaShowPage() {
         <Field label="Created At">{formatDatetime(record.created_at)}</Field>
       </dl>
       <div className="mt-6">
-        <dt className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">Device IDs</dt>
+        <dt className="mb-2 text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+          Device IDs
+        </dt>
         {record.device_ids?.length ? (
           <dd className="flex flex-wrap gap-1.5">
             {record.device_ids.map((deviceId) => (
@@ -87,7 +106,9 @@ function OtaShowPage() {
             ))}
           </dd>
         ) : (
-          <dd className="text-sm text-slate-900 dark:text-slate-100">-</dd>
+          <dd className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
+            -
+          </dd>
         )}
       </div>
     </div>

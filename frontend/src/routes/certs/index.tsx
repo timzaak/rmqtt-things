@@ -58,7 +58,8 @@ function StatusActions({ row }: { row: CertIssue }) {
         <Link
           to="/certs/show/$id"
           params={{ id: String(row.id) }}
-          className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+          className="text-sm hover:underline"
+          style={{ color: 'var(--color-accent)' }}
         >
           Show
         </Link>
@@ -66,13 +67,15 @@ function StatusActions({ row }: { row: CertIssue }) {
           <>
             <button
               onClick={() => openConfirm('revoke')}
-              className="text-sm text-orange-600 hover:underline dark:text-orange-400"
+              className="text-sm hover:underline"
+              style={{ color: '#ea580c' }}
             >
               Revoke
             </button>
             <button
               onClick={() => openConfirm('invalidate')}
-              className="text-sm text-red-600 hover:underline dark:text-red-400"
+              className="text-sm hover:underline"
+              style={{ color: '#dc2626' }}
             >
               Invalidate
             </button>
@@ -160,14 +163,20 @@ function CertsIndexPage() {
                 a.click()
                 URL.revokeObjectURL(url)
               }}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-4 text-sm font-medium"
+              style={{
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+                background: 'var(--color-surface-2)',
+              }}
             >
               <Download className="h-4 w-4" />
               Download CA Certificate
             </button>
             <Link
               to="/certs/create"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md px-4 text-sm font-medium"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
             >
               <Plus className="h-4 w-4" />
               Issue Certificate

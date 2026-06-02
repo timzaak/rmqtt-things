@@ -14,6 +14,17 @@ interface SearchFormProps {
   onSearch: (values: Record<string, string>) => void
 }
 
+const inputStyle = {
+  height: '34px',
+  borderRadius: '8px',
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface-1)',
+  color: 'var(--color-text-primary)',
+  padding: '0 12px',
+  fontSize: '13px',
+  outline: 'none',
+} as React.CSSProperties
+
 export function SearchForm({ fields, onSearch }: SearchFormProps) {
   const initialValues: Record<string, string> = {}
   for (const f of fields) {
@@ -29,8 +40,11 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 pb-4">
       {fields.map((field) => (
-        <div key={field.name} className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div key={field.name} className="flex flex-col gap-1.5">
+          <label
+            className="text-[11px] font-semibold uppercase tracking-wider"
+            style={{ color: 'var(--color-text-muted)' }}
+          >
             {field.label}
           </label>
           {field.type === 'select' ? (
@@ -38,7 +52,7 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
               value={values[field.name]}
               onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
               aria-label={field.label}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              style={inputStyle}
             >
               <option value="">All</option>
               {field.options?.map((opt) => (
@@ -54,16 +68,26 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
               onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
               placeholder={field.placeholder}
               aria-label={field.label}
-              className="h-9 w-48 rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              style={{ ...inputStyle, width: '180px' }}
             />
           )}
         </div>
       ))}
       <button
         type="submit"
-        className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+        className="inline-flex h-[34px] items-center gap-1.5 rounded-lg px-4 text-[13px] font-medium transition-colors duration-150"
+        style={{
+          background: 'var(--color-accent)',
+          color: '#fff',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '0.9'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '1'
+        }}
       >
-        <Search className="h-4 w-4" />
+        <Search className="h-3.5 w-3.5" />
         Search
       </button>
     </form>

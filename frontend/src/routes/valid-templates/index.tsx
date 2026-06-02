@@ -40,6 +40,15 @@ function useColumns() {
     )
   }
 
+  const selectStyle: React.CSSProperties = {
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    padding: '4px 8px',
+    fontSize: '13px',
+    background: 'var(--color-surface-1)',
+    color: 'var(--color-text-primary)',
+  }
+
   const columns: Column<TemplateRow>[] = [
     { header: 'ID', accessor: 'id' },
     { header: 'Product ID', accessor: 'product_id' },
@@ -52,7 +61,7 @@ function useColumns() {
           value={row.status}
           onChange={(e) => handleStatusChange(row.id, e.target.value as EventValidTemplateStatus)}
           disabled={updateStatus.isPending}
-          className="rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+          style={selectStyle}
           data-testid={`template-status-select-${row.id}`}
         >
           {statusOptions.map((opt) => (
@@ -73,7 +82,7 @@ function useColumns() {
             <Link
               to="/valid-templates/edit/$id"
               params={{ id: String(row.id) }}
-              className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+              style={{ fontSize: '13px', color: 'var(--color-accent)' }}
             >
               Edit
             </Link>
@@ -81,7 +90,7 @@ function useColumns() {
           <Link
             to="/valid-templates/show/$id"
             params={{ id: String(row.id) }}
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            style={{ fontSize: '13px', color: 'var(--color-accent)' }}
           >
             View
           </Link>
@@ -118,7 +127,18 @@ function ValidTemplatesIndexPage() {
         actions={
           <Link
             to="/valid-templates/create"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              display: 'inline-flex',
+              height: '36px',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '6px',
+              padding: '0 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+            }}
           >
             <Plus className="h-4 w-4" />
             Create Template

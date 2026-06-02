@@ -111,13 +111,34 @@ function ValidTemplatesEditPage() {
   const isPending = updateTemplate.isPending || updateStatus.isPending
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Loading...</div>
   }
 
-  const inputClass =
-    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-  const disabledInputClass =
-    'w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400'
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    padding: '8px 12px',
+    fontSize: '13px',
+    background: 'var(--color-surface-1)',
+    color: 'var(--color-text-primary)',
+  }
+  const disabledStyle: React.CSSProperties = {
+    width: '100%',
+    borderRadius: '6px',
+    border: '1px solid var(--color-border)',
+    padding: '8px 12px',
+    fontSize: '13px',
+    background: 'var(--color-surface-2)',
+    color: 'var(--color-text-muted)',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    marginBottom: '4px',
+    fontSize: '13px',
+    fontWeight: 500,
+    color: 'var(--color-text-secondary)',
+  }
 
   return (
     <div>
@@ -125,7 +146,18 @@ function ValidTemplatesEditPage() {
       <PageHeader title="Edit Template" />
       {isActive && (
         <div
-          className="mb-6 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+          style={{
+            marginBottom: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            borderRadius: '6px',
+            border: '1px solid #fbbf24',
+            background: '#fffbeb',
+            padding: '12px 16px',
+            fontSize: '13px',
+            color: '#92400e',
+          }}
           data-testid="template-edit-active-notice"
         >
           <Info className="h-4 w-4 shrink-0" />
@@ -137,15 +169,19 @@ function ValidTemplatesEditPage() {
       )}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">
+          <h3
+            style={{
+              marginBottom: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+            }}
+          >
             Basic Info
           </h3>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <div>
-              <label
-                htmlFor="productId"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
+              <label htmlFor="productId" style={labelStyle}>
                 Product ID
               </label>
               <input
@@ -153,15 +189,12 @@ function ValidTemplatesEditPage() {
                 type="text"
                 disabled
                 value={template?.product_id ?? ''}
-                className={disabledInputClass}
+                style={disabledStyle}
                 data-testid="template-edit-product-input"
               />
             </div>
             <div>
-              <label
-                htmlFor="event"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
+              <label htmlFor="event" style={labelStyle}>
                 Event
               </label>
               <input
@@ -169,15 +202,12 @@ function ValidTemplatesEditPage() {
                 type="text"
                 disabled
                 value={template?.event ?? ''}
-                className={disabledInputClass}
+                style={disabledStyle}
                 data-testid="template-edit-event-input"
               />
             </div>
             <div>
-              <label
-                htmlFor="status"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
+              <label htmlFor="status" style={labelStyle}>
                 Status
               </label>
               <select
@@ -185,7 +215,7 @@ function ValidTemplatesEditPage() {
                 value={status}
                 onChange={(e) => setStatus(e.target.value as EventValidTemplateStatus)}
                 disabled={updateStatus.isPending}
-                className={inputClass}
+                style={inputStyle}
                 data-testid="template-edit-status-select"
               >
                 {statusOptions.map((opt) => (
@@ -196,10 +226,7 @@ function ValidTemplatesEditPage() {
               </select>
             </div>
             <div className="col-span-2">
-              <label
-                htmlFor="description"
-                className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-              >
+              <label htmlFor="description" style={labelStyle}>
                 Description
               </label>
               <textarea
@@ -207,29 +234,53 @@ function ValidTemplatesEditPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className={inputClass}
+                style={inputStyle}
                 data-testid="template-edit-description-input"
               />
             </div>
           </div>
         </div>
-        <hr className="border-slate-200 dark:border-slate-700" />
+        <hr style={{ borderColor: 'var(--color-border)' }} />
         <div>
-          <h3 className="mb-3 text-base font-medium text-slate-800 dark:text-slate-200">Schema</h3>
+          <h3
+            style={{
+              marginBottom: '12px',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            Schema
+          </h3>
           <SchemaEditor value={schema} onChange={setSchema} disabled={isActive} />
         </div>
         <div className="flex gap-2 pt-2">
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+              opacity: isPending ? 0.5 : 1,
+            }}
             data-testid="template-edit-submit-button"
           >
             {isPending ? 'Saving...' : 'Save'}
           </button>
           <Link
             to="/valid-templates"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            style={{
+              borderRadius: '6px',
+              border: '1px solid var(--color-border)',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+            }}
           >
             Cancel
           </Link>

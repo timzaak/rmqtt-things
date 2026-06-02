@@ -63,7 +63,11 @@ function ProductsEditPage() {
   }
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+        Loading...
+      </div>
+    )
   }
 
   return (
@@ -74,9 +78,10 @@ function ProductsEditPage() {
         <div>
           <label
             htmlFor="name"
-            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="mb-1 block text-sm font-medium"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
-            Name <span className="text-red-500">*</span>
+            Name <span style={{ color: '#dc2626' }}>*</span>
           </label>
           <input
             id="name"
@@ -84,13 +89,21 @@ function ProductsEditPage() {
             required
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className="w-full rounded-md px-3 py-2 text-sm"
+            style={{
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface-1)',
+              color: 'var(--color-text-primary)',
+              borderRadius: '8px',
+              fontSize: '13px',
+            }}
           />
         </div>
         <div>
           <label
             htmlFor="model_no"
-            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="mb-1 block text-sm font-medium"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             Model Number
           </label>
@@ -99,13 +112,21 @@ function ProductsEditPage() {
             type="text"
             disabled
             value={product?.model_no ?? ''}
-            className="w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400"
+            className="w-full rounded-md px-3 py-2 text-sm"
+            style={{
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface-2)',
+              color: 'var(--color-text-muted)',
+              borderRadius: '8px',
+              fontSize: '13px',
+            }}
           />
         </div>
         <div>
           <label
             htmlFor="description"
-            className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
+            className="mb-1 block text-sm font-medium"
+            style={{ color: 'var(--color-text-secondary)' }}
           >
             Description
           </label>
@@ -114,11 +135,21 @@ function ProductsEditPage() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             rows={3}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            className="w-full rounded-md px-3 py-2 text-sm"
+            style={{
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-surface-1)',
+              color: 'var(--color-text-primary)',
+              borderRadius: '8px',
+              fontSize: '13px',
+            }}
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          <label
+            className="mb-1 block text-sm font-medium"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
             Auto Provisioning
           </label>
           <label className="inline-flex items-center gap-2">
@@ -126,9 +157,10 @@ function ProductsEditPage() {
               type="checkbox"
               checked={form.auto_provisioning}
               onChange={(e) => setForm((f) => ({ ...f, auto_provisioning: e.target.checked }))}
-              className="h-4 w-4 rounded border-slate-300 text-slate-900 dark:border-slate-600"
+              className="h-4 w-4 rounded"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
             />
-            <span className="text-sm text-slate-600 dark:text-slate-400">
+            <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
               Enable device auto-provisioning for this product
             </span>
           </label>
@@ -137,13 +169,19 @@ function ProductsEditPage() {
           <button
             type="submit"
             disabled={updateProduct.isPending}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            className="rounded-md px-4 py-2 text-sm font-medium"
+            style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface-1)' }}
           >
             {updateProduct.isPending ? 'Saving...' : 'Save'}
           </button>
           <Link
             to="/products"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-md px-4 py-2 text-sm font-medium"
+            style={{
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              background: 'transparent',
+            }}
           >
             Cancel
           </Link>

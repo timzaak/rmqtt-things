@@ -27,11 +27,21 @@ interface FormState {
   bin_md5: string
 }
 
-const inputClass =
-  'w-full rounded-md border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-const labelClass = 'mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300'
-const disabledClass =
-  'w-full rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-400'
+const inputStyle = {
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface-1)',
+  color: 'var(--color-text-primary)',
+  borderRadius: '8px',
+  fontSize: '13px',
+}
+const labelStyle = { color: 'var(--color-text-secondary)' }
+const disabledStyle = {
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface-2)',
+  color: 'var(--color-text-muted)',
+  borderRadius: '8px',
+  fontSize: '13px',
+}
 
 function versionBlurHandler(fieldName: string) {
   return (e: React.FocusEvent<HTMLInputElement>) => {
@@ -184,11 +194,19 @@ function OtaEditPage() {
   }
 
   if (isLoading) {
-    return <div className="text-sm text-slate-500">Loading...</div>
+    return (
+      <div className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        Loading...
+      </div>
+    )
   }
 
   if (!otaVersion) {
-    return <div className="text-sm text-red-500">OTA version not found</div>
+    return (
+      <div className="text-sm" style={{ color: '#dc2626' }}>
+        OTA version not found
+      </div>
+    )
   }
 
   return (
@@ -198,31 +216,54 @@ function OtaEditPage() {
       <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
         {/* Product (disabled) */}
         <div>
-          <label className={labelClass}>Product</label>
-          <input type="text" disabled value={productName} className={disabledClass} />
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Product
+          </label>
+          <input
+            type="text"
+            disabled
+            value={productName}
+            className="w-full px-3 py-2 text-sm"
+            style={disabledStyle}
+          />
         </div>
 
         {/* Key (disabled) */}
         <div>
-          <label className={labelClass}>Key</label>
-          <input type="text" disabled value={otaVersion.key} className={disabledClass} />
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Key
+          </label>
+          <input
+            type="text"
+            disabled
+            value={otaVersion.key}
+            className="w-full px-3 py-2 text-sm"
+            style={disabledStyle}
+          />
         </div>
 
         {/* Version (disabled) */}
         <div>
-          <label className={labelClass}>Version</label>
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Version
+          </label>
           <input
             type="text"
             disabled
             value={formatVersion(otaVersion.version)}
-            className={disabledClass}
+            className="w-full px-3 py-2 text-sm"
+            style={disabledStyle}
           />
         </div>
 
         {/* Min Version */}
         <div>
-          <label htmlFor="min_version" className={labelClass}>
-            Min Version <span className="text-red-500">*</span>
+          <label
+            htmlFor="min_version"
+            className="mb-1 block text-sm font-medium"
+            style={labelStyle}
+          >
+            Min Version <span style={{ color: '#dc2626' }}>*</span>
           </label>
           <input
             id="min_version"
@@ -232,13 +273,18 @@ function OtaEditPage() {
             value={form.min_version}
             onBlur={versionBlurHandler('Min Version')}
             onChange={(e) => setForm((f) => ({ ...f, min_version: e.target.value }))}
-            className={inputClass}
+            className="w-full px-3 py-2 text-sm"
+            style={inputStyle}
           />
         </div>
 
         {/* Max Version */}
         <div>
-          <label htmlFor="max_version" className={labelClass}>
+          <label
+            htmlFor="max_version"
+            className="mb-1 block text-sm font-medium"
+            style={labelStyle}
+          >
             Max Version
           </label>
           <input
@@ -248,57 +294,73 @@ function OtaEditPage() {
             value={form.max_version}
             onBlur={versionBlurHandler('Max Version')}
             onChange={(e) => setForm((f) => ({ ...f, max_version: e.target.value }))}
-            className={inputClass}
+            className="w-full px-3 py-2 text-sm"
+            style={inputStyle}
           />
         </div>
 
         {/* File Upload */}
         <div>
-          <label className={labelClass}>Firmware File</label>
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Firmware File
+          </label>
           <input
             ref={fileInputRef}
             type="file"
             onChange={handleFileChange}
-            className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-md file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800 dark:file:bg-slate-100 dark:file:text-slate-900 dark:hover:file:bg-slate-200"
+            className="block w-full text-sm"
+            style={{ color: 'var(--color-text-muted)' }}
           />
           {uploadStatus === 'uploading' && (
-            <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">Uploading...</p>
+            <p className="mt-1 text-sm" style={{ color: 'var(--color-accent)' }}>
+              Uploading...
+            </p>
           )}
           {uploadStatus === 'done' && (
-            <p className="mt-1 text-sm text-green-600 dark:text-green-400">File uploaded</p>
+            <p className="mt-1 text-sm" style={{ color: '#059669' }}>
+              File uploaded
+            </p>
           )}
           {uploadStatus === 'error' && (
-            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{uploadError}</p>
+            <p className="mt-1 text-sm" style={{ color: '#dc2626' }}>
+              {uploadError}
+            </p>
           )}
         </div>
 
         {/* Bin Length (readonly) */}
         <div>
-          <label className={labelClass}>Bin Length</label>
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Bin Length
+          </label>
           <input
             type="text"
             readOnly
             value={form.bin_length || ''}
             placeholder="Auto-calculated on file upload"
-            className={`${inputClass} bg-slate-50 dark:bg-slate-900`}
+            className="w-full px-3 py-2 text-sm"
+            style={{ ...inputStyle, background: 'var(--color-surface-2)' }}
           />
         </div>
 
         {/* Bin MD5 (readonly) */}
         <div>
-          <label className={labelClass}>Bin MD5</label>
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Bin MD5
+          </label>
           <input
             type="text"
             readOnly
             value={form.bin_md5}
             placeholder="Auto-calculated on file upload"
-            className={`${inputClass} bg-slate-50 dark:bg-slate-900`}
+            className="w-full px-3 py-2 text-sm"
+            style={{ ...inputStyle, background: 'var(--color-surface-2)' }}
           />
         </div>
 
         {/* Log */}
         <div>
-          <label htmlFor="log" className={labelClass}>
+          <label htmlFor="log" className="mb-1 block text-sm font-medium" style={labelStyle}>
             Log
           </label>
           <textarea
@@ -306,13 +368,16 @@ function OtaEditPage() {
             value={form.log}
             onChange={(e) => setForm((f) => ({ ...f, log: e.target.value }))}
             rows={3}
-            className={inputClass}
+            className="w-full px-3 py-2 text-sm"
+            style={inputStyle}
           />
         </div>
 
         {/* Device IDs */}
         <div>
-          <label className={labelClass}>Device IDs</label>
+          <label className="mb-1 block text-sm font-medium" style={labelStyle}>
+            Device IDs
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -320,12 +385,18 @@ function OtaEditPage() {
               onChange={(e) => setDeviceInput(e.target.value)}
               onKeyDown={handleDeviceKeyDown}
               placeholder="Enter device ID and press Enter"
-              className={inputClass}
+              className="w-full px-3 py-2 text-sm"
+              style={inputStyle}
             />
             <button
               type="button"
               onClick={addDeviceId}
-              className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="shrink-0 rounded-md border px-3 py-2 text-sm font-medium"
+              style={{
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-secondary)',
+                background: 'var(--color-surface-1)',
+              }}
             >
               Add
             </button>
@@ -335,13 +406,17 @@ function OtaEditPage() {
               {form.device_ids.map((deviceId) => (
                 <span
                   key={deviceId}
-                  className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium"
+                  style={{
+                    background: 'var(--color-surface-2)',
+                    color: 'var(--color-text-secondary)',
+                  }}
                 >
                   {deviceId}
                   <button
                     type="button"
                     onClick={() => removeDeviceId(deviceId)}
-                    className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400"
+                    style={{ color: 'var(--color-text-muted)' }}
                   >
                     x
                   </button>
@@ -356,13 +431,19 @@ function OtaEditPage() {
           <button
             type="submit"
             disabled={updateMutation.isPending || uploadStatus === 'uploading'}
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            className="rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50"
+            style={{ background: 'var(--color-accent)', color: '#fff' }}
           >
             {updateMutation.isPending ? 'Saving...' : 'Save'}
           </button>
           <Link
             to="/ota"
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-md border px-4 py-2 text-sm font-medium"
+            style={{
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-secondary)',
+              background: 'var(--color-surface-1)',
+            }}
           >
             Cancel
           </Link>

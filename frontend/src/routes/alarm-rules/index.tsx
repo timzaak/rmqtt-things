@@ -74,7 +74,12 @@ function AlarmRulesIndexPage() {
               }
             )
           }}
-          className="h-4 w-4 rounded border-slate-300"
+          style={{
+            width: '16px',
+            height: '16px',
+            borderRadius: '4px',
+            borderColor: 'var(--color-border)',
+          }}
         />
       ),
     },
@@ -87,16 +92,10 @@ function AlarmRulesIndexPage() {
       header: 'Actions',
       accessor: (row) => (
         <div className="flex items-center gap-2">
-          <a
-            href={`/alarm-rules/edit/${row.id}`}
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-          >
+          <a href={`/alarm-rules/edit/${row.id}`} style={{ color: 'var(--color-accent)' }}>
             Edit
           </a>
-          <button
-            onClick={() => setDeleteTarget(row)}
-            className="text-sm text-red-600 hover:underline dark:text-red-400"
-          >
+          <button onClick={() => setDeleteTarget(row)} style={{ color: '#dc2626' }}>
             Delete
           </button>
         </div>
@@ -125,7 +124,18 @@ function AlarmRulesIndexPage() {
           <a
             href="/alarm-rules/create"
             data-testid="alarm-rule-create-button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            style={{
+              display: 'inline-flex',
+              height: '36px',
+              alignItems: 'center',
+              gap: '6px',
+              borderRadius: '6px',
+              padding: '0 16px',
+              fontSize: '14px',
+              fontWeight: 500,
+              background: 'var(--color-accent)',
+              color: '#fff',
+            }}
           >
             <Plus className="h-4 w-4" />
             Create Alarm Rule

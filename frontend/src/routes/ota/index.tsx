@@ -94,20 +94,23 @@ function OtaIndexPage() {
           <Link
             to="/ota/show/$id"
             params={{ id: String(row.id) }}
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            className="text-sm hover:underline"
+            style={{ color: 'var(--color-accent)' }}
           >
             Show
           </Link>
           <Link
             to="/ota/edit/$id"
             params={{ id: String(row.id) }}
-            className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+            className="text-sm hover:underline"
+            style={{ color: 'var(--color-accent)' }}
           >
             Edit
           </Link>
           <button
             onClick={() => setDeleteTarget(row)}
-            className="text-sm text-red-600 hover:underline dark:text-red-400"
+            className="text-sm hover:underline"
+            style={{ color: '#dc2626' }}
           >
             Delete
           </button>
@@ -136,7 +139,8 @@ function OtaIndexPage() {
         actions={
           <Link
             to="/ota/create"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md px-4 text-sm font-medium"
+            style={{ background: 'var(--color-accent)', color: '#fff' }}
           >
             <Plus className="h-4 w-4" />
             Create OTA Version

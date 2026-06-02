@@ -25,7 +25,8 @@ const columns: Column<DeviceRow>[] = [
       <Link
         to="/devices/show/$id"
         params={{ id: row.device_id }}
-        className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+        className="text-[12px] hover:underline transition-opacity hover:opacity-80"
+        style={{ color: 'var(--color-accent)', fontFamily: "'JetBrains Mono', monospace" }}
       >
         {row.device_id}
       </Link>
@@ -36,11 +37,10 @@ const columns: Column<DeviceRow>[] = [
     header: 'Status',
     accessor: (row) => (
       <span
-        className={
-          row.status === 'Online'
-            ? 'text-green-600 dark:text-green-400'
-            : 'text-slate-400 dark:text-slate-500'
-        }
+        className="text-[12px] font-semibold"
+        style={{
+          color: row.status === 'Online' ? '#059669' : 'var(--color-text-muted)',
+        }}
       >
         {row.status}
       </span>
@@ -69,7 +69,8 @@ const columns: Column<DeviceRow>[] = [
       <Link
         to="/devices/show/$id"
         params={{ id: row.device_id }}
-        className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+        className="text-[12px] font-medium hover:underline transition-opacity hover:opacity-80"
+        style={{ color: 'var(--color-accent)' }}
       >
         View
       </Link>
