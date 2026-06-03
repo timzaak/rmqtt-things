@@ -2,12 +2,26 @@ use crate::db::models::AlarmRule;
 use dashmap::DashMap;
 use time::OffsetDateTime;
 
+/// Result of a duration check for a rule that requires sustained condition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DurationCheckResult {
+    /// Condition has been met for the full duration window.
+    Met,
+    /// Condition was met before but duration has not elapsed yet.
+    NotYetMet,
+    /// First time condition is met; tracking started now.
+    JustStarted,
+}
+
 /// Rule cache with DashMap-backed storage for rules (keyed by product_id)
 /// and dedup tracking (keyed by "rule_id:device_id").
 #[derive(Clone)]
 pub struct RuleCache {
     rules: DashMap<String, Vec<AlarmRule>>,
     dedup: DashMap<String, OffsetDateTime>,
+    /// Duration tracking: key is "{rule_id}:{device_id}", value is the first time
+    /// the condition was met (sustained from that point).
+    duration_tracking: DashMap<String, OffsetDateTime>,
 }
 
 impl RuleCache {
@@ -15,6 +29,7 @@ impl RuleCache {
         Self {
             rules: DashMap::new(),
             dedup: DashMap::new(),
+            duration_tracking: DashMap::new(),
         }
     }
 
@@ -30,9 +45,21 @@ impl RuleCache {
         self.rules.insert(product_id.to_string(), rules);
     }
 
-    /// Invalidate cached rules for a specific product.
+    /// Invalidate cached rules for a specific product, also clearing
+    /// any duration_tracking and dedup entries for rules of that product.
     pub fn invalidate_product(&self, product_id: &str) {
+        let rule_ids: std::collections::HashSet<String> = self
+            .rules
+            .get(product_id)
+            .map(|entry| entry.value().iter().map(|r| r.id.to_string()).collect())
+            .unwrap_or_default();
         self.rules.remove(product_id);
+        if !rule_ids.is_empty() {
+            self.duration_tracking
+                .retain(|k, _| k.split(':').next().is_none_or(|id| !rule_ids.contains(id)));
+            self.dedup
+                .retain(|k, _| k.split(':').next().is_none_or(|id| !rule_ids.contains(id)));
+        }
     }
 
     /// Invalidate all cached rules.
@@ -65,6 +92,44 @@ impl RuleCache {
         let key = format!("{}:{}", rule_id, device_id);
         self.dedup.insert(key, OffsetDateTime::now_utc());
     }
+
+    /// Check whether the sustained condition duration has been met.
+    ///
+    /// - If no tracking entry exists, inserts `now` and returns `JustStarted`.
+    /// - If entry exists and `now - stored_time >= duration_minutes`, returns `Met`.
+    /// - If entry exists but duration not yet reached, returns `NotYetMet`.
+    pub fn check_duration(
+        &self,
+        rule_id: i64,
+        device_id: &str,
+        duration_minutes: i32,
+        now: OffsetDateTime,
+    ) -> DurationCheckResult {
+        if duration_minutes <= 0 {
+            return DurationCheckResult::Met;
+        }
+        let key = format!("{}:{}", rule_id, device_id);
+        match self.duration_tracking.get(&key) {
+            Some(stored) => {
+                let elapsed = now - *stored;
+                if elapsed.whole_minutes() >= duration_minutes as i64 {
+                    DurationCheckResult::Met
+                } else {
+                    DurationCheckResult::NotYetMet
+                }
+            }
+            None => {
+                self.duration_tracking.insert(key, now);
+                DurationCheckResult::JustStarted
+            }
+        }
+    }
+
+    /// Reset duration tracking when the condition is no longer met.
+    pub fn reset_duration(&self, rule_id: i64, device_id: &str) {
+        let key = format!("{}:{}", rule_id, device_id);
+        self.duration_tracking.remove(&key);
+    }
 }
 
 #[cfg(test)]
@@ -85,6 +150,8 @@ mod tests {
             actions: json!([]),
             enabled: true,
             throttle_minutes: 0,
+            duration_minutes: 0,
+            clear_condition: None,
             created_at: OffsetDateTime::now_utc(),
             updated_at: OffsetDateTime::now_utc(),
         }
@@ -164,5 +231,88 @@ mod tests {
     fn test_dedup_no_previous_trigger() {
         let cache = RuleCache::new();
         assert!(!cache.check_dedup(1, "device_1", 10));
+    }
+
+    // --- Duration tracking tests ---
+
+    #[test]
+    fn test_duration_first_condition_met_returns_just_started() {
+        let cache = RuleCache::new();
+        let now = OffsetDateTime::now_utc();
+        let result = cache.check_duration(1, "device_1", 5, now);
+        assert_eq!(result, DurationCheckResult::JustStarted);
+
+        // Entry was stored
+        let key = "1:device_1".to_string();
+        assert!(cache.duration_tracking.get(&key).is_some());
+    }
+
+    #[test]
+    fn test_duration_not_yet_met() {
+        let cache = RuleCache::new();
+        let now = OffsetDateTime::now_utc();
+        // Start tracking
+        cache.check_duration(1, "device_1", 5, now);
+
+        // Check again 3 minutes later (not yet 5)
+        let later = now + Duration::minutes(3);
+        let result = cache.check_duration(1, "device_1", 5, later);
+        assert_eq!(result, DurationCheckResult::NotYetMet);
+    }
+
+    #[test]
+    fn test_duration_met_after_window() {
+        let cache = RuleCache::new();
+        let now = OffsetDateTime::now_utc();
+        // Start tracking
+        cache.check_duration(1, "device_1", 5, now);
+
+        // Check again 6 minutes later (exceeds 5)
+        let later = now + Duration::minutes(6);
+        let result = cache.check_duration(1, "device_1", 5, later);
+        assert_eq!(result, DurationCheckResult::Met);
+    }
+
+    #[test]
+    fn test_duration_reset_clears_tracking() {
+        let cache = RuleCache::new();
+        let now = OffsetDateTime::now_utc();
+        cache.check_duration(1, "device_1", 5, now);
+
+        // Reset
+        cache.reset_duration(1, "device_1");
+        let key = "1:device_1".to_string();
+        assert!(cache.duration_tracking.get(&key).is_none());
+
+        // After reset, should start fresh (JustStarted)
+        let result = cache.check_duration(1, "device_1", 5, now);
+        assert_eq!(result, DurationCheckResult::JustStarted);
+    }
+
+    #[test]
+    fn test_duration_full_cycle() {
+        // Full cycle: first met -> not yet met -> condition breaks -> reset
+        // -> condition met again -> duration passes -> Met
+        let cache = RuleCache::new();
+        let t0 = OffsetDateTime::now_utc();
+
+        // 1. First condition met
+        let result = cache.check_duration(1, "dev", 3, t0);
+        assert_eq!(result, DurationCheckResult::JustStarted);
+
+        // 2. Still not met (1 min later)
+        let result = cache.check_duration(1, "dev", 3, t0 + Duration::minutes(1));
+        assert_eq!(result, DurationCheckResult::NotYetMet);
+
+        // 3. Condition breaks -> reset
+        cache.reset_duration(1, "dev");
+
+        // 4. Condition met again at t0+5
+        let result = cache.check_duration(1, "dev", 3, t0 + Duration::minutes(5));
+        assert_eq!(result, DurationCheckResult::JustStarted);
+
+        // 5. Duration passes (4 minutes after re-start = t0+9)
+        let result = cache.check_duration(1, "dev", 3, t0 + Duration::minutes(9));
+        assert_eq!(result, DurationCheckResult::Met);
     }
 }

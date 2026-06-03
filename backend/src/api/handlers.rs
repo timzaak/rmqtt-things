@@ -158,7 +158,7 @@ pub async fn property_post(
                 trigger_type: TriggerType::Property,
                 trigger_value,
             };
-            evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+            evaluate_and_trigger(ctx, alarm_repo, rule_cache, None).await;
         });
     } else {
         return Err(ApiError::bad_request("Invalid params format"));
@@ -224,7 +224,7 @@ pub async fn event_post(
             trigger_type: TriggerType::Event,
             trigger_value,
         };
-        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache, None).await;
     });
 
     // 如果需要响应，发布到 RMQTT
@@ -654,7 +654,7 @@ pub async fn device_connect(
             trigger_type: TriggerType::DeviceOnline,
             trigger_value: json!({}),
         };
-        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache, None).await;
     });
 
     Ok(StatusCode::NO_CONTENT)
@@ -705,7 +705,7 @@ pub async fn device_disconnect(
             trigger_type: TriggerType::DeviceOffline,
             trigger_value: json!({}),
         };
-        evaluate_and_trigger(ctx, alarm_repo, rule_cache).await;
+        evaluate_and_trigger(ctx, alarm_repo, rule_cache, None).await;
     });
 
     Ok(StatusCode::NO_CONTENT)

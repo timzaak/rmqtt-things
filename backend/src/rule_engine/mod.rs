@@ -3,11 +3,12 @@ pub mod cache;
 pub mod evaluator;
 
 pub use actions::{ActionExecutor, TriggerContext};
-pub use cache::RuleCache;
+pub use cache::{DurationCheckResult, RuleCache};
 pub use evaluator::{RuleEvaluator, TriggerType};
 
 use crate::db::alarm::AlarmRepo;
 use serde_json::Value as JsonValue;
+use time::OffsetDateTime;
 use tracing::{debug, warn};
 
 /// Top-level entry point for rule evaluation and action triggering.
@@ -17,14 +18,18 @@ use tracing::{debug, warn};
 /// 2. Filters by trigger_type.
 /// 3. For property rules, extracts the actual value for the configured property_name.
 /// 4. For event rules, matches the event_identifier against top-level keys in trigger_value.
-/// 5. Checks dedup.
-/// 6. Evaluates the condition.
-/// 7. On match, marks triggered and executes actions.
+/// 5. Evaluates the condition.
+/// 6. Duration check (property rules with duration_minutes > 0 only).
+/// 7. Dedup check.
+/// 8. On match, marks triggered and executes actions.
+/// 9. After the rule loop, evaluates clear conditions (property triggers only).
 pub async fn evaluate_and_trigger(
     ctx: TriggerContext,
     alarm_repo: AlarmRepo,
     rule_cache: RuleCache,
+    now_fn: Option<fn() -> OffsetDateTime>,
 ) {
+    let now = now_fn.unwrap_or(OffsetDateTime::now_utc);
     let product_id = ctx.product_id.clone();
 
     // Get rules from cache, loading from DB on miss
@@ -56,15 +61,6 @@ pub async fn evaluate_and_trigger(
         };
 
         if rule_trigger_type != ctx.trigger_type {
-            continue;
-        }
-
-        // Dedup check
-        if rule_cache.check_dedup(rule.id, &ctx.device_id, rule.throttle_minutes as i64) {
-            debug!(
-                "Skipping rule {} for device {} due to dedup window",
-                rule.id, ctx.device_id
-            );
             continue;
         }
 
@@ -118,6 +114,33 @@ pub async fn evaluate_and_trigger(
 
         // Evaluate condition
         if !RuleEvaluator::evaluate(&rule.condition, &actual_value) {
+            // Condition not met: reset duration tracking for property rules with duration
+            if rule_trigger_type == TriggerType::Property && rule.duration_minutes > 0 {
+                rule_cache.reset_duration(rule.id, &ctx.device_id);
+            }
+            continue;
+        }
+
+        // Duration check (only property rules with duration_minutes > 0)
+        if rule_trigger_type == TriggerType::Property && rule.duration_minutes > 0 {
+            match rule_cache.check_duration(rule.id, &ctx.device_id, rule.duration_minutes, now()) {
+                DurationCheckResult::Met => { /* proceed to dedup check */ }
+                DurationCheckResult::NotYetMet | DurationCheckResult::JustStarted => {
+                    debug!(
+                        "Rule {} duration not yet met for device {}",
+                        rule.id, ctx.device_id
+                    );
+                    continue;
+                }
+            }
+        }
+
+        // Dedup check (moved here after condition + duration evaluation)
+        if rule_cache.check_dedup(rule.id, &ctx.device_id, rule.throttle_minutes as i64) {
+            debug!(
+                "Skipping rule {} for device {} due to dedup window",
+                rule.id, ctx.device_id
+            );
             continue;
         }
 
@@ -139,6 +162,66 @@ pub async fn evaluate_and_trigger(
         .await
         {
             warn!("Failed to execute actions for rule {}: {}", rule.id, e);
+        }
+    }
+
+    // Clear condition evaluation (only for Property trigger type)
+    if ctx.trigger_type == TriggerType::Property {
+        for rule in &rules {
+            // Only property rules with a configured clear_condition
+            if rule.trigger_type != "property" {
+                continue;
+            }
+            let clear_condition = match &rule.clear_condition {
+                Some(cc) => cc,
+                None => continue,
+            };
+
+            // Query active alarms for this (rule_id, device_id)
+            let active_alarms = match alarm_repo
+                .query_active_alarms_for_clear(rule.id, &ctx.device_id)
+                .await
+            {
+                Ok(alarms) => alarms,
+                Err(e) => {
+                    warn!(
+                        "Failed to query active alarms for clear on rule {}: {}",
+                        rule.id, e
+                    );
+                    continue;
+                }
+            };
+
+            if active_alarms.is_empty() {
+                continue;
+            }
+
+            // Extract property value using this rule's own property_name
+            let property_name = match rule
+                .trigger_config
+                .get("property_name")
+                .and_then(|v| v.as_str())
+            {
+                Some(name) => name,
+                None => continue,
+            };
+            let actual_value = match extract_property_value(&ctx.trigger_value, property_name) {
+                Some(v) => v,
+                None => continue,
+            };
+
+            // Evaluate clear condition
+            if RuleEvaluator::evaluate(clear_condition, &actual_value) {
+                for alarm in &active_alarms {
+                    if let Err(e) = alarm_repo.clear_alarm(alarm.id).await {
+                        warn!(
+                            "Failed to clear alarm {} for rule {}: {}",
+                            alarm.id, rule.id, e
+                        );
+                    }
+                }
+                rule_cache.reset_duration(rule.id, &ctx.device_id);
+            }
         }
     }
 }

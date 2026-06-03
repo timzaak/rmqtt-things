@@ -49,6 +49,12 @@ pub struct CreateAlarmRuleRequest {
     /// Dedup interval in minutes, 0 means no dedup
     #[serde(default)]
     pub throttle_minutes: i32,
+    /// Duration condition in minutes, 0 = instant trigger, only for property trigger type
+    #[serde(default)]
+    pub duration_minutes: i32,
+    /// Clear condition, same format as condition, only for property trigger type
+    #[serde(default)]
+    pub clear_condition: Option<JsonValue>,
 }
 
 fn default_trigger_config() -> JsonValue {
@@ -70,6 +76,52 @@ pub struct UpdateAlarmRuleRequest {
     pub actions: Option<JsonValue>,
     /// Dedup interval in minutes
     pub throttle_minutes: Option<i32>,
+    /// Duration condition in minutes, 0 = instant trigger, only for property trigger type
+    pub duration_minutes: Option<i32>,
+    /// Clear condition, same format as condition. Some(None) = clear to null, None = do not update.
+    #[serde(default, deserialize_with = "deserialize_double_option")]
+    pub clear_condition: Option<Option<JsonValue>>,
+}
+
+/// Deserialize an optional optional field: absent -> None, null -> Some(None), value -> Some(Some(value)).
+fn deserialize_double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    // Use a visitor that distinguishes absent (unit) from null from present value.
+    struct DoubleOptionVisitor<T>(std::marker::PhantomData<T>);
+
+    impl<'de, T> serde::de::Visitor<'de> for DoubleOptionVisitor<T>
+    where
+        T: serde::Deserialize<'de>,
+    {
+        type Value = Option<Option<T>>;
+
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "a nullable value or nothing")
+        }
+
+        fn visit_unit<E: serde::de::Error>(self) -> Result<Option<Option<T>>, E> {
+            // Field was absent (unit) -> outer None
+            Ok(None)
+        }
+
+        fn visit_none<E: serde::de::Error>(self) -> Result<Option<Option<T>>, E> {
+            // Explicit null -> Some(None) means "clear to null"
+            Ok(Some(None))
+        }
+
+        fn visit_some<D: serde::Deserializer<'de>>(
+            self,
+            de: D,
+        ) -> Result<Option<Option<T>>, D::Error> {
+            // Non-null value -> Some(Some(value))
+            T::deserialize(de).map(|v| Some(Some(v)))
+        }
+    }
+
+    de.deserialize_option(DoubleOptionVisitor(std::marker::PhantomData))
 }
 
 /// Request body for enabling/disabling an alarm rule
@@ -102,6 +154,9 @@ pub struct AlarmQuery {
     pub level: Option<String>,
     /// Filter by acknowledged status
     pub acknowledged: Option<bool>,
+    /// Filter by status: active / acknowledged / cleared
+    #[serde(default)]
+    pub status: Option<String>,
     /// Page number, default 1
     #[serde(default = "default_page")]
     pub page: i64,
@@ -123,10 +178,14 @@ pub struct ApiAlarmRecord {
     pub message: Option<String>,
     pub trigger_value: Option<JsonValue>,
     pub acknowledged: bool,
+    /// Alarm status: "active" / "acknowledged" / "cleared"
+    pub status: String,
     /// Webhook status: None = not configured, Some("success") / Some("failed")
     pub webhook_status: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
+    /// RFC3339 timestamp when alarm was cleared
+    pub cleared_at: Option<String>,
 }
 
 impl From<AlarmRecord> for ApiAlarmRecord {
@@ -141,6 +200,10 @@ impl From<AlarmRecord> for ApiAlarmRecord {
             Some(0) => Some("success".to_string()),
             Some(_) => Some("failed".to_string()),
         };
+        let cleared_at = record.cleared_at.and_then(|t| {
+            t.format(&time::format_description::well_known::Rfc3339)
+                .ok()
+        });
         Self {
             id: record.id,
             rule_id: record.rule_id,
@@ -150,9 +213,11 @@ impl From<AlarmRecord> for ApiAlarmRecord {
             level,
             message: record.message,
             trigger_value: record.trigger_value,
-            acknowledged: record.acknowledged,
+            acknowledged: record.status != "active",
+            status: record.status,
             webhook_status,
             created_at: record.created_at,
+            cleared_at,
         }
     }
 }

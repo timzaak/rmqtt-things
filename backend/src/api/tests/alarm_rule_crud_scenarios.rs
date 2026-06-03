@@ -91,6 +91,14 @@ async fn scenario_create_alarm_rule_property_type(ctx: &mut TestContext) {
     assert_eq!(resp["data"]["product_id"], model_no);
     assert_eq!(resp["data"]["enabled"], true);
     assert_eq!(resp["data"]["trigger_type"], "property");
+    assert_eq!(
+        resp["data"]["duration_minutes"], 0,
+        "duration_minutes must default to 0 when omitted"
+    );
+    assert!(
+        resp["data"]["clear_condition"].is_null(),
+        "clear_condition must default to null when omitted"
+    );
 }
 
 /// User story: US-PA-030
@@ -218,6 +226,14 @@ async fn scenario_get_alarm_rule_by_id(ctx: &mut TestContext) {
     assert_eq!(resp["data"]["name"], "Get detail rule");
     assert_eq!(resp["data"]["trigger_type"], "property");
     assert_eq!(resp["data"]["enabled"], true);
+    assert_eq!(
+        resp["data"]["duration_minutes"], 0,
+        "duration_minutes must be 0 by default"
+    );
+    assert!(
+        resp["data"]["clear_condition"].is_null(),
+        "clear_condition must be null by default"
+    );
 }
 
 /// User story: US-PA-031

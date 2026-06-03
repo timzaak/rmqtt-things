@@ -91,6 +91,18 @@ async fn scenario_list_alarm_records(ctx: &mut TestContext) {
         .expect("pagination.total required");
     assert!(total >= 3, "Expected pagination.total >= 3, got {total}");
 
+    // Verify each record has status and cleared_at fields
+    for record in data {
+        assert!(
+            record["status"].is_string(),
+            "Alarm record must contain status field as string"
+        );
+        assert!(
+            record["cleared_at"].is_null() || record["cleared_at"].is_string(),
+            "cleared_at must be null or RFC3339 string"
+        );
+    }
+
     // Verify descending order by created_at
     let timestamps: Vec<&str> = data
         .iter()
@@ -319,18 +331,23 @@ async fn scenario_ack_alarm(ctx: &mut TestContext) {
     let resp: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(resp["data"]["id"], id);
     assert_eq!(resp["data"]["acknowledged"], true);
+    assert_eq!(
+        resp["data"]["status"], "acknowledged",
+        "After ack, status must transition from active to acknowledged"
+    );
 }
 
 /// User story: US-PA-035
 /// Covers: Scenario 2 -- Admin re-acknowledges an already-acknowledged alarm;
-///         PATCH returns 409 Conflict. The API must NOT accept idempotent 200.
+///         PATCH returns 409 Conflict because the status check (status != "active") rejects
+///         non-active alarms. The API must NOT accept idempotent 200.
 #[test_context(TestContext)]
 #[tokio::test]
 async fn scenario_ack_already_acknowledged_alarm(ctx: &mut TestContext) {
     let product_id = "alarm_reack_prod";
     let id = insert_test_alarm(ctx, product_id, "dev_reack", 1, "Already acked").await;
 
-    // First ack succeeds
+    // First ack succeeds (status: active -> acknowledged)
     let (status, _) = request(
         &ctx.service,
         Method::PATCH,
@@ -339,7 +356,7 @@ async fn scenario_ack_already_acknowledged_alarm(ctx: &mut TestContext) {
     .await;
     assert_eq!(status, StatusCode::OK, "First ack should return 200");
 
-    // Second ack must return 409 Conflict
+    // Second ack must return 409 Conflict (status is "acknowledged", not "active")
     let (status, _body) = request(
         &ctx.service,
         Method::PATCH,
@@ -349,7 +366,7 @@ async fn scenario_ack_already_acknowledged_alarm(ctx: &mut TestContext) {
     assert_eq!(
         status,
         StatusCode::CONFLICT,
-        "Re-acknowledging must return 409 Conflict, got {status}"
+        "Re-acknowledging must return 409 Conflict (status != active), got {status}"
     );
 }
 

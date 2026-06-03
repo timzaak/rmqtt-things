@@ -14,6 +14,7 @@
 |-----|----|--------|------|
 | [product-device-management.md](core/product-device-management.md) | core | P0 | 产品 CRUD、设备状态/属性/事件管理、属性命令下发、设备列表/详情前端页面 |
 | [alarm-rule-engine.md](core/alarm-rule-engine.md) | core | P0 | 告警规则引擎：属性阈值/事件/设备状态触发、规则 CRUD、告警记录管理 |
+| [alarm-rule-check.md](core/alarm-rule-check.md) | core | P0 | 告警规则增强：持续时间条件、清除条件、三态生命周期（Active/Acknowledged/Cleared） |
 | [device-auto-provisioning.md](core/device-auto-provisioning.md) | core | P0 | 设备自动注册：产品级自动注册开关、首次 HMAC 认证自动创建设备身份记录、注册来源标记 |
 | [cert-management.md](integration/cert-management.md) | integration | P0 | TLS 证书签发/吊销、HMAC 设备认证、ACL 控制 |
 | [ota-management.md](integration/ota-management.md) | integration | P1 | OTA 固件版本管理、设备版本上报与升级推送 |

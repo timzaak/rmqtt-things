@@ -1,3 +1,6 @@
+mod alarm_api_extended_scenarios;
+mod alarm_duration_scenarios;
+mod alarm_lifecycle_scenarios;
 mod alarm_record_api_scenarios;
 mod alarm_rule_crud_scenarios;
 mod cert_scenarios;

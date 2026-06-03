@@ -95,6 +95,19 @@ pub async fn create_alarm_rule(
         )));
     }
 
+    // Validate duration_minutes >= 0
+    if req.duration_minutes < 0 {
+        return Err(ApiError::bad_request("duration_minutes must be >= 0"));
+    }
+
+    // Only property trigger type supports duration_minutes > 0 and clear_condition
+    if req.trigger_type != "property" && (req.duration_minutes > 0 || req.clear_condition.is_some())
+    {
+        return Err(ApiError::bad_request(
+            "Duration and clear conditions are only supported for property trigger type",
+        ));
+    }
+
     let rule_id = state
         .db
         .alarm()
@@ -108,6 +121,8 @@ pub async fn create_alarm_rule(
             &req.actions,
             true,
             req.throttle_minutes,
+            req.duration_minutes,
+            req.clear_condition.as_ref(),
         )
         .await
         .map_err(|e| {
@@ -181,6 +196,13 @@ pub async fn update_alarm_rule(
 ) -> Result<Json<AlarmRuleResponse>, ApiError> {
     let state = &state.admin;
 
+    // Validate duration_minutes >= 0 if provided
+    if let Some(v) = req.duration_minutes
+        && v < 0
+    {
+        return Err(ApiError::bad_request("duration_minutes must be >= 0"));
+    }
+
     // Fetch existing rule to get product_id for cache invalidation
     let existing = state
         .db
@@ -193,6 +215,19 @@ pub async fn update_alarm_rule(
         })?
         .ok_or_else(|| ApiError::not_found("Alarm rule not found"))?;
 
+    // Only property trigger type supports duration_minutes > 0 and clear_condition
+    if existing.trigger_type != "property"
+        && (req.duration_minutes.is_some_and(|v| v > 0)
+            || req
+                .clear_condition
+                .as_ref()
+                .is_some_and(|opt| opt.is_some()))
+    {
+        return Err(ApiError::bad_request(
+            "Duration and clear conditions are only supported for property trigger type",
+        ));
+    }
+
     let rows_affected = state
         .db
         .alarm()
@@ -204,6 +239,8 @@ pub async fn update_alarm_rule(
             req.condition.as_ref(),
             req.actions.as_ref(),
             req.throttle_minutes,
+            req.duration_minutes,
+            req.clear_condition.as_ref().map(|opt| opt.as_ref()),
         )
         .await
         .map_err(|e| {
@@ -367,6 +404,13 @@ pub async fn list_alarms(
 ) -> Result<Json<AlarmRecordListResponse>, ApiError> {
     let state = &state.admin;
 
+    // status and acknowledged are mutually exclusive
+    if query.status.is_some() && query.acknowledged.is_some() {
+        return Err(ApiError::bad_request(
+            "Parameters 'status' and 'acknowledged' are mutually exclusive",
+        ));
+    }
+
     let level = query.level.as_deref().and_then(parse_level);
 
     let (alarms, total) = state
@@ -377,6 +421,7 @@ pub async fn list_alarms(
             query.device_id.as_deref(),
             level,
             query.acknowledged,
+            query.status.as_deref(),
             query.page,
             query.page_size,
         )
@@ -429,8 +474,10 @@ pub async fn ack_alarm(
         })?
         .ok_or_else(|| ApiError::not_found("Alarm not found"))?;
 
-    if existing.acknowledged {
-        return Err(ApiError::conflict("Alarm already acknowledged"));
+    if existing.status != "active" {
+        return Err(ApiError::conflict(
+            "Only alarms in active status can be acknowledged",
+        ));
     }
 
     let rows_affected = state.db.alarm().ack_alarm(id).await.map_err(|e| {
@@ -439,7 +486,9 @@ pub async fn ack_alarm(
     })?;
 
     if rows_affected == 0 {
-        return Err(ApiError::conflict("Alarm already acknowledged"));
+        return Err(ApiError::conflict(
+            "Only alarms in active status can be acknowledged",
+        ));
     }
 
     // Fetch updated record
@@ -453,6 +502,66 @@ pub async fn ack_alarm(
             ApiError::internal("Database operation failed")
         })?
         .ok_or_else(|| ApiError::internal("Failed to fetch updated alarm"))?;
+
+    Ok(Json(AlarmRecordResponse {
+        data: ApiAlarmRecord::from(updated),
+    }))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/admin/alarm/{id}/clear",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Alarm record id")),
+    responses(
+        (status = 200, description = "Alarm cleared", body = AlarmRecordResponse),
+        (status = 404, description = "Alarm not found"),
+        (status = 409, description = "Alarm already cleared"),
+        (status = 500, description = "Server error")
+    )
+)]
+pub async fn clear_alarm(
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<i64>,
+) -> Result<Json<AlarmRecordResponse>, ApiError> {
+    let state = &state.admin;
+
+    // Check existence first
+    let existing = state
+        .db
+        .alarm()
+        .get_alarm_by_id(id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?
+        .ok_or_else(|| ApiError::not_found("Alarm not found"))?;
+
+    if existing.status == "cleared" {
+        return Err(ApiError::conflict("Alarm already cleared"));
+    }
+
+    let rows_affected = state.db.alarm().clear_alarm(id).await.map_err(|e| {
+        error!("Database error clearing alarm: {}", e);
+        ApiError::internal("Database operation failed")
+    })?;
+
+    if rows_affected == 0 {
+        return Err(ApiError::conflict("Alarm already cleared"));
+    }
+
+    // Fetch updated record
+    let updated = state
+        .db
+        .alarm()
+        .get_alarm_by_id(id)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching cleared alarm: {}", e);
+            ApiError::internal("Database operation failed")
+        })?
+        .ok_or_else(|| ApiError::internal("Failed to fetch cleared alarm"))?;
 
     Ok(Json(AlarmRecordResponse {
         data: ApiAlarmRecord::from(updated),

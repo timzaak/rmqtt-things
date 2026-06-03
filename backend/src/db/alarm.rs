@@ -31,11 +31,13 @@ impl AlarmRepo {
         actions: &JsonValue,
         enabled: bool,
         throttle_minutes: i32,
+        duration_minutes: i32,
+        clear_condition: Option<&JsonValue>,
     ) -> anyhow::Result<i64> {
         let row = sqlx::query(
             r#"
-            INSERT INTO alarm_rule (product_id, name, description, trigger_type, trigger_config, condition, actions, enabled, throttle_minutes)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO alarm_rule (product_id, name, description, trigger_type, trigger_config, condition, actions, enabled, throttle_minutes, duration_minutes, clear_condition)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
             "#,
         )
@@ -48,6 +50,8 @@ impl AlarmRepo {
         .bind(actions)
         .bind(enabled)
         .bind(throttle_minutes)
+        .bind(duration_minutes)
+        .bind(clear_condition)
         .fetch_one(&self.pool)
         .await?;
         Ok(row.get("id"))
@@ -57,7 +61,8 @@ impl AlarmRepo {
         let rule = sqlx::query_as::<_, AlarmRule>(
             r#"
             SELECT id, product_id, name, description, trigger_type, trigger_config,
-                   condition, actions, enabled, throttle_minutes, created_at, updated_at
+                   condition, actions, enabled, throttle_minutes, duration_minutes, clear_condition,
+                   created_at, updated_at
             FROM alarm_rule
             WHERE id = $1
             "#,
@@ -77,6 +82,8 @@ impl AlarmRepo {
         condition: Option<&JsonValue>,
         actions: Option<&JsonValue>,
         throttle_minutes: Option<i32>,
+        duration_minutes: Option<i32>,
+        clear_condition: Option<Option<&JsonValue>>,
     ) -> anyhow::Result<u64> {
         let mut builder: QueryBuilder<Postgres> =
             QueryBuilder::new("UPDATE alarm_rule SET updated_at = NOW()");
@@ -104,6 +111,17 @@ impl AlarmRepo {
         if let Some(throttle_minutes) = throttle_minutes {
             builder.push(", throttle_minutes = ");
             builder.push_bind(throttle_minutes);
+        }
+        if let Some(duration_minutes) = duration_minutes {
+            builder.push(", duration_minutes = ");
+            builder.push_bind(duration_minutes);
+        }
+        if let Some(clear_condition) = clear_condition {
+            builder.push(", clear_condition = ");
+            match clear_condition {
+                Some(val) => builder.push_bind(val),
+                None => builder.push("NULL"),
+            };
         }
 
         builder.push(" WHERE id = ");
@@ -150,7 +168,8 @@ impl AlarmRepo {
     ) -> anyhow::Result<(Vec<AlarmRule>, i64)> {
         let mut query_builder = QueryBuilder::new(
             r#"SELECT id, product_id, name, description, trigger_type, trigger_config,
-                      condition, actions, enabled, throttle_minutes, created_at, updated_at
+                      condition, actions, enabled, throttle_minutes, duration_minutes, clear_condition,
+                      created_at, updated_at
                FROM alarm_rule WHERE 1=1"#,
         );
 
@@ -195,7 +214,8 @@ impl AlarmRepo {
         let rules = sqlx::query_as::<_, AlarmRule>(
             r#"
             SELECT id, product_id, name, description, trigger_type, trigger_config,
-                   condition, actions, enabled, throttle_minutes, created_at, updated_at
+                   condition, actions, enabled, throttle_minutes, duration_minutes, clear_condition,
+                   created_at, updated_at
             FROM alarm_rule
             WHERE product_id = $1 AND enabled = true
             ORDER BY id
@@ -261,12 +281,13 @@ impl AlarmRepo {
         device_id: Option<&str>,
         level: Option<i16>,
         acknowledged: Option<bool>,
+        status: Option<&str>,
         page: i64,
         page_size: i64,
     ) -> anyhow::Result<(Vec<AlarmRecord>, i64)> {
         let mut query_builder = QueryBuilder::new(
             r#"SELECT id, rule_id, rule_name, product_id, device_id, level,
-                      message, trigger_value, acknowledged, webhook_status, created_at
+                      message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
                FROM alarm WHERE 1=1"#,
         );
 
@@ -282,9 +303,16 @@ impl AlarmRepo {
             query_builder.push(" AND level = ");
             query_builder.push_bind(level);
         }
-        if let Some(acknowledged) = acknowledged {
-            query_builder.push(" AND acknowledged = ");
-            query_builder.push_bind(acknowledged);
+        if let Some(status) = status {
+            query_builder.push(" AND status = ");
+            query_builder.push_bind(status);
+        } else if let Some(acknowledged) = acknowledged {
+            // acknowledged is kept for backward compatibility, mapped to status
+            if acknowledged {
+                query_builder.push(" AND status != 'active'");
+            } else {
+                query_builder.push(" AND status = 'active'");
+            }
         }
 
         query_builder.push(" ORDER BY created_at DESC");
@@ -308,9 +336,15 @@ impl AlarmRepo {
             count_builder.push(" AND level = ");
             count_builder.push_bind(level);
         }
-        if let Some(acknowledged) = acknowledged {
-            count_builder.push(" AND acknowledged = ");
-            count_builder.push_bind(acknowledged);
+        if let Some(status) = status {
+            count_builder.push(" AND status = ");
+            count_builder.push_bind(status);
+        } else if let Some(acknowledged) = acknowledged {
+            if acknowledged {
+                count_builder.push(" AND status != 'active'");
+            } else {
+                count_builder.push(" AND status = 'active'");
+            }
         }
 
         let count_row = count_builder.build().fetch_one(&self.pool).await?;
@@ -323,7 +357,7 @@ impl AlarmRepo {
         let alarm = sqlx::query_as::<_, AlarmRecord>(
             r#"
             SELECT id, rule_id, rule_name, product_id, device_id, level,
-                   message, trigger_value, acknowledged, webhook_status, created_at
+                   message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
             FROM alarm
             WHERE id = $1
             "#,
@@ -338,8 +372,42 @@ impl AlarmRepo {
         let result = sqlx::query(
             r#"
             UPDATE alarm
-            SET acknowledged = true
-            WHERE id = $1 AND acknowledged = false
+            SET acknowledged = true, status = 'acknowledged'
+            WHERE id = $1 AND status = 'active'
+            "#,
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn query_active_alarms_for_clear(
+        &self,
+        rule_id: i64,
+        device_id: &str,
+    ) -> anyhow::Result<Vec<AlarmRecord>> {
+        let alarms = sqlx::query_as::<_, AlarmRecord>(
+            r#"
+            SELECT id, rule_id, rule_name, product_id, device_id, level,
+                   message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
+            FROM alarm
+            WHERE rule_id = $1 AND device_id = $2 AND status = 'active'
+            "#,
+        )
+        .bind(rule_id)
+        .bind(device_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(alarms)
+    }
+
+    pub async fn clear_alarm(&self, id: i64) -> anyhow::Result<u64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE alarm
+            SET status = 'cleared', cleared_at = NOW(), acknowledged = true
+            WHERE id = $1 AND status != 'cleared'
             "#,
         )
         .bind(id)

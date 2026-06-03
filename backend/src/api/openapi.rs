@@ -61,6 +61,7 @@ use utoipa::{Modify, OpenApi};
         alarm_handlers::delete_alarm_rule,
         alarm_handlers::list_alarms,
         alarm_handlers::ack_alarm,
+        alarm_handlers::clear_alarm,
     ),
     components(
         schemas(

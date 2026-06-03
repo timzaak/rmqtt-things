@@ -8,7 +8,7 @@
 
 | 文件 | 角色 | 故事数量 |
 |------|------|----------|
-| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 37 |
+| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 41 |
 | [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 10 |
 | [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 6 |
 
@@ -55,6 +55,10 @@
 | US-PA-035 | 确认告警 | P1 | 01-platform-admin-user-stories.md |
 | US-PA-036 | 配置产品自动注册 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-037 | 查看设备注册来源 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-038 | 配置持续时间条件 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-039 | 配置告警清除条件 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-040 | 查看告警生命周期状态 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-041 | 手动清除告警 | P1 | 01-platform-admin-user-stories.md |
 
 ### Demo E2E (DEMO-xxx)
 

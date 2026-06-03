@@ -173,7 +173,11 @@ pub fn create_router(
             patch(alarm_handlers::update_alarm_rule_status),
         )
         .route("/admin/alarm", get(alarm_handlers::list_alarms))
-        .route("/admin/alarm/{id}/ack", patch(alarm_handlers::ack_alarm));
+        .route("/admin/alarm/{id}/ack", patch(alarm_handlers::ack_alarm))
+        .route(
+            "/admin/alarm/{id}/clear",
+            patch(alarm_handlers::clear_alarm),
+        );
 
     let admin_routes = match (config.herald.as_ref(), herald_client) {
         (Some(herald_config), Some(herald_sdk)) => {

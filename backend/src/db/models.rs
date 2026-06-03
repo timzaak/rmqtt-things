@@ -286,6 +286,9 @@ pub struct AlarmRule {
     pub actions: JsonValue,
     pub enabled: bool,
     pub throttle_minutes: i32,
+    pub duration_minutes: i32,
+    #[serde(default)]
+    pub clear_condition: Option<JsonValue>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]
@@ -303,9 +306,12 @@ pub struct AlarmRecord {
     pub message: Option<String>,
     pub trigger_value: Option<JsonValue>,
     pub acknowledged: bool,
+    pub status: String,
     pub webhook_status: Option<i16>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub cleared_at: Option<OffsetDateTime>,
 }
 
 #[cfg(test)]
