@@ -100,13 +100,13 @@ async function validateBackendHealth(options: {
 async function verifyHeraldConnection(logger?: UnifiedLogger): Promise<void> {
   const config = await fetchAuthConfig()
 
-  if (!config.enabled || !config.login_url) {
+  if (!config.enabled || !config.herald_login_url) {
     logger?.testCode.log('[Env] Herald SSO 未启用，跳过检查') ?? console.warn('[Env] Herald SSO 未启用，跳过检查')
     return
   }
 
-  // Derive Herald base URL from login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
-  const heraldBaseUrl = config.login_url.replace(/\/[^/]*\/auth\/login$/, '')
+  // Derive Herald base URL from herald_login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
+  const heraldBaseUrl = config.herald_login_url.replace(/\/[^/]*\/auth\/login$/, '')
 
   try {
     const resp = await fetch(heraldBaseUrl, {
