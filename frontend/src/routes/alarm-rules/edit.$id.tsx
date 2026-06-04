@@ -10,10 +10,13 @@ import {
   TriggerConfigSection,
   ConditionEditor,
   ActionsEditor,
+  DurationSection,
+  ClearConditionSection,
   TRIGGER_TYPE_OPTIONS,
   type FormState,
   type ActionFormState,
   type ConditionFormState,
+  validateClearCondition,
 } from '@/components/alarm-rule/form-sections'
 import type { AlarmRule } from '@/lib/api-generated/types.gen'
 
@@ -60,6 +63,8 @@ const emptyForm: FormState = {
   condition: { operator: '' },
   actions: [],
   throttle_minutes: 0,
+  duration_minutes: 0,
+  clear_condition: null,
 }
 
 function alarmRuleToForm(rule: AlarmRule): FormState {
@@ -72,6 +77,8 @@ function alarmRuleToForm(rule: AlarmRule): FormState {
     condition: (rule.condition as ConditionFormState) ?? { operator: '' },
     actions: (rule.actions as ActionFormState[]) ?? [],
     throttle_minutes: rule.throttle_minutes ?? 0,
+    duration_minutes: rule.duration_minutes ?? 0,
+    clear_condition: (rule.clear_condition as ConditionFormState | null) ?? null,
   }
 }
 
@@ -118,7 +125,9 @@ function AlarmRuleEditPage() {
       JSON.stringify(form.trigger_config) !== JSON.stringify(initialForm.trigger_config) ||
       JSON.stringify(form.condition) !== JSON.stringify(initialForm.condition) ||
       JSON.stringify(form.actions) !== JSON.stringify(initialForm.actions) ||
-      form.throttle_minutes !== initialForm.throttle_minutes)
+      form.throttle_minutes !== initialForm.throttle_minutes ||
+      form.duration_minutes !== initialForm.duration_minutes ||
+      JSON.stringify(form.clear_condition) !== JSON.stringify(initialForm.clear_condition))
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -161,6 +170,21 @@ function AlarmRuleEditPage() {
       return
     }
 
+    // Duration validation (only for property trigger)
+    if (form.trigger_type === 'property' && form.duration_minutes < 0) {
+      toast.error('Duration must be >= 0')
+      return
+    }
+
+    // Clear condition completeness (only when enabled for property trigger)
+    if (form.trigger_type === 'property' && form.clear_condition) {
+      const err = validateClearCondition(form.clear_condition)
+      if (err) {
+        toast.error(err)
+        return
+      }
+    }
+
     // At least one alarm action
     const hasAlarm = form.actions.some((a) => a.type === 'alarm')
     if (!hasAlarm) {
@@ -189,6 +213,15 @@ function AlarmRuleEditPage() {
         condition: form.condition,
         actions: form.actions,
         throttle_minutes: form.throttle_minutes,
+        ...(form.trigger_type === 'property'
+          ? {
+              duration_minutes: form.duration_minutes > 0 ? form.duration_minutes : undefined,
+              clear_condition:
+                form.clear_condition && form.clear_condition.operator !== ''
+                  ? form.clear_condition
+                  : null,
+            }
+          : {}),
       },
       {
         onSuccess: () => {
@@ -293,6 +326,20 @@ function AlarmRuleEditPage() {
             trigger_type={form.trigger_type}
           />
         </div>
+
+        {/* Duration section */}
+        <DurationSection
+          duration_minutes={form.duration_minutes}
+          onDurationChange={(v) => setForm((f) => ({ ...f, duration_minutes: v }))}
+          visible={form.trigger_type === 'property'}
+        />
+
+        {/* Clear condition section */}
+        <ClearConditionSection
+          clear_condition={form.clear_condition}
+          onClearConditionChange={(c) => setForm((f) => ({ ...f, clear_condition: c }))}
+          visible={form.trigger_type === 'property'}
+        />
 
         {/* Actions editor */}
         <div

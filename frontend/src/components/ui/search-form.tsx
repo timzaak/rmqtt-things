@@ -7,6 +7,7 @@ export interface SearchField {
   type?: 'text' | 'select'
   options?: { label: string; value: string }[]
   placeholder?: string
+  testId?: string
 }
 
 interface SearchFormProps {
@@ -52,6 +53,7 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
               value={values[field.name]}
               onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
               aria-label={field.label}
+              data-testid={field.testId}
               style={inputStyle}
             >
               <option value="">All</option>
@@ -68,6 +70,7 @@ export function SearchForm({ fields, onSearch }: SearchFormProps) {
               onChange={(e) => setValues((v) => ({ ...v, [field.name]: e.target.value }))}
               placeholder={field.placeholder}
               aria-label={field.label}
+              data-testid={field.testId}
               style={{ ...inputStyle, width: '180px' }}
             />
           )}

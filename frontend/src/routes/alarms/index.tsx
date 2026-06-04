@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { createRoute } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
 import { useProducts } from '@/hooks/useProducts'
-import { useAlarms, useAckAlarm } from '@/hooks/useAlarms'
+import { useAlarms, useAckAlarm, useClearAlarm } from '@/hooks/useAlarms'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
+import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/sonner'
 import { formatDatetime } from '@/lib/utils'
 
@@ -25,7 +26,8 @@ interface AlarmRecordRow extends Record<string, unknown> {
   device_id: string
   level: string
   message?: string | null
-  acknowledged: boolean
+  status: string
+  cleared_at?: string | null
   webhook_status?: string | null
   created_at: string
 }
@@ -34,7 +36,7 @@ function AlarmsIndexPage() {
   const [productId, setProductId] = useState<string>('')
   const [deviceId, setDeviceId] = useState<string>('')
   const [level, setLevel] = useState<string>('')
-  const [acknowledged, setAcknowledged] = useState<string>('')
+  const [status, setStatus] = useState<string>('')
   const [page, setPage] = useState(1)
 
   const { data: products } = useProducts()
@@ -42,21 +44,38 @@ function AlarmsIndexPage() {
     product_id: productId || null,
     device_id: deviceId || null,
     level: level || null,
-    acknowledged: acknowledged === 'true' ? true : acknowledged === 'false' ? false : null,
+    status: status || null,
     page,
     page_size: 10,
   })
   const ackMutation = useAckAlarm()
+  const clearMutation = useClearAlarm()
 
   const productMap = new Map(products?.data?.map((p) => [p.model_no, p.name]) ?? [])
 
   const items: AlarmRecordRow[] = (data?.data ?? []) as AlarmRecordRow[]
   const pagination = data?.pagination
 
-  const levelStyleMap: Record<string, React.CSSProperties> = {
-    info: { background: '#dbeafe', color: '#1e40af' },
-    warning: { background: '#fef3c7', color: '#92400e' },
-    critical: { background: '#fee2e2', color: '#991b1b' },
+  const levelVariantMap: Record<string, 'info' | 'warning' | 'danger'> = {
+    info: 'info',
+    warning: 'warning',
+    critical: 'danger',
+  }
+
+  const statusVariantMap: Record<string, 'danger' | 'warning' | 'success'> = {
+    active: 'danger',
+    acknowledged: 'warning',
+    cleared: 'success',
+  }
+
+  const actionButtonStyle: React.CSSProperties = {
+    fontSize: '13px',
+    color: 'var(--color-accent)',
+    textDecoration: 'underline',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
   }
 
   const columns: Column<AlarmRecordRow>[] = [
@@ -73,21 +92,7 @@ function AlarmsIndexPage() {
     {
       header: 'Level',
       accessor: (row) => (
-        <span
-          style={{
-            display: 'inline-flex',
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            fontWeight: 500,
-            ...(levelStyleMap[row.level] ?? {
-              background: 'var(--color-surface-2)',
-              color: 'var(--color-text-secondary)',
-            }),
-          }}
-        >
-          {row.level}
-        </span>
+        <Badge variant={levelVariantMap[row.level] ?? 'default'}>{row.level}</Badge>
       ),
     },
     {
@@ -95,53 +100,73 @@ function AlarmsIndexPage() {
       accessor: (row) => row.message ?? '-',
     },
     {
-      header: 'Acknowledged',
+      header: 'Status',
       accessor: (row) => (
-        <span
-          data-testid={`alarm-acknowledged-tag-${row.id}`}
-          style={{
-            display: 'inline-flex',
-            borderRadius: '4px',
-            padding: '2px 8px',
-            fontSize: '12px',
-            fontWeight: 500,
-            ...(row.acknowledged
-              ? { background: '#dcfce7', color: '#166534' }
-              : { background: 'var(--color-surface-2)', color: 'var(--color-text-secondary)' }),
-          }}
+        <Badge
+          data-testid={`alarm-status-tag-${row.id}`}
+          variant={statusVariantMap[row.status] ?? 'default'}
+          style={{ textTransform: 'capitalize' }}
         >
-          {row.acknowledged ? 'Yes' : 'No'}
-        </span>
+          {row.status}
+        </Badge>
       ),
     },
     {
-      header: 'Actions',
+      header: 'Cleared At',
       accessor: (row) =>
-        row.acknowledged ? (
-          <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Acknowledged</span>
-        ) : (
-          <button
-            data-testid={`ack-alarm-button-${row.id}`}
-            onClick={() => {
-              ackMutation.mutate(row.id, {
-                onError: (error) => {
-                  toast.error('Failed to acknowledge alarm', { description: error.message })
-                },
-              })
-            }}
-            style={{
-              fontSize: '13px',
-              color: 'var(--color-accent)',
-              textDecoration: 'underline',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            Acknowledge
-          </button>
-        ),
+        row.cleared_at ? formatDatetime(row.cleared_at) : row.status === 'cleared' ? 'N/A' : '-',
+    },
+    {
+      header: 'Actions',
+      accessor: (row) => {
+        if (row.status === 'cleared') {
+          return <span style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>-</span>
+        }
+        return (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {row.status === 'active' && (
+              <button
+                data-testid={`ack-alarm-button-${row.id}`}
+                disabled={ackMutation.isPending}
+                onClick={() => {
+                  ackMutation.mutate(row.id, {
+                    onError: (error) => {
+                      toast.error('Failed to acknowledge alarm', { description: error.message })
+                    },
+                  })
+                }}
+                style={actionButtonStyle}
+              >
+                Acknowledge
+              </button>
+            )}
+            <button
+              data-testid={`clear-alarm-button-${row.id}`}
+              disabled={clearMutation.isPending}
+              onClick={() => {
+                clearMutation.mutate(row.id, {
+                  onError: (error) => {
+                    const msg =
+                      error instanceof Error
+                        ? error.message
+                        : typeof error === 'object' && error !== null && 'message' in error
+                          ? String((error as { message: unknown }).message)
+                          : String(error)
+                    if (msg.includes('already cleared')) {
+                      toast.error('Alarm already cleared')
+                    } else {
+                      toast.error('Failed to clear alarm', { description: msg })
+                    }
+                  },
+                })
+              }}
+              style={actionButtonStyle}
+            >
+              Clear
+            </button>
+          </div>
+        )
+      },
     },
   ]
 
@@ -174,12 +199,14 @@ function AlarmsIndexPage() {
               ],
             },
             {
-              name: 'acknowledged',
-              label: 'Acknowledged',
+              name: 'status',
+              label: 'Status',
               type: 'select',
+              testId: 'status-filter-select',
               options: [
-                { label: 'Acknowledged', value: 'true' },
-                { label: 'Unacknowledged', value: 'false' },
+                { label: 'Active', value: 'active' },
+                { label: 'Acknowledged', value: 'acknowledged' },
+                { label: 'Cleared', value: 'cleared' },
               ],
             },
           ]}
@@ -188,7 +215,7 @@ function AlarmsIndexPage() {
             setProductId(values.product_id)
             setDeviceId(values.device_id)
             setLevel(values.level)
-            setAcknowledged(values.acknowledged)
+            setStatus(values.status)
           }}
         />
       </div>

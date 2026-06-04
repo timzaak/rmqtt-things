@@ -39,6 +39,8 @@ export interface FormState {
   condition: ConditionFormState
   actions: ActionFormState[]
   throttle_minutes: number
+  duration_minutes: number
+  clear_condition: ConditionFormState | null
 }
 
 const TRIGGER_TYPES = [
@@ -426,6 +428,113 @@ export function ActionsEditor({ actions, onActionsChange }: ActionsEditorProps) 
       </div>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// DurationSection
+// ---------------------------------------------------------------------------
+
+interface DurationSectionProps {
+  duration_minutes: number
+  onDurationChange: (v: number) => void
+  visible: boolean
+}
+
+export function DurationSection({
+  duration_minutes,
+  onDurationChange,
+  visible,
+}: DurationSectionProps) {
+  if (!visible) return null
+
+  return (
+    <div>
+      <label htmlFor="duration_minutes" className={labelClass}>
+        Duration (minutes)
+      </label>
+      <input
+        id="duration_minutes"
+        type="number"
+        min={0}
+        value={duration_minutes}
+        onChange={(e) => onDurationChange(e.target.value === '' ? 0 : Number(e.target.value))}
+        className={inputClass}
+        data-testid="duration-minutes-input"
+      />
+      <p className="mt-1 text-xs text-slate-500">
+        Condition must hold for this duration before alarm fires. 0 = instant.
+      </p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// ClearConditionSection
+// ---------------------------------------------------------------------------
+
+interface ClearConditionSectionProps {
+  clear_condition: ConditionFormState | null
+  onClearConditionChange: (c: ConditionFormState | null) => void
+  visible: boolean
+}
+
+export function ClearConditionSection({
+  clear_condition,
+  onClearConditionChange,
+  visible,
+}: ClearConditionSectionProps) {
+  if (!visible) return null
+
+  const enabled = clear_condition !== null
+
+  return (
+    <div
+      className="rounded-md border border-slate-200 p-4 dark:border-slate-700 space-y-3"
+      data-testid="clear-condition-section"
+    >
+      <div className="flex items-center gap-2">
+        <input
+          id="clear_condition_toggle"
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => onClearConditionChange(e.target.checked ? { operator: '' } : null)}
+          data-testid="clear-condition-toggle"
+        />
+        <label htmlFor="clear_condition_toggle" className={labelClass}>
+          Enable auto-clear condition
+        </label>
+      </div>
+
+      {enabled && (
+        <>
+          <ConditionEditor
+            condition={clear_condition}
+            onConditionChange={onClearConditionChange}
+            trigger_type="property"
+          />
+          <p className="text-xs text-slate-500">
+            Auto-clear active alarms when device data returns to normal.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function validateClearCondition(cc: ConditionFormState): string | null {
+  if (!cc.operator) return 'Clear condition operator is required'
+  if (cc.operator === 'between') {
+    if (cc.min === undefined || cc.max === undefined)
+      return 'Clear condition min and max are required for between operator'
+  } else if (cc.operator !== 'always' && cc.value === undefined) {
+    return 'Clear condition value is required'
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------

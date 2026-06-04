@@ -10,9 +10,12 @@ import {
   TriggerConfigSection,
   ConditionEditor,
   ActionsEditor,
+  DurationSection,
+  ClearConditionSection,
   INITIAL_CONDITION,
   INITIAL_ACTIONS,
   OPERATORS_BY_TRIGGER_MAP,
+  validateClearCondition,
   type FormState,
 } from '@/components/alarm-rule/form-sections'
 
@@ -37,6 +40,8 @@ const initialForm: FormState = {
   condition: { ...INITIAL_CONDITION },
   actions: INITIAL_ACTIONS.map((a) => ({ ...a })),
   throttle_minutes: 0,
+  duration_minutes: 0,
+  clear_condition: null,
 }
 
 const inputStyle: React.CSSProperties = {
@@ -88,7 +93,9 @@ function AlarmRuleCreatePage() {
       form.condition.min !== undefined ||
       form.condition.max !== undefined ||
       form.actions.some((a) => a.message !== '' || a.url !== '') ||
-      form.throttle_minutes !== 0)
+      form.throttle_minutes !== 0 ||
+      form.duration_minutes !== 0 ||
+      form.clear_condition !== null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,6 +125,21 @@ function AlarmRuleCreatePage() {
     } else if (form.condition.operator !== 'always' && form.condition.value === undefined) {
       toast.error('Condition value is required')
       return
+    }
+
+    // Duration validation (only for property trigger)
+    if (form.trigger_type === 'property' && form.duration_minutes < 0) {
+      toast.error('Duration must be >= 0')
+      return
+    }
+
+    // Clear condition completeness (only when enabled for property trigger)
+    if (form.trigger_type === 'property' && form.clear_condition) {
+      const err = validateClearCondition(form.clear_condition)
+      if (err) {
+        toast.error(err)
+        return
+      }
     }
 
     // At least one alarm action
@@ -161,6 +183,16 @@ function AlarmRuleCreatePage() {
       body.throttle_minutes = form.throttle_minutes
     }
 
+    // Duration and clear condition only for property trigger type
+    if (form.trigger_type === 'property') {
+      if (form.duration_minutes > 0) {
+        body.duration_minutes = form.duration_minutes
+      }
+      if (form.clear_condition && form.clear_condition.operator !== '') {
+        body.clear_condition = form.clear_condition
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createAlarmRule.mutate(body as any, {
       onSuccess: () => {
@@ -182,6 +214,8 @@ function AlarmRuleCreatePage() {
       trigger_type: type,
       trigger_config: {},
       condition: { operator: defaultOperator },
+      duration_minutes: type === 'property' ? f.duration_minutes : 0,
+      clear_condition: type === 'property' ? f.clear_condition : null,
     }))
   }
 
@@ -266,6 +300,20 @@ function AlarmRuleCreatePage() {
             trigger_type={form.trigger_type}
           />
         </div>
+
+        {/* Duration section */}
+        <DurationSection
+          duration_minutes={form.duration_minutes}
+          onDurationChange={(v) => setForm((f) => ({ ...f, duration_minutes: v }))}
+          visible={form.trigger_type === 'property'}
+        />
+
+        {/* Clear condition section */}
+        <ClearConditionSection
+          clear_condition={form.clear_condition}
+          onClearConditionChange={(c) => setForm((f) => ({ ...f, clear_condition: c }))}
+          visible={form.trigger_type === 'property'}
+        />
 
         {/* Actions editor */}
         <div
