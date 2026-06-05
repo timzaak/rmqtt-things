@@ -108,27 +108,10 @@ pub async fn create_alarm_rule(
         ));
     }
 
-    let rule_id = state
-        .db
-        .alarm()
-        .create_rule(
-            &req.product_id,
-            &req.name,
-            req.description.as_deref(),
-            &req.trigger_type,
-            &req.trigger_config,
-            &req.condition,
-            &req.actions,
-            true,
-            req.throttle_minutes,
-            req.duration_minutes,
-            req.clear_condition.as_ref(),
-        )
-        .await
-        .map_err(|e| {
-            error!("Database error creating rule: {}", e);
-            ApiError::internal("Database operation failed")
-        })?;
+    let rule_id = state.db.alarm().create_rule(&req).await.map_err(|e| {
+        error!("Database error creating rule: {}", e);
+        ApiError::internal("Database operation failed")
+    })?;
 
     // Fetch the created rule to return full data
     let rule = state

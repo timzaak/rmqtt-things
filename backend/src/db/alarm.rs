@@ -1,3 +1,4 @@
+use crate::api::alarm_models::CreateAlarmRuleRequest;
 use crate::db::models::{AlarmRecord, AlarmRule};
 use serde_json::Value as JsonValue;
 use sqlx::{PgPool, Postgres, QueryBuilder, Row};
@@ -20,38 +21,24 @@ impl AlarmRepo {
         builder.push_bind(offset);
     }
 
-    pub async fn create_rule(
-        &self,
-        product_id: &str,
-        name: &str,
-        description: Option<&str>,
-        trigger_type: &str,
-        trigger_config: &JsonValue,
-        condition: &JsonValue,
-        actions: &JsonValue,
-        enabled: bool,
-        throttle_minutes: i32,
-        duration_minutes: i32,
-        clear_condition: Option<&JsonValue>,
-    ) -> anyhow::Result<i64> {
+    pub async fn create_rule(&self, req: &CreateAlarmRuleRequest) -> anyhow::Result<i64> {
         let row = sqlx::query(
             r#"
             INSERT INTO alarm_rule (product_id, name, description, trigger_type, trigger_config, condition, actions, enabled, throttle_minutes, duration_minutes, clear_condition)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)
             RETURNING id
             "#,
         )
-        .bind(product_id)
-        .bind(name)
-        .bind(description)
-        .bind(trigger_type)
-        .bind(trigger_config)
-        .bind(condition)
-        .bind(actions)
-        .bind(enabled)
-        .bind(throttle_minutes)
-        .bind(duration_minutes)
-        .bind(clear_condition)
+        .bind(&req.product_id)
+        .bind(&req.name)
+        .bind(&req.description)
+        .bind(&req.trigger_type)
+        .bind(&req.trigger_config)
+        .bind(&req.condition)
+        .bind(&req.actions)
+        .bind(req.throttle_minutes)
+        .bind(req.duration_minutes)
+        .bind(&req.clear_condition)
         .fetch_one(&self.pool)
         .await?;
         Ok(row.get("id"))
