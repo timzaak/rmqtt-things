@@ -37,6 +37,8 @@ export interface AlarmRecordResponse {
   message: string | null
   trigger_value: Record<string, unknown> | null
   acknowledged: boolean
+  status: string
+  cleared_at: string | null
   webhook_status: string | null
   created_at: string
 }
@@ -130,6 +132,15 @@ export async function acknowledgeAlarm(
   id: number,
 ): Promise<AlarmRecordResponse> {
   const response = await request.patch(`/api/admin/alarm/${id}/ack`)
+  await assertOk(response)
+  return (await response.json()).data
+}
+
+export async function clearAlarm(
+  request: APIRequestContext,
+  id: number,
+): Promise<AlarmRecordResponse> {
+  const response = await request.patch(`/api/admin/alarm/${id}/clear`)
   await assertOk(response)
   return (await response.json()).data
 }

@@ -2,7 +2,8 @@
  * Alarm Records List Page Object
  *
  * Encapsulates the alarm records list page (/alarms).
- * User stories: US-PA-034 (list/filter), US-PA-035 (acknowledge)
+ * User stories: US-PA-034 (list/filter), US-PA-035 (acknowledge),
+ *               US-PA-040 (lifecycle status), US-PA-041 (manual clear)
  */
 
 import { Page, Locator, expect } from '@playwright/test'
@@ -48,6 +49,11 @@ export class AlarmRecordsListPage extends BasePage {
     await acknowledgedSelect.selectOption(value)
   }
 
+  async selectStatusFilter(status: string): Promise<void> {
+    const statusSelect = this.page.locator(SELECTORS.alarms.statusFilter)
+    await statusSelect.selectOption(status)
+  }
+
   async clickSearch(): Promise<void> {
     const searchButton = this.searchForm.getByRole('button', { name: 'Search' })
     await this.smartClick(searchButton)
@@ -57,6 +63,14 @@ export class AlarmRecordsListPage extends BasePage {
     return this.page.locator(SELECTORS.alarms.ackButton(alarmId))
   }
 
+  getClearButton(alarmId: number): Locator {
+    return this.page.locator(SELECTORS.alarms.clearButton(alarmId))
+  }
+
+  getStatusTag(alarmId: number): Locator {
+    return this.page.locator(SELECTORS.alarms.statusTag(alarmId))
+  }
+
   getAcknowledgedTag(alarmId: number): Locator {
     return this.page.locator(SELECTORS.alarms.acknowledgedTag(alarmId))
   }
@@ -64,6 +78,11 @@ export class AlarmRecordsListPage extends BasePage {
   async acknowledgeAlarm(alarmId: number): Promise<void> {
     const ackButton = this.getAckButton(alarmId)
     await this.smartClick(ackButton)
+  }
+
+  async clearAlarm(alarmId: number): Promise<void> {
+    const clearButton = this.getClearButton(alarmId)
+    await this.smartClick(clearButton)
   }
 
   async waitForAlarmInList(ruleName: string): Promise<void> {

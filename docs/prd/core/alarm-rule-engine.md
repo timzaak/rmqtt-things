@@ -2,6 +2,7 @@
 
 **创建时间**: 2026-05-19
 **优先级**: P0
+**版本说明**: V1 基础版本。告警状态模型已由 `alarm-rule-check.md` 升级为三态（Active/Acknowledged/Cleared），持续时间条件和清除条件参见该文档。
 
 ---
 
@@ -106,7 +107,7 @@
 
 1. 管理员可通过 Web 后台为产品创建告警规则，指定触发类型、条件和动作
 2. 规则支持属性阈值（`property`）、事件匹配（`event`）、设备上线（`device_online`）、设备离线（`device_offline`）四种触发类型
-3. 条件支持数值比较（>, >=, <, <=, ==, !=）、区间判断（between）、包含判断（contains）和无条件触发（always）
+3. 条件支持数值比较（>, >=, <, <=, ==, !=）、区间判断（between，闭区间 [min, max]）、包含判断（contains）和无条件触发（always）
 4. 触发后执行预配置的动作：创建告警记录（必选）、发送 Webhook 回调（可选）
 5. 告警记录包含告警级别（info/warning/critical）、触发时的数据值和可配置的消息模板
 6. 去重机制：同一规则对同一设备在 throttle_minutes 时间窗口内不重复触发
@@ -217,21 +218,21 @@
 
 ## 9. 相关文件索引
 
-### 10.1 后端文件
+### 10.1 后端文件（已实现）
 
-- `backend/src/api/handlers.rs` — **需修改** — webhook 回调中插入规则评估调用
-- `backend/src/api/mod.rs` — **需修改** — 注册新路由，AppState 增加规则引擎组件
+- `backend/src/api/handlers.rs` — 已修改 — webhook 回调中集成规则评估调用
+- `backend/src/api/mod.rs` — 已修改 — 注册告警路由，AppState 包含规则引擎组件
 - `backend/src/cache.rs` — 参考复用 — SchemaCache 缓存模式
 - `backend/src/rmqtt_client.rs` — 参考复用 — MQTT 命令下发通道
-- `backend/src/db/database.rs` — **需修改** — 增加规则和告警的 DB 操作
-- `backend/src/rule_engine/` — **需新建** — 规则引擎模块（evaluator、actions、cache）
-- `backend/src/api/alarm_handlers.rs` — **需新建** — 规则和告警管理 Admin API
-- `backend/migrations/` — **需新建** — alarm_rule 和 alarm 表迁移文件
+- `backend/src/db/database.rs` — 已修改 — 规则和告警的 DB 操作
+- `backend/src/rule_engine/` — 已实现 — 规则引擎模块（evaluator、actions、cache）
+- `backend/src/api/alarm_handlers.rs` — 已实现 — 规则和告警管理 Admin API
+- `backend/migrations/` — 已实现 — alarm_rule 和 alarm 表迁移文件
 
-### 10.2 前端文件
+### 10.2 前端文件（已实现）
 
-- `frontend/src/routes/alarm-rules/` — **需新建** — 规则管理页面
-- `frontend/src/routes/alarms/` — **需新建** — 告警记录查询页面
+- `frontend/src/routes/alarm-rules/` — 已实现 — 规则管理页面（index、create、edit）
+- `frontend/src/routes/alarms/` — 已实现 — 告警记录查询页面
 
 ---
 

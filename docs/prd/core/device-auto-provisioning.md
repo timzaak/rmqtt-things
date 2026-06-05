@@ -194,19 +194,19 @@
 
 ## 9. 相关文件索引
 
-### 10.1 后端文件
-- `backend/src/api/auth_handlers.rs` — HMAC 认证回调处理器（需修改：增加设备准入检查和自动注册逻辑）
-- `backend/src/api/ca_handlers.rs` — 证书签发处理器（需修改：签发证书时同步创建设备记录）
-- `backend/src/db/models.rs` — 数据模型定义（需修改：新增 Device 模型和注册来源枚举）
-- `backend/src/db/product.rs` — 产品数据库操作（需修改：增加 auto_provisioning 字段读写）
-- `backend/src/db/database.rs` — 数据库服务入口（需修改：注册设备 repo）
-- `backend/src/db/cert_issue.rs` — 证书记录操作（签发流程需联动设备注册）
+### 10.1 后端文件（已实现）
+- `backend/src/api/auth_handlers.rs` — HMAC 认证回调处理器（已实现设备准入检查和自动注册逻辑）
+- `backend/src/api/ca_handlers.rs` — 证书签发处理器（已实现签发证书时同步创建设备记录）
+- `backend/src/db/models.rs` — 数据模型定义（已包含 Device 模型和注册来源枚举）
+- `backend/src/db/product.rs` — 产品数据库操作（已包含 auto_provisioning 字段读写）
+- `backend/src/db/database.rs` — 数据库服务入口（已注册设备 repo）
+- `backend/src/db/cert_issue.rs` — 证书记录操作（已联动设备注册）
 
-### 10.2 前端文件
-- `frontend/src/routes/products/edit.$id.tsx` — 产品编辑页（需修改：增加自动注册开关）
-- `frontend/src/routes/devices/index.tsx` — 设备列表页（需修改：增加注册来源列和筛选）
-- `frontend/src/hooks/useProducts.ts` — 产品 hooks（需适配：支持自动注册字段）
-- `frontend/src/hooks/useDevices.ts` — 设备 hooks（需适配：支持注册来源筛选）
+### 10.2 前端文件（已实现）
+- `frontend/src/routes/products/edit.$id.tsx` — 产品编辑页（已包含自动注册开关）
+- `frontend/src/routes/devices/index.tsx` — 设备列表页（已包含注册来源列和筛选）
+- `frontend/src/hooks/useProducts.ts` — 产品 hooks（已支持自动注册字段）
+- `frontend/src/hooks/useDevices.ts` — 设备 hooks（已支持注册来源筛选）
 
 ---
 

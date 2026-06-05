@@ -2,7 +2,8 @@
  * Alarm Rules CRUD Demo Tests
  *
  * User stories: US-PA-029 (create), US-PA-030 (list), US-PA-031 (edit),
- *               US-PA-032 (toggle status), US-PA-033 (delete)
+ *               US-PA-032 (toggle status), US-PA-033 (delete),
+ *               US-PA-038 (duration condition), US-PA-039 (clear condition)
  *
  * Each test is self-contained: creates data via API, verifies UI, cleans up
  * via API in finally blocks. No test depends on data from another test.
@@ -286,5 +287,132 @@ test.describe('Delete alarm rule (US-PA-033)', () => {
     } finally {
       await deleteAlarmRule(request, rule.id)
     }
+  })
+})
+
+// ===========================================================================
+// US-PA-038: Duration condition
+// ===========================================================================
+
+test.describe('Duration condition (US-PA-038)', () => {
+  test('[US-PA-038] create rule with duration_minutes via API and verify in list', async ({ request, page }) => {
+    const ruleName = `E2E Duration Rule ${Date.now()}`
+    const rule = await createAlarmRule(request, {
+      product_id: PRODUCT_ID,
+      name: ruleName,
+      description: 'E2E duration condition test',
+      trigger_type: 'property',
+      trigger_config: { property_name: 'temperature' },
+      condition: { operator: '>', value: 50 },
+      actions: [{ type: 'alarm', level: 'warning', message: 'temperature exceeded' }],
+      throttle_minutes: 0,
+      duration_minutes: 5,
+    })
+    try {
+      const listPage = new AlarmRulesListPage(page)
+      await listPage.gotoList(FRONTEND_URL)
+      await listPage.waitForRuleInList(ruleName)
+    } finally {
+      await deleteAlarmRule(request, rule.id)
+    }
+  })
+
+  test('[US-PA-038] create rule with instant duration (0) via form', async ({ request, page }) => {
+    const ruleName = `E2E Instant Duration Rule ${Date.now()}`
+    const ruleId: number[] = []
+    try {
+      const createPage = new AlarmRuleCreatePage(page)
+      await createPage.gotoCreate(FRONTEND_URL)
+      await createPage.verifyCreatePage()
+
+      await createPage.selectProduct(PRODUCT_ID)
+      await createPage.fillName(ruleName)
+      await createPage.selectTriggerType('property')
+
+      await expect(createPage.propertyNameInput).toBeVisible({ timeout: 5000 })
+      await createPage.fillPropertyName('temperature')
+      await createPage.selectConditionOperator('>')
+      await expect(createPage.conditionValueInput).toBeVisible({ timeout: 5000 })
+      await createPage.fillConditionValue('50')
+
+      // Verify duration field exists and defaults to 0
+      const durationInput = page.locator('[data-testid="duration-minutes-input"]')
+      await expect(durationInput).toBeVisible()
+      await expect(durationInput).toHaveValue('0')
+
+      await createPage.fillActionMessage(0, 'instant duration test')
+      await createPage.selectActionLevel(0, 'warning')
+
+      const responsePromise = page.waitForResponse(
+        resp => resp.url().includes('/api/admin/alarm-rule') && resp.request().method() === 'POST' && resp.status() === 201,
+      )
+      await createPage.submit()
+      const response = await responsePromise
+      const created = (await response.json()).data
+      ruleId.push(created.id)
+
+      await page.waitForURL('**/alarm-rules')
+
+      const listPage = new AlarmRulesListPage(page)
+      await listPage.waitForRuleInList(ruleName)
+    } finally {
+      for (const id of ruleId) {
+        await deleteAlarmRule(request, id).catch(() => {})
+      }
+    }
+  })
+})
+
+// ===========================================================================
+// US-PA-039: Clear condition
+// ===========================================================================
+
+test.describe('Clear condition (US-PA-039)', () => {
+  test('[US-PA-039] create rule with clear_condition via API and verify in list', async ({ request, page }) => {
+    const ruleName = `E2E Clear Condition Rule ${Date.now()}`
+    const rule = await createAlarmRule(request, {
+      product_id: PRODUCT_ID,
+      name: ruleName,
+      description: 'E2E clear condition test',
+      trigger_type: 'property',
+      trigger_config: { property_name: 'temperature' },
+      condition: { operator: '>', value: 50 },
+      actions: [{ type: 'alarm', level: 'warning', message: 'temperature exceeded' }],
+      throttle_minutes: 0,
+      clear_condition: { operator: '<', value: 50 },
+    })
+    try {
+      const listPage = new AlarmRulesListPage(page)
+      await listPage.gotoList(FRONTEND_URL)
+      await listPage.waitForRuleInList(ruleName)
+    } finally {
+      await deleteAlarmRule(request, rule.id)
+    }
+  })
+
+  test('[US-PA-039] clear_condition toggle visible for property trigger type', async ({ page }) => {
+    const createPage = new AlarmRuleCreatePage(page)
+    await createPage.gotoCreate(FRONTEND_URL)
+    await createPage.verifyCreatePage()
+
+    await createPage.selectProduct(PRODUCT_ID)
+    await createPage.selectTriggerType('property')
+
+    // Clear condition section should appear for property trigger
+    const clearConditionSection = page.locator('[data-testid="clear-condition-section"]')
+    await expect(clearConditionSection).toBeVisible({ timeout: 5000 })
+  })
+
+  test('[US-PA-039] clear_condition not available for event trigger type', async ({ page }) => {
+    const createPage = new AlarmRuleCreatePage(page)
+    await createPage.gotoCreate(FRONTEND_URL)
+    await createPage.verifyCreatePage()
+
+    await createPage.selectProduct(PRODUCT_ID)
+    await createPage.selectTriggerType('event')
+
+    // Clear condition section should NOT appear for event trigger
+    const clearConditionSection = page.locator('[data-testid="clear-condition-section"]')
+    await expect(clearConditionSection).toBeHidden({ timeout: 3000 })
   })
 })

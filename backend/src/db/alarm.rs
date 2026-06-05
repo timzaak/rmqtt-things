@@ -392,7 +392,7 @@ impl AlarmRepo {
             SELECT id, rule_id, rule_name, product_id, device_id, level,
                    message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
             FROM alarm
-            WHERE rule_id = $1 AND device_id = $2 AND status = 'active'
+            WHERE rule_id = $1 AND device_id = $2 AND status IN ('active', 'acknowledged')
             "#,
         )
         .bind(rule_id)

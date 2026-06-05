@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createRoute } from '@tanstack/react-router'
+import { createRoute, Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { rootRoute } from '../__root'
 import { useProducts } from '@/hooks/useProducts'
@@ -92,9 +92,13 @@ function AlarmRulesIndexPage() {
       header: 'Actions',
       accessor: (row) => (
         <div className="flex items-center gap-2">
-          <a href={`/alarm-rules/edit/${row.id}`} style={{ color: 'var(--color-accent)' }}>
+          <Link
+            to="/alarm-rules/edit/$id"
+            params={{ id: String(row.id) }}
+            style={{ color: 'var(--color-accent)' }}
+          >
             Edit
-          </a>
+          </Link>
           <button onClick={() => setDeleteTarget(row)} style={{ color: '#dc2626' }}>
             Delete
           </button>
@@ -121,8 +125,8 @@ function AlarmRulesIndexPage() {
       <PageHeader
         title="Alarm Rules"
         actions={
-          <a
-            href="/alarm-rules/create"
+          <Link
+            to="/alarm-rules/create"
             data-testid="alarm-rule-create-button"
             style={{
               display: 'inline-flex',
@@ -139,7 +143,7 @@ function AlarmRulesIndexPage() {
           >
             <Plus className="h-4 w-4" />
             Create Alarm Rule
-          </a>
+          </Link>
         }
       />
       <div data-testid="alarm-rule-search-form">

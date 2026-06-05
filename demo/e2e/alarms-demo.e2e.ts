@@ -1,7 +1,8 @@
 /**
  * Alarm Records List & Acknowledge Demo Tests
  *
- * User stories: US-PA-034 (view/filter alarm records), US-PA-035 (acknowledge alarm)
+ * User stories: US-PA-034 (view/filter alarm records), US-PA-035 (acknowledge alarm),
+ *               US-PA-040 (lifecycle status), US-PA-041 (manual clear)
  *
  * Each test is self-contained: creates a rule via API, triggers an alarm via MQTT,
  * verifies the UI, then cleans up the rule in a finally block.
@@ -16,6 +17,7 @@ import {
   deleteAlarmRule,
   getAlarmRecords,
   acknowledgeAlarm,
+  clearAlarm,
   type AlarmRecordResponse,
 } from './helpers/alarm-api'
 import { DemoMqttDevice } from './helpers/mqtt-device'
@@ -252,6 +254,123 @@ test.describe('Acknowledge alarm (US-PA-035)', () => {
 
       const ackButton = recordsPage.getAckButton(result.alarmId)
       await expect(ackButton).toBeHidden({ timeout: 5_000 })
+    })
+  })
+
+  // ===========================================================================
+  // US-PA-040: Lifecycle status (Active/Acknowledged/Cleared)
+  // ===========================================================================
+
+  test.describe('Alarm lifecycle status (US-PA-040)', () => {
+    test('[US-PA-040] active alarm shows Active status tag', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+        await recordsPage.waitForAlarmInList(result.ruleName)
+
+        const statusTag = recordsPage.getStatusTag(result.alarmId)
+        await expect(statusTag).toBeVisible({ timeout: 10_000 })
+        await expect(statusTag).toHaveText(/active/i, { timeout: 5_000 })
+      })
+    })
+
+    test('[US-PA-040] acknowledged alarm shows Acknowledged status tag', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        await acknowledgeAlarm(request, result.alarmId)
+
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+        await recordsPage.waitForAlarmInList(result.ruleName)
+
+        const statusTag = recordsPage.getStatusTag(result.alarmId)
+        await expect(statusTag).toBeVisible({ timeout: 10_000 })
+        await expect(statusTag).toHaveText(/acknowledged/i, { timeout: 5_000 })
+
+        // Ack button should be hidden for acknowledged alarms
+        const ackButton = recordsPage.getAckButton(result.alarmId)
+        await expect(ackButton).toBeHidden({ timeout: 5_000 })
+
+        // Clear button should still be visible
+        const clearButton = recordsPage.getClearButton(result.alarmId)
+        await expect(clearButton).toBeVisible({ timeout: 5_000 })
+      })
+    })
+
+    test('[US-PA-040] filter alarm records by status', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+
+        // Filter by active status
+        await recordsPage.selectStatusFilter('active')
+        await recordsPage.clickSearch()
+        await recordsPage.waitForAlarmInList(result.ruleName)
+      })
+    })
+  })
+
+  // ===========================================================================
+  // US-PA-041: Manual clear alarm
+  // ===========================================================================
+
+  test.describe('Manual clear alarm (US-PA-041)', () => {
+    test('[US-PA-041] clear active alarm from list page', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+        await recordsPage.waitForAlarmInList(result.ruleName)
+
+        const clearButton = recordsPage.getClearButton(result.alarmId)
+        await expect(clearButton).toBeVisible({ timeout: 10_000 })
+
+        await recordsPage.clearAlarm(result.alarmId)
+
+        // Verify status changed to Cleared
+        const statusTag = recordsPage.getStatusTag(result.alarmId)
+        await expect(statusTag).toHaveText(/cleared/i, { timeout: 5_000 })
+
+        // Cleared alarm should not have ack or clear buttons
+        await expect(recordsPage.getAckButton(result.alarmId)).toBeHidden({ timeout: 5_000 })
+        await expect(recordsPage.getClearButton(result.alarmId)).toBeHidden({ timeout: 5_000 })
+      })
+    })
+
+    test('[US-PA-041] clear acknowledged alarm from list page', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        // First acknowledge, then clear
+        await acknowledgeAlarm(request, result.alarmId)
+
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+        await recordsPage.waitForAlarmInList(result.ruleName)
+
+        const clearButton = recordsPage.getClearButton(result.alarmId)
+        await expect(clearButton).toBeVisible({ timeout: 10_000 })
+
+        await recordsPage.clearAlarm(result.alarmId)
+
+        // Verify status changed to Cleared
+        const statusTag = recordsPage.getStatusTag(result.alarmId)
+        await expect(statusTag).toHaveText(/cleared/i, { timeout: 5_000 })
+      })
+    })
+
+    test('[US-PA-041] clear alarm via API and verify in UI', async ({ request, page }) => {
+      await withTriggeredAlarm(request, {}, async (result) => {
+        await clearAlarm(request, result.alarmId)
+
+        const recordsPage = new AlarmRecordsListPage(page)
+        await recordsPage.gotoList(FRONTEND_URL)
+        await recordsPage.waitForAlarmInList(result.ruleName)
+
+        const statusTag = recordsPage.getStatusTag(result.alarmId)
+        await expect(statusTag).toBeVisible({ timeout: 10_000 })
+        await expect(statusTag).toHaveText(/cleared/i, { timeout: 5_000 })
+
+        // No action buttons for cleared alarms
+        await expect(recordsPage.getAckButton(result.alarmId)).toBeHidden({ timeout: 5_000 })
+        await expect(recordsPage.getClearButton(result.alarmId)).toBeHidden({ timeout: 5_000 })
+      })
     })
   })
 })

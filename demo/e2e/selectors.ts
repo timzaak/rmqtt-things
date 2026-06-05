@@ -115,8 +115,11 @@ export const SELECTORS = {
   alarms: {
     searchForm: '[data-testid="alarm-search-form"]',
     table: '[data-testid="alarm-table"]',
+    statusTag: (id: number) => `[data-testid="alarm-status-tag-${id}"]`,
     ackButton: (id: number) => `[data-testid="ack-alarm-button-${id}"]`,
+    clearButton: (id: number) => `[data-testid="clear-alarm-button-${id}"]`,
     acknowledgedTag: (id: number) => `[data-testid="alarm-acknowledged-tag-${id}"]`,
+    statusFilter: '[data-testid="status-filter-select"]',
   },
 
   /** Products 页选择器 */

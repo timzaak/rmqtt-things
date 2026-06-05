@@ -6,7 +6,7 @@
 
 | DEMO ID | 标题 | 关联用户故事 | 测试文件 |
 |---------|------|-------------|---------|
-| DEMO-001 | 管理员查看已创建的产品 | US-PA-002 | products-demo.e2e.ts |
+| DEMO-001 | 产品管理完整流程（创建/查看/编辑） | US-PA-001/002/003 | products-demo.e2e.ts |
 | DEMO-002 | 管理员查看设备列表和详情 | US-PA-019 | devices-demo.e2e.ts |
 | DEMO-003 | 管理员查看证书列表并导航到签发页 | US-PA-005 | certs-demo.e2e.ts |
 | DEMO-004 | 管理员查看校验模板列表并导航到创建页 | US-PA-008 | valid-templates-demo.e2e.ts |
@@ -27,6 +27,10 @@
 | DEMO-019 | 证书和私钥下载验证 | US-PA-024/025 | cert-download-demo.e2e.ts |
 | DEMO-020 | 证书吊销/作废验证 | US-PA-006 | cert-revoke-demo.e2e.ts |
 | DEMO-021 | 证书详情页验证 | US-PA-023 | cert-detail-demo.e2e.ts |
+| DEMO-022 | 告警规则持续时间条件验证 | US-PA-038 | alarm-rules-demo.e2e.ts |
+| DEMO-023 | 告警规则清除条件验证 | US-PA-039 | alarm-rules-demo.e2e.ts |
+| DEMO-024 | 告警记录生命周期状态验证 | US-PA-040 | alarms-demo.e2e.ts |
+| DEMO-025 | 手动清除告警验证 | US-PA-041 | alarms-demo.e2e.ts |
 
 > `demo-basic.e2e.ts` 为基础设施测试（验证测试环境和 Logger），不关联用户故事。
 
@@ -34,9 +38,9 @@
 
 ## Products
 
-### 故事：管理员查看已创建的产品 [DEMO-001]
+### 故事：产品管理完整流程 [DEMO-001]
 
-**关联**: US-PA-002
+**关联**: US-PA-001/002/003
 
 **【用户故事】**
 **作为**：Platform Admin

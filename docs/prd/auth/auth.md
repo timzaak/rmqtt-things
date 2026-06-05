@@ -230,9 +230,9 @@ rmqtt-things 要求 Herald 中预置以下权限点，用于管理端 API 的访
 
 | 文件 | 说明 |
 |------|------|
-| `frontend/src/lib/auth.ts` | 需新建，认证状态管理 + 登录跳转工具 |
-| `frontend/src/lib/api-client.ts` | 需添加 401 拦截器 |
-| `frontend/src/routes/__root.tsx` 或路由配置 | 需添加路由守卫 |
+| `frontend/src/lib/auth.ts` | 已实现，认证状态管理 + 登录跳转工具 |
+| `frontend/src/lib/api-client.ts` | 已添加 401 拦截器 |
+| `frontend/src/routes/__root.tsx` 或路由配置 | 已添加路由守卫 |
 | `frontend/src/lib/config.ts` | 需添加 Herald 地址配置 |
 
 ### 9.3 参考文件
