@@ -32,7 +32,7 @@ impl AsyncTestContext for HeraldAuthTestContext {
         // Database
         let (admin_pool, schema_name, pool) = create_test_database().await;
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-        let db_service = DatabaseService::new(pool);
+        let db_service = DatabaseService::new(pool, Default::default());
 
         // Herald configuration
         let herald_url = std::env::var("TEST_HERALD_URL")
@@ -81,7 +81,8 @@ impl AsyncTestContext for HeraldAuthTestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client,
-            rule_cache: crate::rule_engine::RuleCache::new(),
+            rule_cache: crate::rule_engine::RuleCache::new_in_memory(),
+            task_set: Arc::new(tokio::sync::Mutex::new(tokio::task::JoinSet::new())),
         });
 
         // Create Herald SDK client and pass it to the router

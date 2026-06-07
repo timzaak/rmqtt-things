@@ -11,6 +11,8 @@ mod mqtt_integration;
 mod mqtt_test_context;
 mod ota_tests;
 mod product_tests;
+mod redis_rule_state_scenarios;
 mod s3_tests;
 mod simple_tests;
 mod validator_tests;
+mod webhook_retry_scenarios;

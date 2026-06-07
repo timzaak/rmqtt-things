@@ -283,6 +283,7 @@ def main() -> int:
     test_env.setdefault("TEST_RMQTT_MQTT_PORT", "11883")
     test_env.setdefault("TEST_RMQTT_HTTP_PORT", "16060")
     test_env.setdefault("TEST_BACKEND_PORT", "18080")
+    test_env.setdefault("TEST_REDIS_URL", "redis://127.0.0.1:16379")
 
     start_code = start_test_environment()
     if start_code != 0:

@@ -30,7 +30,7 @@ impl AsyncTestContext for TestContext {
         let (admin_pool, schema_name, pool) = create_test_database().await;
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
 
-        let db_service = DatabaseService::new(pool);
+        let db_service = DatabaseService::new(pool, Default::default());
 
         let endpoint = test_s3_endpoint();
         let s3_config = S3Config {
@@ -71,7 +71,8 @@ impl AsyncTestContext for TestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client: app_state.s3_client.clone(),
-            rule_cache: crate::rule_engine::RuleCache::new(),
+            rule_cache: crate::rule_engine::RuleCache::new_in_memory(),
+            task_set: Arc::new(tokio::sync::Mutex::new(tokio::task::JoinSet::new())),
         });
 
         let router = create_router(config, app_state.clone(), admin_state.clone(), None);

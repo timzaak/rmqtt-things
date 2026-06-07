@@ -60,6 +60,7 @@ async fn insert_test_alarm(
             level,
             Some(message),
             None,
+            "property",
         )
         .await
         .expect("insert_test_alarm failed")
@@ -286,12 +287,9 @@ async fn scenario_update_rule_set_clear_condition(ctx: &mut TestContext) {
 // f. Update non-property rule accepts duration without error
 // ===========================================================================
 
-/// User story: US-PA-038 update behavior
-/// Covers: Create an event-type rule (without duration/clear_condition), then PATCH to set
-///         duration_minutes: 5. Assert 200 OK -- update does not validate trigger_type
-///         compatibility for duration_minutes (design decision: engine-layer protection;
-///         non-property rules ignore duration_minutes/clear_condition at evaluation time).
-///         GET the rule and verify duration_minutes == 5 (stored but ignored by engine).
+/// Covers: Update endpoint rejects duration_minutes > 0 on non-property rules,
+///         consistent with create-time validation. The handler checks existing.trigger_type
+///         and returns 400 if duration_minutes > 0 is sent for a non-property rule.
 #[test_context(TestContext)]
 #[tokio::test]
 async fn scenario_update_non_property_rule_accepts_duration_without_error(ctx: &mut TestContext) {
@@ -319,8 +317,7 @@ async fn scenario_update_non_property_rule_accepts_duration_without_error(ctx: &
     let rule_id = extract_rule_id(&create_resp);
 
     // PATCH to set duration_minutes = 5 on non-property rule
-    // Design: update endpoint does NOT validate trigger_type compatibility.
-    // The engine ignores duration for non-property rules.
+    // Update handler validates trigger_type and rejects duration_minutes > 0 for event rules.
     let update_body = json!({ "duration_minutes": 5 });
     let (status, _resp_body) = request_json(
         &ctx.service,
@@ -331,22 +328,8 @@ async fn scenario_update_non_property_rule_accepts_duration_without_error(ctx: &
     .await;
     assert_eq!(
         status,
-        StatusCode::OK,
-        "PATCH duration_minutes on event rule must return 200 (no trigger_type validation on update)"
-    );
-
-    // GET and verify duration_minutes is stored as 5
-    let (status, resp_body) = request(
-        &ctx.service,
-        Method::GET,
-        &format!("/api/admin/alarm-rule/{rule_id}"),
-    )
-    .await;
-    assert_eq!(status, StatusCode::OK);
-    let resp: serde_json::Value = serde_json::from_str(&resp_body).unwrap();
-    assert_eq!(
-        resp["data"]["duration_minutes"], 5,
-        "duration_minutes must be stored as 5 even for non-property rule (engine ignores it)"
+        StatusCode::BAD_REQUEST,
+        "PATCH duration_minutes > 0 on event rule must return 400 (trigger_type validation on update)"
     );
 }
 

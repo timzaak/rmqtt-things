@@ -3,7 +3,9 @@ pub mod cache;
 pub mod evaluator;
 
 pub use actions::{ActionExecutor, TriggerContext};
-pub use cache::{DurationCheckResult, RuleCache};
+pub use cache::{
+    DurationCheckResult, InMemoryRuleStateStore, RedisRuleStateStore, RuleCache, RuleStateStore,
+};
 pub use evaluator::{RuleEvaluator, TriggerType};
 
 use crate::db::alarm::AlarmRepo;
@@ -116,16 +118,21 @@ pub async fn evaluate_and_trigger(
         if !RuleEvaluator::evaluate(&rule.condition, &actual_value) {
             // Condition not met: reset duration tracking for property rules with duration
             if rule_trigger_type == TriggerType::Property && rule.duration_minutes > 0 {
-                rule_cache.reset_duration(rule.id, &ctx.device_id);
+                let _ = rule_cache.reset_duration(rule.id, &ctx.device_id).await;
             }
             continue;
         }
 
         // Duration check (only property rules with duration_minutes > 0)
         if rule_trigger_type == TriggerType::Property && rule.duration_minutes > 0 {
-            match rule_cache.check_duration(rule.id, &ctx.device_id, rule.duration_minutes, now()) {
+            match rule_cache
+                .check_duration(rule.id, &ctx.device_id, rule.duration_minutes, now())
+                .await
+            {
                 DurationCheckResult::Met => { /* proceed to dedup check */ }
-                DurationCheckResult::NotYetMet | DurationCheckResult::JustStarted => {
+                DurationCheckResult::NotYetMet
+                | DurationCheckResult::JustStarted
+                | DurationCheckResult::NotStarted => {
                     debug!(
                         "Rule {} duration not yet met for device {}",
                         rule.id, ctx.device_id
@@ -136,7 +143,10 @@ pub async fn evaluate_and_trigger(
         }
 
         // Dedup check (moved here after condition + duration evaluation)
-        if rule_cache.check_dedup(rule.id, &ctx.device_id, rule.throttle_minutes as i64) {
+        if rule_cache
+            .check_dedup(rule.id, &ctx.device_id, rule.throttle_minutes as i64, now())
+            .await
+        {
             debug!(
                 "Skipping rule {} for device {} due to dedup window",
                 rule.id, ctx.device_id
@@ -150,7 +160,9 @@ pub async fn evaluate_and_trigger(
             rule.id, ctx.device_id, ctx.product_id
         );
 
-        rule_cache.mark_triggered(rule.id, &ctx.device_id);
+        let _ = rule_cache
+            .mark_triggered(rule.id, &ctx.device_id, rule.throttle_minutes as i64)
+            .await;
 
         if let Err(e) = ActionExecutor::execute_actions(
             &rule.actions.as_array().cloned().unwrap_or_default(),
@@ -220,7 +232,7 @@ pub async fn evaluate_and_trigger(
                         );
                     }
                 }
-                rule_cache.reset_duration(rule.id, &ctx.device_id);
+                let _ = rule_cache.reset_duration(rule.id, &ctx.device_id).await;
             }
         }
     }

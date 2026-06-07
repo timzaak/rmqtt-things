@@ -18,6 +18,8 @@ pub struct Config {
     pub ca: CAConfig,
     #[serde(default)]
     pub herald: Option<HeraldConfig>,
+    #[serde(default)]
+    pub alarm: AlarmConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -234,6 +236,31 @@ impl Default for AuthConfig {
     fn default() -> Self {
         Self {
             suffix: "default_suffix".to_string(),
+        }
+    }
+}
+
+fn default_webhook_max_retries() -> i16 {
+    3
+}
+
+fn default_webhook_retry_interval_seconds() -> u64 {
+    30
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AlarmConfig {
+    #[serde(default = "default_webhook_max_retries")]
+    pub webhook_max_retries: i16,
+    #[serde(default = "default_webhook_retry_interval_seconds")]
+    pub webhook_retry_interval_seconds: u64,
+}
+
+impl Default for AlarmConfig {
+    fn default() -> Self {
+        Self {
+            webhook_max_retries: default_webhook_max_retries(),
+            webhook_retry_interval_seconds: default_webhook_retry_interval_seconds(),
         }
     }
 }

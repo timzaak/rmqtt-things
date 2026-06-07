@@ -34,6 +34,7 @@ async fn insert_test_alarm(
             level,
             Some(message),
             None,
+            "property",
         )
         .await
         .expect("insert_test_alarm failed")

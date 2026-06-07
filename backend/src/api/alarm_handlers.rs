@@ -126,7 +126,7 @@ pub async fn create_alarm_rule(
         .ok_or_else(|| ApiError::internal("Failed to fetch created rule"))?;
 
     // Invalidate cache for this product
-    state.rule_cache.invalidate_product(&req.product_id);
+    state.rule_cache.invalidate_product(&req.product_id).await;
 
     Ok((StatusCode::CREATED, Json(AlarmRuleResponse { data: rule })))
 }
@@ -248,7 +248,10 @@ pub async fn update_alarm_rule(
         .ok_or_else(|| ApiError::internal("Failed to fetch updated rule"))?;
 
     // Invalidate cache for this product
-    state.rule_cache.invalidate_product(&existing.product_id);
+    state
+        .rule_cache
+        .invalidate_product(&existing.product_id)
+        .await;
 
     Ok(Json(AlarmRuleResponse { data: updated }))
 }
@@ -311,7 +314,10 @@ pub async fn update_alarm_rule_status(
         .ok_or_else(|| ApiError::internal("Failed to fetch updated rule"))?;
 
     // Invalidate cache for this product
-    state.rule_cache.invalidate_product(&existing.product_id);
+    state
+        .rule_cache
+        .invalidate_product(&existing.product_id)
+        .await;
 
     Ok(Json(AlarmRuleResponse { data: updated }))
 }
@@ -355,7 +361,10 @@ pub async fn delete_alarm_rule(
     }
 
     // Invalidate cache for this product
-    state.rule_cache.invalidate_product(&existing.product_id);
+    state
+        .rule_cache
+        .invalidate_product(&existing.product_id)
+        .await;
 
     Ok(StatusCode::NO_CONTENT)
 }

@@ -1,6 +1,7 @@
 use crate::db::alarm::AlarmRepo;
 use crate::rule_engine::evaluator::TriggerType;
 use serde_json::Value as JsonValue;
+use time::{Duration, OffsetDateTime};
 use tracing::{error, warn};
 
 /// Context describing the trigger event being evaluated.
@@ -71,6 +72,30 @@ pub fn parse_actions(actions_json: &[JsonValue]) -> Vec<AlarmAction> {
     actions
 }
 
+/// Send a webhook POST with a JSON payload and configurable timeout.
+///
+/// Shared by both the initial action execution and the background retry task.
+pub(crate) async fn send_webhook(
+    url: &str,
+    payload: &serde_json::Value,
+    timeout: std::time::Duration,
+) -> anyhow::Result<()> {
+    let client = reqwest::Client::new();
+    let response = client
+        .post(url)
+        .json(payload)
+        .timeout(timeout)
+        .send()
+        .await?;
+
+    let status = response.status();
+    if status.is_success() {
+        Ok(())
+    } else {
+        anyhow::bail!("Webhook returned status {}", status)
+    }
+}
+
 pub struct ActionExecutor;
 
 impl ActionExecutor {
@@ -110,62 +135,67 @@ impl ActionExecutor {
                     Some(&message)
                 },
                 Some(&ctx.trigger_value),
+                ctx.trigger_type.as_str(),
             )
             .await?;
 
-        // Execute webhook actions
-        for action in &parsed {
-            if let AlarmAction::Webhook { url } = action {
-                let webhook_result = Self::execute_webhook(url, ctx, rule_name).await;
-                let status: i16 = match webhook_result {
-                    Ok(()) => 0, // success
-                    Err(e) => {
-                        error!("Webhook action failed for rule {}: {}", rule_id, e);
-                        1 // failed
+        // Execute webhook actions and collect results
+        let webhook_actions: Vec<&AlarmAction> = parsed
+            .iter()
+            .filter(|a| matches!(a, AlarmAction::Webhook { .. }))
+            .collect();
+
+        if !webhook_actions.is_empty() {
+            let payload = serde_json::json!({
+                "rule_name": rule_name,
+                "product_id": ctx.product_id,
+                "device_id": ctx.device_id,
+                "trigger_type": ctx.trigger_type.as_str(),
+                "trigger_value": ctx.trigger_value,
+            });
+
+            let mut any_webhook_failed = false;
+            for action in &webhook_actions {
+                if let AlarmAction::Webhook { url } = action {
+                    match send_webhook(url, &payload, std::time::Duration::from_secs(5)).await {
+                        Ok(()) => {}
+                        Err(e) => {
+                            error!("Webhook action failed for rule {}: {}", rule_id, e);
+                            any_webhook_failed = true;
+                        }
                     }
-                };
+                }
+            }
+
+            // Single status update after all webhooks attempted
+            if any_webhook_failed {
                 if let Err(e) = alarm_repo
-                    .update_alarm_webhook_status(alarm_id, status)
+                    .update_alarm_webhook_status_with_retry(
+                        alarm_id,
+                        1,
+                        alarm_repo.webhook_max_retries,
+                        Some(
+                            OffsetDateTime::now_utc()
+                                + Duration::seconds(
+                                    alarm_repo.webhook_retry_interval_seconds as i64,
+                                ),
+                        ),
+                    )
                     .await
                 {
                     error!(
-                        "Failed to update webhook status for alarm {}: {}",
+                        "Failed to update webhook retry state for alarm {}: {}",
                         alarm_id, e
                     );
                 }
+            } else if let Err(e) = alarm_repo.update_alarm_webhook_status(alarm_id, 0).await {
+                error!(
+                    "Failed to update webhook status for alarm {}: {}",
+                    alarm_id, e
+                );
             }
         }
 
         Ok(())
-    }
-
-    /// Execute a webhook action with a 5-second timeout.
-    async fn execute_webhook(
-        url: &str,
-        ctx: &TriggerContext,
-        rule_name: &str,
-    ) -> anyhow::Result<()> {
-        let payload = serde_json::json!({
-            "rule_name": rule_name,
-            "product_id": ctx.product_id,
-            "device_id": ctx.device_id,
-            "trigger_type": ctx.trigger_type.as_str(),
-            "trigger_value": ctx.trigger_value,
-        });
-
-        let client = reqwest::Client::new();
-        let response = client
-            .post(url)
-            .json(&payload)
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
-            .await?;
-
-        let status = response.status();
-        if status.is_success() {
-            Ok(())
-        } else {
-            anyhow::bail!("Webhook returned status {}", status)
-        }
     }
 }

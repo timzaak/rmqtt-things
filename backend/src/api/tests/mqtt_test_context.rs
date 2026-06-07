@@ -58,7 +58,7 @@ impl AsyncTestContext for MqttTestContext {
         // Database
         let (admin_pool, schema_name, pool) = create_test_database().await;
         sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-        let db_service = DatabaseService::new(pool);
+        let db_service = DatabaseService::new(pool, Default::default());
 
         // Config
         let s3_config = S3Config {
@@ -123,7 +123,8 @@ impl AsyncTestContext for MqttTestContext {
             config: config.clone(),
             cache: schema_cache,
             s3_client,
-            rule_cache: crate::rule_engine::RuleCache::new(),
+            rule_cache: crate::rule_engine::RuleCache::new_in_memory(),
+            task_set: Arc::new(tokio::sync::Mutex::new(tokio::task::JoinSet::new())),
         });
 
         // Start real axum server

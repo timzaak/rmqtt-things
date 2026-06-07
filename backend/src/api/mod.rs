@@ -9,6 +9,8 @@ use axum::routing::{get, patch, post};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::task::JoinSet;
 use tower::ServiceBuilder;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::services::{ServeDir, ServeFile};
@@ -46,6 +48,7 @@ pub struct AdminAppState {
     pub config: Arc<Config>,
     pub s3_client: Option<S3Client>,
     pub rule_cache: crate::rule_engine::RuleCache,
+    pub task_set: Arc<Mutex<JoinSet<()>>>,
 }
 
 #[derive(Clone)]

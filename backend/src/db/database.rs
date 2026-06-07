@@ -1,4 +1,5 @@
 use crate::api::web_models::{DeviceConnectRequest, DeviceDisconnectRequest};
+use crate::config::AlarmConfig;
 use crate::db::alarm::AlarmRepo;
 use crate::db::cert_issue::CertIssueRepo;
 use crate::db::device::DeviceRepo;
@@ -27,11 +28,12 @@ fn timestamp_to_datetime(ts: i64) -> OffsetDateTime {
 #[derive(Clone)]
 pub struct DatabaseService {
     pool: PgPool,
+    alarm_config: AlarmConfig,
 }
 
 impl DatabaseService {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(pool: PgPool, alarm_config: AlarmConfig) -> Self {
+        Self { pool, alarm_config }
     }
 
     pub fn cert_issue(&self) -> CertIssueRepo {
@@ -47,7 +49,11 @@ impl DatabaseService {
     }
 
     pub fn alarm(&self) -> AlarmRepo {
-        AlarmRepo::new(self.pool.clone())
+        AlarmRepo::new(
+            self.pool.clone(),
+            self.alarm_config.webhook_max_retries,
+            self.alarm_config.webhook_retry_interval_seconds,
+        )
     }
 
     pub fn device(&self) -> DeviceRepo {

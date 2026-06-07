@@ -2,15 +2,26 @@ use crate::api::alarm_models::CreateAlarmRuleRequest;
 use crate::db::models::{AlarmRecord, AlarmRule};
 use serde_json::Value as JsonValue;
 use sqlx::{PgPool, Postgres, QueryBuilder, Row};
+use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct AlarmRepo {
     pool: PgPool,
+    pub webhook_max_retries: i16,
+    pub webhook_retry_interval_seconds: u64,
 }
 
 impl AlarmRepo {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    pub fn new(
+        pool: PgPool,
+        webhook_max_retries: i16,
+        webhook_retry_interval_seconds: u64,
+    ) -> Self {
+        Self {
+            pool,
+            webhook_max_retries,
+            webhook_retry_interval_seconds,
+        }
     }
 
     fn add_pagination<'a>(builder: &mut QueryBuilder<'a, Postgres>, page: i64, page_size: i64) {
@@ -223,11 +234,12 @@ impl AlarmRepo {
         level: i16,
         message: Option<&str>,
         trigger_value: Option<&JsonValue>,
+        trigger_type: &str,
     ) -> anyhow::Result<i64> {
         let row = sqlx::query(
             r#"
-            INSERT INTO alarm (rule_id, rule_name, product_id, device_id, level, message, trigger_value)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO alarm (rule_id, rule_name, product_id, device_id, level, message, trigger_value, trigger_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
             "#,
         )
@@ -238,6 +250,7 @@ impl AlarmRepo {
         .bind(level)
         .bind(message)
         .bind(trigger_value)
+        .bind(trigger_type)
         .fetch_one(&self.pool)
         .await?;
         Ok(row.get("id"))
@@ -274,7 +287,9 @@ impl AlarmRepo {
     ) -> anyhow::Result<(Vec<AlarmRecord>, i64)> {
         let mut query_builder = QueryBuilder::new(
             r#"SELECT id, rule_id, rule_name, product_id, device_id, level,
-                      message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
+                      message, trigger_value, acknowledged, status, webhook_status,
+                      trigger_type, webhook_retries_left, webhook_next_retry_at,
+                      created_at, cleared_at
                FROM alarm WHERE 1=1"#,
         );
 
@@ -344,7 +359,9 @@ impl AlarmRepo {
         let alarm = sqlx::query_as::<_, AlarmRecord>(
             r#"
             SELECT id, rule_id, rule_name, product_id, device_id, level,
-                   message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
+                   message, trigger_value, acknowledged, status, webhook_status,
+                   trigger_type, webhook_retries_left, webhook_next_retry_at,
+                   created_at, cleared_at
             FROM alarm
             WHERE id = $1
             "#,
@@ -377,7 +394,9 @@ impl AlarmRepo {
         let alarms = sqlx::query_as::<_, AlarmRecord>(
             r#"
             SELECT id, rule_id, rule_name, product_id, device_id, level,
-                   message, trigger_value, acknowledged, status, webhook_status, created_at, cleared_at
+                   message, trigger_value, acknowledged, status, webhook_status,
+                   trigger_type, webhook_retries_left, webhook_next_retry_at,
+                   created_at, cleared_at
             FROM alarm
             WHERE rule_id = $1 AND device_id = $2 AND status IN ('active', 'acknowledged')
             "#,
@@ -401,5 +420,81 @@ impl AlarmRepo {
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Get the actions JSON for a rule by its ID.
+    ///
+    /// Returns `None` if the rule has been deleted.
+    pub async fn get_rule_actions(&self, rule_id: i64) -> anyhow::Result<Option<JsonValue>> {
+        sqlx::query_scalar::<_, JsonValue>("SELECT actions FROM alarm_rule WHERE id = $1")
+            .bind(rule_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Query alarms that are due for webhook retry.
+    pub async fn query_pending_retries(&self) -> anyhow::Result<Vec<AlarmRecord>> {
+        sqlx::query_as::<_, AlarmRecord>(
+            r#"SELECT id, rule_id, rule_name, product_id, device_id, level,
+                      message, trigger_value, acknowledged, status, webhook_status,
+                      trigger_type, webhook_retries_left, webhook_next_retry_at,
+                      created_at, cleared_at
+               FROM alarm
+               WHERE webhook_status = 1 AND webhook_retries_left > 0 AND webhook_next_retry_at <= NOW()"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
+    /// Decrement retries_left and schedule the next retry attempt.
+    pub async fn decrement_retry_and_schedule_next(&self, id: i64) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"UPDATE alarm
+               SET webhook_retries_left = webhook_retries_left - 1,
+                   webhook_next_retry_at = NOW() + make_interval(secs => $1)
+               WHERE id = $2 AND webhook_retries_left > 0"#,
+        )
+        .bind(self.webhook_retry_interval_seconds as i64)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Mark a webhook as successfully delivered (terminal state).
+    pub async fn mark_webhook_success(&self, id: i64) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"UPDATE alarm
+               SET webhook_status = 0, webhook_retries_left = 0, webhook_next_retry_at = NULL
+               WHERE id = $1"#,
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Set webhook_status, webhook_retries_left, and webhook_next_retry_at in one update.
+    pub async fn update_alarm_webhook_status_with_retry(
+        &self,
+        id: i64,
+        webhook_status: i16,
+        retries_left: i16,
+        next_retry_at: Option<OffsetDateTime>,
+    ) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"UPDATE alarm
+               SET webhook_status = $1, webhook_retries_left = $2, webhook_next_retry_at = $3
+               WHERE id = $4"#,
+        )
+        .bind(webhook_status)
+        .bind(retries_left)
+        .bind(next_retry_at)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }

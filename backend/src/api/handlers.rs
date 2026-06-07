@@ -146,10 +146,11 @@ pub async fn property_post(
 
         // 异步触发规则评估（不阻塞主流程）
         let admin = Arc::clone(&state.admin);
+        let task_set = admin.task_set.clone();
         let trigger_product_id = product_id.clone();
         let trigger_device_id = device_id.clone();
         let trigger_value = properties.clone();
-        tokio::spawn(async move {
+        task_set.lock().await.spawn(async move {
             let alarm_repo = admin.db.alarm();
             let rule_cache = admin.rule_cache.clone();
             let ctx = TriggerContext {
@@ -212,10 +213,11 @@ pub async fn event_post(
 
     // 异步触发规则评估（不阻塞主流程）
     let admin = Arc::clone(&state.admin);
+    let task_set = admin.task_set.clone();
     let trigger_product_id = product_id.clone();
     let trigger_device_id = device_id.clone();
     let trigger_value = events.clone();
-    tokio::spawn(async move {
+    task_set.lock().await.spawn(async move {
         let alarm_repo = admin.db.alarm();
         let rule_cache = admin.rule_cache.clone();
         let ctx = TriggerContext {
@@ -643,9 +645,10 @@ pub async fn device_connect(
 
     // 异步触发规则评估（不阻塞主流程）
     let admin = Arc::clone(&state.admin);
+    let task_set = admin.task_set.clone();
     let trigger_product_id = req.product_id.clone();
     let trigger_device_id = req.device_id.clone();
-    tokio::spawn(async move {
+    task_set.lock().await.spawn(async move {
         let alarm_repo = admin.db.alarm();
         let rule_cache = admin.rule_cache.clone();
         let ctx = TriggerContext {
@@ -694,9 +697,10 @@ pub async fn device_disconnect(
 
     // 异步触发规则评估（不阻塞主流程）
     let admin = Arc::clone(&state.admin);
+    let task_set = admin.task_set.clone();
     let trigger_product_id = req.product_id.clone();
     let trigger_device_id = req.device_id.clone();
-    tokio::spawn(async move {
+    task_set.lock().await.spawn(async move {
         let alarm_repo = admin.db.alarm();
         let rule_cache = admin.rule_cache.clone();
         let ctx = TriggerContext {

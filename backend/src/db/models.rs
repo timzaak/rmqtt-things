@@ -308,6 +308,10 @@ pub struct AlarmRecord {
     pub acknowledged: bool,
     pub status: String,
     pub webhook_status: Option<i16>,
+    pub trigger_type: String,
+    pub webhook_retries_left: i16,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub webhook_next_retry_at: Option<OffsetDateTime>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339::option")]
