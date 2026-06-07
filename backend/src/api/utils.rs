@@ -114,6 +114,32 @@ pub fn validate_identifier(id: &str, field_name: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
+/// Validate that a version string follows the x.y.z format (3 dot-separated numeric parts).
+pub fn validate_version_format(version: &str, field_name: &str) -> Result<(), ApiError> {
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() != 3 {
+        return Err(ApiError::bad_request(format!(
+            "Invalid {field_name} format '{version}': must be x.y.z (e.g. 1.2.3)"
+        )));
+    }
+    for (i, part) in parts.iter().enumerate() {
+        if part.parse::<u32>().is_err() {
+            return Err(ApiError::bad_request(format!(
+                "Invalid {field_name} format '{version}': must be x.y.z (e.g. 1.2.3)"
+            )));
+        }
+        // Match the DB layer limits: major/minor <= 99, patch <= 999
+        let max = if i < 2 { 99 } else { 999 };
+        let value: u32 = part.parse().unwrap();
+        if value > max {
+            return Err(ApiError::bad_request(format!(
+                "Invalid {field_name} format '{version}': each part exceeds allowed range"
+            )));
+        }
+    }
+    Ok(())
+}
+
 pub fn extract_and_validate_product_id(topic: &str) -> Result<String, ApiError> {
     let product_id = extract_product_id_from_topic(topic)
         .ok_or_else(|| ApiError::bad_request("Product ID not found in topic"))?;
@@ -214,5 +240,36 @@ mod tests {
     fn test_extract_and_validate_product_id_rejects_invalid() {
         let result = extract_and_validate_product_id("/bad.product/dev1/thing/property/post");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_version_format_accepts_valid() {
+        assert!(validate_version_format("1.2.3", "version").is_ok());
+        assert!(validate_version_format("0.0.0", "version").is_ok());
+        assert!(validate_version_format("99.99.999", "version").is_ok());
+    }
+
+    #[test]
+    fn test_validate_version_format_rejects_too_few_parts() {
+        assert!(validate_version_format("1.2", "version").is_err());
+        assert!(validate_version_format("1", "version").is_err());
+    }
+
+    #[test]
+    fn test_validate_version_format_rejects_too_many_parts() {
+        assert!(validate_version_format("1.2.3.4", "version").is_err());
+    }
+
+    #[test]
+    fn test_validate_version_format_rejects_non_numeric() {
+        assert!(validate_version_format("1.a.3", "version").is_err());
+        assert!(validate_version_format("v1.2.3", "version").is_err());
+    }
+
+    #[test]
+    fn test_validate_version_format_rejects_out_of_range() {
+        assert!(validate_version_format("100.0.0", "version").is_err());
+        assert!(validate_version_format("0.100.0", "version").is_err());
+        assert!(validate_version_format("0.0.1000", "version").is_err());
     }
 }

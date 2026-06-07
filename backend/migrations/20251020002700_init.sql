@@ -148,11 +148,11 @@ CREATE TABLE IF NOT EXISTS cert_issue (
     pub_cert TEXT NOT NULL,
     start_at TIMESTAMPTZ NOT NULL,
     end_at TIMESTAMPTZ NOT NULL,
-    status INT2 NOT NULL DEFAULT 0, -- 0: Normal, 2: Revoked
+    status INT2 NOT NULL DEFAULT 0, -- 0: Normal, 1: InValid, 2: Revoked
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON COLUMN cert_issue.status IS '0: Normal, 2: Revoked';
+COMMENT ON COLUMN cert_issue.status IS '0: Normal, 1: InValid, 2: Revoked';
 
 CREATE INDEX IF NOT EXISTS idx_cert_issue_product_id ON cert_issue (product_id);
 CREATE INDEX IF NOT EXISTS idx_cert_issue_device_id ON cert_issue (device_id);

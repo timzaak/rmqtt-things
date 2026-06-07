@@ -247,6 +247,8 @@ pub struct OtaVersion {
     pub file_key: String,
     pub log: Option<JsonValue>,
     pub device_ids: Option<Vec<String>>,
+    pub bin_length: i64,
+    pub bin_md5: String,
     #[serde(with = "time::serde::rfc3339")]
     pub released_at: OffsetDateTime,
     pub status: i16,

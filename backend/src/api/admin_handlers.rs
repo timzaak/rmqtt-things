@@ -1,7 +1,9 @@
 use crate::api::ApiState;
 use crate::api::admin_models::*;
 use crate::api::error::ApiError;
-use crate::api::utils::{send_property_command_to_device, validate_identifier};
+use crate::api::utils::{
+    send_property_command_to_device, validate_identifier, validate_version_format,
+};
 use crate::api::web_models::{FileUploadRequest, FileUploadResponse};
 use crate::cache::SchemaCacheManager;
 use crate::db::database::ACTIVE_TEMPLATE_SCHEMA_ERR;
@@ -728,6 +730,11 @@ pub async fn create_ota_version(
 ) -> Result<StatusCode, ApiError> {
     let state = &state.admin;
     validate_identifier(&req.product_id, "product_id")?;
+    validate_version_format(&req.version, "version")?;
+    validate_version_format(&req.min_version, "min_version")?;
+    if let Some(ref max_ver) = req.max_version {
+        validate_version_format(max_ver, "max_version")?;
+    }
     state.db.ota().create_ota_version(&req).await.map_err(|e| {
         error!("Database error: {}", e);
         ApiError::internal("Database operation failed")
@@ -750,6 +757,12 @@ pub async fn update_ota_version(
     Json(req): Json<UpdateOtaVersionRequest>,
 ) -> Result<StatusCode, ApiError> {
     let state = &state.admin;
+    if let Some(ref min_ver) = req.min_version {
+        validate_version_format(min_ver, "min_version")?;
+    }
+    if let Some(ref max_ver) = req.max_version {
+        validate_version_format(max_ver, "max_version")?;
+    }
     let rows_affected = state
         .db
         .ota()

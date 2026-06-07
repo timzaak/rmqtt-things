@@ -115,7 +115,7 @@ pub async fn issue_cert_handler(
         .await
         .map_err(map_db_err)?;
 
-    if let Err(e) = app_state
+    app_state
         .db
         .device()
         .upsert(
@@ -124,14 +124,7 @@ pub async fn issue_cert_handler(
             RegistrationSource::Manual,
         )
         .await
-    {
-        tracing::warn!(
-            product_id = %issue_req.product_id,
-            device_id = %issue_req.device_id,
-            error = %e,
-            "Failed to create device record during cert issuance"
-        );
-    }
+        .map_err(map_db_err)?;
 
     Ok(Json(IssueCertResponse { cert_pem, key_pem }))
 }

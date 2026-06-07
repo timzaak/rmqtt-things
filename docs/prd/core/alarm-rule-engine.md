@@ -109,7 +109,10 @@
 2. 规则支持属性阈值（`property`）、事件匹配（`event`）、设备上线（`device_online`）、设备离线（`device_offline`）四种触发类型
 3. 条件支持数值比较（>, >=, <, <=, ==, !=）、区间判断（between，闭区间 [min, max]）、包含判断（contains）和无条件触发（always）
 4. 触发后执行预配置的动作：创建告警记录（必选）、发送 Webhook 回调（可选）
-5. 告警记录包含告警级别（info/warning/critical）、触发时的数据值和可配置的消息模板
+5. 告警记录包含告警级别（info/warning/critical）、触发时的数据值和可配置的消息模板。每条告警记录还包含以下字段用于 Webhook 重试和触发类型追踪：
+   - `trigger_type: String` — 触发类型，记录触发告警的具体类型（property / event / device_online / device_offline）
+   - `webhook_retries_left: i16` — Webhook 剩余重试次数，初始值为配置的最大重试次数，每次重试减 1，耗尽后标记为最终失败
+   - `webhook_next_retry_at: Option<OffsetDateTime>` — 下次 Webhook 重试时间，由后台 `webhook_retry_task` 调度使用
 6. 去重机制：同一规则对同一设备在 throttle_minutes 时间窗口内不重复触发
 7. 规则支持启用/禁用切换，禁用后不参与评估
 8. 规则评估异步执行，不阻塞属性/事件存储主路径
@@ -210,9 +213,9 @@
 - **告警统计看板不在 V1 范围**：不做告警统计/聚合看板
 - **MQTT 命令下发作为动作推迟到 V2**：当前动作仅包含创建告警记录和 Webhook 回调
 
-### 9.2 待确认假设
+### 9.2 已确认决策
 
-- **Webhook 动作执行失败策略**：当前假设记录失败状态到告警记录，不自动重试。是否需要重试机制影响动作执行器的复杂度，需在设计阶段确认 / 需 Platform Admin 使用场景反馈
+- **Webhook 动作执行失败策略**：已确认采用自动重试机制。最大重试次数和重试间隔可配置。重试通过后台任务 `webhook_retry_task` 执行，基于 `alarm_records.webhook_retries_left` 和 `webhook_next_retry_at` 字段调度。重试耗尽后标记为最终失败。
 
 ---
 
