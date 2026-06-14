@@ -1,6 +1,7 @@
 use crate::api::ApiState;
 use crate::api::admin_models::*;
 use crate::api::error::ApiError;
+use crate::api::handlers::is_file_upload_directory_allowed;
 use crate::api::utils::{
     send_property_command_to_device, validate_identifier, validate_version_format,
 };
@@ -29,15 +30,12 @@ pub async fn admin_file_upload_handler(
 ) -> Result<Json<FileUploadResponse>, ApiError> {
     let state = &state.admin;
     if let Some(s3_client) = state.s3_client.as_ref() {
-        let is_directory_allowed = s3_client.config.directories.iter().any(|rule| {
-            if rule.ends_with('*') {
-                req.directory.starts_with(&rule[..rule.len() - 1])
-            } else {
-                &req.directory == rule
-            }
-        });
-
-        if !is_directory_allowed {
+        // 复用设备端统一的目录白名单校验，确保两端 `/*` 边界语义一致
+        // （路径段边界）。管理端目录规则为静态字符串，无 `${productId}` /
+        // `${deviceId}` 变量，因此 product_id / device_id 传空串——变量替换
+        // 对无变量的规则无影响。See file-upload.md 与 P0-3 audit fix.
+        if !is_file_upload_directory_allowed(&s3_client.config.directories, "", "", &req.directory)
+        {
             return Err(ApiError::bad_request("Directory not allowed"));
         }
 
@@ -323,6 +321,72 @@ pub async fn update_event_valid_template(
             "Template not found or cannot be updated",
         ))
     }
+}
+
+// DELETE /api/admin/valid/event/{id} - Delete a validation template.
+//
+// Design decision (P1-2): templates of any status (Draft / Active / Inactive)
+// may be deleted. Active-state uniqueness is enforced by the DB layer on
+// promotion, so deleting an Active template simply leaves the
+// (product_id, event) pair without a template — equivalent to "no validation"
+// for that pair, matching the documented behavior for absent templates
+// (validation-template.md §3.2). When the deleted template was an Active
+// property schema, the in-memory schema cache entry for that product is
+// invalidated so the next property_post re-queries the DB.
+#[utoipa::path(
+    delete,
+    path = "/api/admin/valid/event/{id}",
+    tag = "admin",
+    params(("id" = i64, Path, description = "Template id")),
+    responses(
+        (status = 200, description = "Validation template deleted"),
+        (status = 404, description = "Template not found")
+    )
+)]
+pub async fn delete_event_valid_template(
+    State(state): State<Arc<ApiState>>,
+    Path(id): Path<i64>,
+) -> Result<StatusCode, ApiError> {
+    let state = &state.admin;
+
+    // Fetch first so we can invalidate the schema cache when deleting an
+    // Active property template (mirrors update_*_template_status).
+    let template = state
+        .db
+        .get_event_valid_template_by_id(id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    let rows_affected = state
+        .db
+        .delete_event_valid_template(id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    if rows_affected == 0 {
+        return Err(ApiError::not_found("Template not found"));
+    }
+
+    if let Some(template) = template
+        && template.event == "property"
+    {
+        if let Err(e) = state.cache._remove(&template.product_id).await {
+            error!("Failed to remove schema from cache: {}", e);
+        } else {
+            info!(
+                "Property schema for product_id {} removed from cache after delete",
+                template.product_id
+            );
+        }
+    }
+
+    Ok(StatusCode::OK)
 }
 
 // POST /admin/property/command - 创建属性命令

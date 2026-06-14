@@ -123,7 +123,8 @@ pub fn create_router(
         .route(
             "/admin/valid/event/{id}",
             get(admin_handlers::get_event_valid_template)
-                .patch(admin_handlers::update_event_valid_template),
+                .patch(admin_handlers::update_event_valid_template)
+                .delete(admin_handlers::delete_event_valid_template),
         )
         .route(
             "/admin/valid/event/{id}/status",

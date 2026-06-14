@@ -191,3 +191,125 @@ async fn test_schema_validation(ctx: &mut TestContext) {
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
+
+// Event payload validation: when an Active event validation template exists
+// for (product_id, event_identifier), event_post must validate `params`
+// against the template schema before persisting. No template => allow.
+// See validation-template.md §3.2 line 74 ("other values used for event
+// validation") and P0-2 audit fix.
+#[test_context(TestContext)]
+#[tokio::test]
+async fn test_event_schema_validation(ctx: &mut TestContext) {
+    let product_id = "test_product_event_001".to_string();
+    let client_id = "test_client_event_001".to_string();
+
+    // 1. Create an Active event template for (product_id, "alert").
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "severity": {"type": "string", "enum": ["info", "warn", "error"]},
+            "message": {"type": "string"}
+        },
+        "required": ["severity", "message"]
+    });
+
+    let create_req = CreateEventValidTemplateRequest {
+        product_id: product_id.clone(),
+        event: "alert".to_string(),
+        description: Some("event payload schema".to_string()),
+        schema: schema.clone(),
+    };
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/admin/valid/event",
+        &create_req,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    let resp = UpdateEventValidTemplateStatusRequest {
+        status: EventValidTemplateStatus::Active,
+    };
+    request_json(
+        &ctx.service,
+        Method::PATCH,
+        "/api/admin/valid/event/1/status",
+        &resp,
+    )
+    .await;
+
+    // 2. Post a valid event: severity+message present, severity in enum.
+    let topic = format!("/{product_id}/{client_id}/thing/event/alert/post");
+    let valid_event = json!({"severity": "warn", "message": "temperature high"});
+    let mqtt_message = RMqttPublishMessage {
+        client_id: client_id.clone(),
+        topic: topic.clone(),
+        payload: base64::engine::general_purpose::STANDARD.encode(
+            serde_json::to_string(&json!({
+                "id": "ev1",
+                "params": valid_event,
+                "ack": AckStatus::No
+            }))
+            .unwrap(),
+        ),
+        ..Default::default()
+    };
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/thing/event/post",
+        &mqtt_message,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // 3. Post an invalid event: severity not in enum.
+    let invalid_event = json!({"severity": "panic", "message": "x"});
+    let mqtt_message = RMqttPublishMessage {
+        client_id: client_id.clone(),
+        topic: topic.clone(),
+        payload: base64::engine::general_purpose::STANDARD.encode(
+            serde_json::to_string(&json!({
+                "id": "ev2",
+                "params": invalid_event,
+                "ack": AckStatus::No
+            }))
+            .unwrap(),
+        ),
+        ..Default::default()
+    };
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/thing/event/post",
+        &mqtt_message,
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // 4. No Active template => event allowed through without validation.
+    // Use a different event identifier that has no template registered.
+    let no_template_topic = format!("/{product_id}/{client_id}/thing/event/heartbeat/post");
+    let mqtt_message = RMqttPublishMessage {
+        client_id: client_id.clone(),
+        topic: no_template_topic,
+        payload: base64::engine::general_purpose::STANDARD.encode(
+            serde_json::to_string(&json!({
+                "id": "ev3",
+                "params": json!({"any": "thing"}),
+                "ack": AckStatus::No
+            }))
+            .unwrap(),
+        ),
+        ..Default::default()
+    };
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/thing/event/post",
+        &mqtt_message,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}

@@ -15,6 +15,8 @@ use utoipa::{Modify, OpenApi};
     modifiers(&SecurityAddon),
     paths(
         auth_handlers::get_auth_config,
+        auth_handlers::oauth_start,
+        auth_handlers::oauth_callback,
         auth_handlers::auth,
         auth_handlers::acl,
         handlers::property_set_subscribe,
@@ -38,6 +40,7 @@ use utoipa::{Modify, OpenApi};
         admin_handlers::create_event_valid_template,
         admin_handlers::get_event_valid_template,
         admin_handlers::update_event_valid_template,
+        admin_handlers::delete_event_valid_template,
         admin_handlers::update_event_valid_template_status,
         ca_handlers::list_certs_handler,
         ca_handlers::issue_cert_handler,

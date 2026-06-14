@@ -690,6 +690,17 @@ impl DatabaseService {
         Ok(template)
     }
 
+    // Delete event valid template by id. Returns the number of rows deleted
+    // (0 when the id does not exist). The caller is responsible for cache
+    // invalidation when the deleted template was an Active property schema.
+    pub async fn delete_event_valid_template(&self, id: i64) -> anyhow::Result<u64> {
+        let result = sqlx::query("DELETE FROM event_valid_template WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     // get event valid template by id for update
     pub async fn get_event_valid_template_by_id_for_update<'a>(
         &self,
@@ -843,6 +854,30 @@ impl DatabaseService {
             "#,
         )
         .bind(product_id)
+        .bind(EventValidTemplateStatus::Active)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(template)
+    }
+
+    // Get active event validation template by (product_id, event identifier).
+    // Returns None when no Active template matches, in which case callers
+    // (event_post) should allow the event through without validation, matching
+    // property_post's "no schema = no validation" semantics for absent schemas.
+    pub async fn get_event_valid_template(
+        &self,
+        product_id: &str,
+        event: &str,
+    ) -> anyhow::Result<Option<EventValidTemplate>> {
+        let template = sqlx::query_as::<_, EventValidTemplate>(
+            r#"
+            SELECT id, product_id, event, description, schema, status, created_at, updated_at
+            FROM event_valid_template
+            WHERE product_id = $1 AND event = $2 AND status = $3
+            "#,
+        )
+        .bind(product_id)
+        .bind(event)
         .bind(EventValidTemplateStatus::Active)
         .fetch_optional(&self.pool)
         .await?;

@@ -30,6 +30,20 @@ impl TriggerType {
     }
 }
 
+/// Operators recognized by [`RuleEvaluator::evaluate`].
+///
+/// Exposed so that API-layer validation (create/update alarm rule) can reject
+/// unknown operators up-front instead of silently accepting a rule that would
+/// never fire. Kept in sync with the `match operator { ... }` arm below.
+pub const SUPPORTED_OPERATORS: &[&str] = &[
+    ">", ">=", "<", "<=", "==", "!=", "between", "contains", "always",
+];
+
+/// Returns true if `op` is one of [`SUPPORTED_OPERATORS`].
+pub fn is_supported_operator(op: &str) -> bool {
+    SUPPORTED_OPERATORS.contains(&op)
+}
+
 pub struct RuleEvaluator;
 
 impl RuleEvaluator {

@@ -77,6 +77,10 @@ pub async fn create_alarm_rule(
         )));
     }
 
+    // P1-3: validate condition operator, actions non-empty (with at least one
+    // alarm action), and trigger_config requirements for the trigger type.
+    crate::api::alarm_models::validate_create_rule_request(&req)?;
+
     // Validate product_id exists by checking product.model_no
     let product = state
         .db
@@ -209,6 +213,25 @@ pub async fn update_alarm_rule(
         return Err(ApiError::bad_request(
             "Duration and clear conditions are only supported for property trigger type",
         ));
+    }
+
+    // P1-3: validate provided condition / actions / clear_condition / trigger_config.
+    // trigger_type is not updatable, so trigger_config validation uses the
+    // existing rule's trigger_type; if a new trigger_config is provided it must
+    // still satisfy that trigger type's required fields (e.g. property_name).
+    if let Some(ref condition) = req.condition {
+        crate::api::alarm_models::validate_condition(condition, "condition")?;
+    }
+    if let Some(ref actions) = req.actions {
+        crate::api::alarm_models::validate_actions(actions)?;
+    }
+    if let Some(clear_opt) = &req.clear_condition
+        && let Some(clear) = clear_opt
+    {
+        crate::api::alarm_models::validate_condition(clear, "clear_condition")?;
+    }
+    if let Some(ref tc) = req.trigger_config {
+        crate::api::alarm_models::validate_trigger_config(&existing.trigger_type, tc)?;
     }
 
     let rows_affected = state
@@ -395,6 +418,10 @@ pub async fn list_alarms(
     Query(query): Query<AlarmQuery>,
 ) -> Result<Json<AlarmRecordListResponse>, ApiError> {
     let state = &state.admin;
+
+    // status must be one of the allowed lifecycle values when provided.
+    // Mirrors the alarm_status_check DB constraint (see P1-11 audit fix).
+    crate::api::alarm_models::validate_alarm_status(query.status.as_deref())?;
 
     // status and acknowledged are mutually exclusive
     if query.status.is_some() && query.acknowledged.is_some() {

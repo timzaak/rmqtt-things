@@ -90,6 +90,28 @@ pub fn extract_product_id_from_topic(topic: &str) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Extract the event identifier from a thing/event topic of the form
+/// `/{product}/{device}/thing/event/{event_identifier}/post`.
+/// Returns None when the topic does not match the expected segment layout.
+pub fn extract_event_identifier_from_topic(topic: &str) -> Option<String> {
+    let mut parts = topic.trim_start_matches('/').split('/');
+    // expected: {product}, {device}, "thing", "event", {event_identifier}, "post"
+    match (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) {
+        (Some(_), Some(_), Some(seg3), Some(seg4), Some(event_id))
+            if seg3 == "thing" && seg4 == "event" && !event_id.is_empty() =>
+        {
+            Some(event_id.to_string())
+        }
+        _ => None,
+    }
+}
+
 const MAX_IDENTIFIER_LENGTH: usize = 128;
 
 pub fn validate_identifier(id: &str, field_name: &str) -> Result<(), ApiError> {
@@ -240,6 +262,44 @@ mod tests {
     fn test_extract_and_validate_product_id_rejects_invalid() {
         let result = extract_and_validate_product_id("/bad.product/dev1/thing/property/post");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_event_identifier_from_topic() {
+        // Standard thing/event topic: /{product}/{device}/thing/event/{id}/post
+        assert_eq!(
+            extract_event_identifier_from_topic("/demo_product/dev1/thing/event/alert/post"),
+            Some("alert".to_string())
+        );
+        assert_eq!(
+            extract_event_identifier_from_topic("/p/d/thing/event/property/post"),
+            Some("property".to_string())
+        );
+        // Tolerates topics without leading slash
+        assert_eq!(
+            extract_event_identifier_from_topic("p/d/thing/event/alert/post"),
+            Some("alert".to_string())
+        );
+    }
+
+    #[test]
+    fn test_extract_event_identifier_from_topic_rejects_non_event() {
+        // Wrong segment 4 (not "event")
+        assert_eq!(
+            extract_event_identifier_from_topic("/p/d/thing/property/post"),
+            None
+        );
+        // Wrong segment 3 (not "thing")
+        assert_eq!(
+            extract_event_identifier_from_topic("/p/d/ota/event/alert/post"),
+            None
+        );
+        // Too few segments
+        assert_eq!(
+            extract_event_identifier_from_topic("/p/d/thing/event"),
+            None
+        );
+        assert_eq!(extract_event_identifier_from_topic(""), None);
     }
 
     #[test]

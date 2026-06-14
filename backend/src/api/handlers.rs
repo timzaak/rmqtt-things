@@ -1,5 +1,6 @@
 use crate::api::utils::{
-    extract_and_validate_product_id, send_property_command_to_device, validate_identifier,
+    extract_and_validate_product_id, extract_event_identifier_from_topic,
+    send_property_command_to_device, validate_identifier,
 };
 use crate::api::web_models::*;
 use crate::cache::{SchemaCache, SchemaCacheManager, compile_schema};
@@ -10,6 +11,7 @@ use crate::rmqtt_client::RmqttHttpClient;
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
+use jsonschema::Validator;
 use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::post_policy::{PostPolicy, PostPolicyField, PostPolicyValue};
@@ -201,6 +203,28 @@ pub async fn event_post(
     let events = payload.params.unwrap_or(JsonValue::Null);
 
     let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
+
+    // 事件 schema 校验：当 thing schema validator 开启且存在 Active 状态的
+    // (product_id, event_identifier) 模板时，校验 params（事件负载）。
+    // 无模板则放行，与 property_post 的"无 schema 即放行"语义一致。
+    // See validation-template.md §3.2 第 4 条：「其他值用于事件校验」。
+    if app_state.config.api.property_schema_validator
+        && let Some(event_identifier) = extract_event_identifier_from_topic(&mqtt_msg.topic)
+        && let Some(validator) =
+            load_event_validator(app_state, &product_id, &event_identifier).await?
+    {
+        let errors: Vec<_> = validator.iter_errors(&events).collect();
+        if !errors.is_empty() {
+            let error_messages: Vec<String> =
+                errors.into_iter().map(|err| err.to_string()).collect();
+            error!(
+                "Event validation failed for device {}: event={}, errors={:?}",
+                device_id, event_identifier, error_messages
+            );
+            return Err(ApiError::bad_request("Event validation failed"));
+        }
+    }
+
     // 保存事件到数据库
     app_state
         .db
@@ -396,7 +420,7 @@ pub async fn file_upload_handler(
     }
 }
 
-fn is_file_upload_directory_allowed(
+pub fn is_file_upload_directory_allowed(
     rules: &[String],
     product_id: &str,
     device_id: &str,
@@ -586,6 +610,92 @@ mod tests {
             "device-a",
             "demo_product/device-b"
         ));
+    }
+
+    // Admin endpoints (no product/device context) reuse the same helper with
+    // empty substitution. The rule is static, but `/*` boundary semantics must
+    // match the device-side path-segment boundary (e.g. `ota/*` allows base
+    // `ota` itself, and `ota/child`, but not `ota-other`). See P0-3 audit fix.
+    #[test]
+    fn file_upload_directory_admin_static_rule_uses_segment_boundary() {
+        let rules = vec!["ota/*".to_string(), "firmware".to_string()];
+
+        // base directory itself is allowed by `/*`
+        assert!(is_file_upload_directory_allowed(&rules, "", "", "ota"));
+        // child directories are allowed
+        assert!(is_file_upload_directory_allowed(&rules, "", "", "ota/v1"));
+        assert!(is_file_upload_directory_allowed(
+            &rules,
+            "",
+            "",
+            "ota/v1/bin"
+        ));
+        // exact-match rule (non-wildcard)
+        assert!(is_file_upload_directory_allowed(&rules, "", "", "firmware"));
+        // prefix-only match must be rejected (this is the bug the inline
+        // admin implementation had: `ends_with('*')` -> `starts_with("ota/")`
+        // would have accepted `ota-other` because it shares a textual prefix).
+        assert!(!is_file_upload_directory_allowed(
+            &rules,
+            "",
+            "",
+            "ota-other"
+        ));
+        assert!(!is_file_upload_directory_allowed(&rules, "", "", "public"));
+    }
+}
+
+/// Load an event validation schema for (product_id, event_identifier) by
+/// reading from the schema cache first and falling back to the database.
+/// Returns Ok(None) when no Active template exists for this event, in which
+/// case the caller skips validation (matching `property_post`'s semantics for
+/// absent schemas).
+async fn load_event_validator(
+    app_state: &AppState,
+    product_id: &str,
+    event_identifier: &str,
+) -> Result<Option<Validator>, ApiError> {
+    let cache_key = format!("event:{product_id}:{event_identifier}");
+    let cached = app_state.cache.get(&cache_key).await.map_err(|e| {
+        error!("Cache error while loading event schema: {}", e);
+        ApiError::internal("Cache error")
+    })?;
+
+    if let Some(schema) = cached {
+        let validator = compile_schema(&schema).map_err(|e| {
+            error!("Failed to compile event schema from cache: {}", e);
+            ApiError::internal("Schema compilation failed")
+        })?;
+        return Ok(Some(validator));
+    }
+
+    let template = app_state
+        .db
+        .get_event_valid_template(product_id, event_identifier)
+        .await
+        .map_err(|e| {
+            error!("Database error while getting event schema: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    match template {
+        Some(template) => {
+            let validator = compile_schema(&template.schema).map_err(|e| {
+                error!("Failed to compile event schema: {}", e);
+                ApiError::internal("Schema compilation failed")
+            })?;
+            // Async cache populate, mirroring property_post's pattern.
+            let cache_clone = app_state.cache.clone();
+            let key_clone = cache_key;
+            let schema_to_cache = template.schema.clone();
+            tokio::spawn(async move {
+                if let Err(e) = cache_clone.set(key_clone, schema_to_cache).await {
+                    error!("Failed to cache event schema: {}", e);
+                }
+            });
+            Ok(Some(validator))
+        }
+        None => Ok(None),
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::api::ApiState;
 use crate::api::admin_models::{PaginatedResponse, PaginationInfo, ProductQuery};
 use crate::api::error::ApiError;
+use crate::api::utils::validate_identifier;
 use crate::db::models::{CreateProductRequest, Product, UpdateProductRequest};
 use axum::Json;
 use axum::extract::{Path, Query, State};
@@ -10,6 +11,32 @@ use tracing::error;
 
 /// PostgreSQL error code for unique constraint violation.
 const PG_UNIQUE_VIOLATION: &str = "23505";
+
+/// Max length enforced for the human-readable product `name` field.
+/// `model_no` is bounded by `validate_identifier` (128 chars).
+const MAX_PRODUCT_NAME_LENGTH: usize = 128;
+
+/// Validate a CreateProductRequest before touching the database.
+///
+/// `model_no` is the product identifier used across the system (it is the
+/// `product_id` in alarm rules, validation templates, MQTT topics, etc.), so
+/// it must satisfy `validate_identifier` (non-empty, <=128 chars,
+/// `[A-Za-z0-9_-]`). `name` is a free-form display label: non-empty, <=128
+/// chars. See PRD docs/prd/core/product-device-management.md §5.1 (model_no
+/// globally unique) and P1-10 audit fix.
+pub fn validate_create_product_request(req: &CreateProductRequest) -> Result<(), ApiError> {
+    let name = req.name.trim();
+    if name.is_empty() {
+        return Err(ApiError::bad_request("name must not be empty"));
+    }
+    if name.len() > MAX_PRODUCT_NAME_LENGTH {
+        return Err(ApiError::bad_request(format!(
+            "name must not exceed {MAX_PRODUCT_NAME_LENGTH} characters"
+        )));
+    }
+    validate_identifier(&req.model_no, "model_no")?;
+    Ok(())
+}
 
 #[utoipa::path(
     post,
@@ -26,6 +53,7 @@ pub async fn create_product(
     Json(req): Json<CreateProductRequest>,
 ) -> Result<(StatusCode, Json<Product>), ApiError> {
     let state = &state.admin;
+    validate_create_product_request(&req)?;
     match state.db.product().create_product(&req).await {
         Ok(product) => Ok((StatusCode::CREATED, Json(product))),
         Err(e) => {
@@ -128,4 +156,86 @@ pub async fn list_products(
         },
     };
     Ok(Json(response))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::models::CreateProductRequest;
+
+    fn req(name: &str, model_no: &str) -> CreateProductRequest {
+        CreateProductRequest {
+            name: name.into(),
+            model_no: model_no.into(),
+            description: None,
+        }
+    }
+
+    fn err_status(result: Result<(), ApiError>) -> Option<u16> {
+        use axum::response::IntoResponse;
+        result.err().map(|e| e.into_response().status().as_u16())
+    }
+
+    #[test]
+    fn valid_request_passes() {
+        assert!(validate_create_product_request(&req("Sensor", "sensor-v1")).is_ok());
+    }
+
+    #[test]
+    fn empty_model_no_rejected() {
+        assert_eq!(
+            err_status(validate_create_product_request(&req("Sensor", ""))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn empty_name_rejected() {
+        // Whitespace-only name trims to empty -> rejected.
+        assert_eq!(
+            err_status(validate_create_product_request(&req("   ", "sensor-v1"))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn overlong_name_rejected() {
+        let long = "a".repeat(129);
+        assert_eq!(
+            err_status(validate_create_product_request(&req(&long, "sensor-v1"))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn overlong_model_no_rejected() {
+        let long = "a".repeat(129);
+        assert_eq!(
+            err_status(validate_create_product_request(&req("Sensor", &long))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn invalid_chars_in_model_no_rejected() {
+        // Spaces, slashes, dots, etc. are not part of [A-Za-z0-9_-].
+        assert_eq!(
+            err_status(validate_create_product_request(&req("Sensor", "sensor v1"))),
+            Some(400)
+        );
+        assert_eq!(
+            err_status(validate_create_product_request(&req("Sensor", "sensor/v1"))),
+            Some(400)
+        );
+        assert_eq!(
+            err_status(validate_create_product_request(&req("Sensor", "sensor.v1"))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn name_at_max_length_and_model_no_with_dashes_underscore_accepted() {
+        let max_name = "a".repeat(128);
+        assert!(validate_create_product_request(&req(&max_name, "sensor_v1-rc")).is_ok());
+    }
 }
