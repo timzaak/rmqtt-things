@@ -96,6 +96,60 @@ async fn test_ota_version_crud_apis(ctx: &mut TestContext) {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
+// Negative: create_ota_version must reject an invalid `key` (empty / overlong /
+// illegal characters) with 400. `key` flows into the OTA object path and device
+// lookup, so it must satisfy the same identifier rules as product_id / device_id
+// (see admin_handlers.rs::create_ota_version).
+#[test_context(TestContext)]
+#[tokio::test]
+async fn test_create_ota_version_rejects_invalid_key(ctx: &mut TestContext) {
+    let base_valid = || CreateOtaVersionRequest {
+        product_id: "ota_key_prod".to_string(),
+        key: "firmware".to_string(),
+        version: "1.0.0".to_string(),
+        min_version: "0.9.0".to_string(),
+        max_version: None,
+        file_key: "path/to/firmware.bin".to_string(),
+        log: None,
+        device_ids: None,
+        bin_length: 1,
+        bin_md5: "d41d8cd98f00b204e9800998ecf8427e".to_string(),
+    };
+
+    // Empty key
+    let mut req = base_valid();
+    req.key = "".to_string();
+    let (status, _) =
+        request_json(&ctx.service, Method::POST, "/api/admin/ota/version", &req).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "empty key must be rejected"
+    );
+
+    // Illegal character (path separator)
+    let mut req = base_valid();
+    req.key = "firmware/evil".to_string();
+    let (status, _) =
+        request_json(&ctx.service, Method::POST, "/api/admin/ota/version", &req).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "key with '/' must be rejected"
+    );
+
+    // Overlong key
+    let mut req = base_valid();
+    req.key = "a".repeat(129);
+    let (status, _) =
+        request_json(&ctx.service, Method::POST, "/api/admin/ota/version", &req).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "key longer than 128 chars must be rejected"
+    );
+}
+
 #[test_context(TestContext)]
 #[tokio::test]
 async fn test_admin_file_upload_api(ctx: &mut TestContext) {

@@ -92,6 +92,7 @@
 ### 访问控制原则
 - 管理端上传接口当前不做鉴权（单租户部署模式）
 - 设备端上传请求由 RMQTT Broker 转发
+- 设备端目录白名单以 MQTT `client_id` 作为 `deviceId` 进行 `${deviceId}` 变量替换与校验，信任前提是 RMQTT Broker 已对该 `client_id` 完成设备 HMAC 认证；若 broker 认证配置错误，可能导致跨设备目录越权
 - 目录白名单校验是唯一的安全屏障
 
 ### 数据边界

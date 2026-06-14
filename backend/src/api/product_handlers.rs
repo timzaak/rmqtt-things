@@ -38,6 +38,24 @@ pub fn validate_create_product_request(req: &CreateProductRequest) -> Result<(),
     Ok(())
 }
 
+/// Validate an UpdateProductRequest before touching the database.
+///
+/// Mirrors `validate_create_product_request` for the updatable `name` field
+/// (non-empty, <=128 chars). `model_no` is immutable on update; `description`
+/// is free-form and not length-bounded (consistent with create). See P2-17.
+pub fn validate_update_product_request(req: &UpdateProductRequest) -> Result<(), ApiError> {
+    let name = req.name.trim();
+    if name.is_empty() {
+        return Err(ApiError::bad_request("name must not be empty"));
+    }
+    if name.len() > MAX_PRODUCT_NAME_LENGTH {
+        return Err(ApiError::bad_request(format!(
+            "name must not exceed {MAX_PRODUCT_NAME_LENGTH} characters"
+        )));
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     post,
     path = "/api/admin/product",
@@ -87,6 +105,7 @@ pub async fn update_product(
     Json(req): Json<UpdateProductRequest>,
 ) -> Result<Json<Product>, ApiError> {
     let state = &state.admin;
+    validate_update_product_request(&req)?;
     match state.db.product().update_product(id, &req).await {
         Ok(Some(product)) => Ok(Json(product)),
         Ok(None) => Err(ApiError::not_found("Product not found")),
@@ -237,5 +256,35 @@ mod tests {
     fn name_at_max_length_and_model_no_with_dashes_underscore_accepted() {
         let max_name = "a".repeat(128);
         assert!(validate_create_product_request(&req(&max_name, "sensor_v1-rc")).is_ok());
+    }
+
+    fn update_req(name: &str) -> UpdateProductRequest {
+        UpdateProductRequest {
+            name: name.into(),
+            description: String::new(),
+            auto_provisioning: false,
+        }
+    }
+
+    #[test]
+    fn update_valid_request_passes() {
+        assert!(validate_update_product_request(&update_req("Sensor")).is_ok());
+    }
+
+    #[test]
+    fn update_empty_name_rejected() {
+        assert_eq!(
+            err_status(validate_update_product_request(&update_req("   "))),
+            Some(400)
+        );
+    }
+
+    #[test]
+    fn update_overlong_name_rejected() {
+        let long = "a".repeat(129);
+        assert_eq!(
+            err_status(validate_update_product_request(&update_req(&long))),
+            Some(400)
+        );
     }
 }

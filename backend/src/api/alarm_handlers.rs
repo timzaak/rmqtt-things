@@ -221,6 +221,12 @@ pub async fn update_alarm_rule(
     // still satisfy that trigger type's required fields (e.g. property_name).
     if let Some(ref condition) = req.condition {
         crate::api::alarm_models::validate_condition(condition, "condition")?;
+        // Device-status triggers must keep the `always` operator even on
+        // update (P2-13): the rule engine has no value to compare against.
+        crate::api::alarm_models::validate_device_trigger_condition(
+            &existing.trigger_type,
+            condition,
+        )?;
     }
     if let Some(ref actions) = req.actions {
         crate::api::alarm_models::validate_actions(actions)?;

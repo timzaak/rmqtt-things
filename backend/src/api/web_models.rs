@@ -180,8 +180,9 @@ pub struct FileUploadRequest {
     pub directory: String,
     #[serde(rename = "useOriginName")]
     pub use_origin_name: bool,
-    #[serde(rename = "fileType")]
-    pub file_type: String,
+    /// 客户端可携带的文件类型提示。当前后端不消费此字段（保留），可选。
+    #[serde(rename = "fileType", default)]
+    pub file_type: Option<String>,
 }
 
 use std::collections::HashMap;

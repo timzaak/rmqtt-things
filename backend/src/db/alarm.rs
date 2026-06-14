@@ -449,14 +449,41 @@ impl AlarmRepo {
     }
 
     /// Decrement retries_left and schedule the next retry attempt.
-    pub async fn decrement_retry_and_schedule_next(&self, id: i64) -> anyhow::Result<()> {
-        sqlx::query(
+    ///
+    /// Returns the `webhook_retries_left` value AFTER the decrement, or `None`
+    /// when the row was not eligible for another retry (already at 0). The
+    /// caller uses the returned count to detect the retry-exhausted transition
+    /// and promote the row to the `final_failed` webhook state (see
+    /// `mark_webhook_final_failure`).
+    pub async fn decrement_retry_and_schedule_next(&self, id: i64) -> anyhow::Result<Option<i16>> {
+        let row = sqlx::query(
             r#"UPDATE alarm
                SET webhook_retries_left = webhook_retries_left - 1,
                    webhook_next_retry_at = NOW() + make_interval(secs => $1)
-               WHERE id = $2 AND webhook_retries_left > 0"#,
+               WHERE id = $2 AND webhook_retries_left > 0
+               RETURNING webhook_retries_left"#,
         )
         .bind(self.webhook_retry_interval_seconds as i64)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| r.get::<i16, _>("webhook_retries_left")))
+    }
+
+    /// Mark a webhook as permanently failed after all retry attempts are
+    /// exhausted (PRD alarm-rule-engine.md §6 "重试耗尽后标记为最终失败").
+    ///
+    /// Sets `webhook_status = 2` (final_failed) and clears the retry scheduling
+    /// fields. The `webhook_status` integer column has no CHECK constraint, so
+    /// this is a pure code-level semantic extension over the existing values:
+    /// `NULL` = not configured, `0` = success, `1` = pending retry,
+    /// `2` = retries exhausted (terminal failure).
+    pub async fn mark_webhook_final_failure(&self, id: i64) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"UPDATE alarm
+               SET webhook_status = 2, webhook_retries_left = 0, webhook_next_retry_at = NULL
+               WHERE id = $1"#,
+        )
         .bind(id)
         .execute(&self.pool)
         .await?;

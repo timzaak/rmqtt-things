@@ -244,7 +244,7 @@ pub async fn update_event_valid_template_status(
         })?;
 
     if rows_affected > 0 {
-        if let Some(template) = template_to_update
+        if let Some(template) = template_to_update.as_ref()
             && template.event == "property"
         {
             if let Err(e) = state.cache._remove(&template.product_id).await {
@@ -253,6 +253,24 @@ pub async fn update_event_valid_template_status(
                 info!(
                     "Property schema for product_id {} removed from cache",
                     template.product_id
+                );
+            }
+        }
+        if let Some(template) = template_to_update.as_ref()
+            && template.event != "property"
+        {
+            // Event (non-property) templates are cached under
+            // `event:{product_id}:{event}` (see handlers::load_event_validator).
+            // A status change can flip Active<->Inactive, so the cached schema
+            // must be dropped or event_post keeps validating against the old
+            // state (PRD validation-template.md §4.2 "模板状态变更或更新时清除缓存").
+            let cache_key = format!("event:{}:{}", template.product_id, template.event);
+            if let Err(e) = state.cache._remove(&cache_key).await {
+                error!("Failed to remove event schema from cache: {}", e);
+            } else {
+                info!(
+                    "Event schema for {}:{} removed from cache after status change",
+                    template.product_id, template.event
                 );
             }
         }
@@ -303,7 +321,7 @@ pub async fn update_event_valid_template(
         })?;
 
     if rows_affected > 0 {
-        if let Some(template) = template_to_update
+        if let Some(template) = template_to_update.as_ref()
             && template.event == "property"
         {
             if let Err(e) = state.cache._remove(&template.product_id).await {
@@ -312,6 +330,22 @@ pub async fn update_event_valid_template(
                 info!(
                     "Property schema for product_id {} removed from cache",
                     template.product_id
+                );
+            }
+        }
+        if let Some(template) = template_to_update.as_ref()
+            && template.event != "property"
+        {
+            // Mirrors the property branch: an Active event schema is cached
+            // under `event:{product_id}:{event}` and must be invalidated on
+            // update so event_post re-reads the new schema from the DB.
+            let cache_key = format!("event:{}:{}", template.product_id, template.event);
+            if let Err(e) = state.cache._remove(&cache_key).await {
+                error!("Failed to remove event schema from cache: {}", e);
+            } else {
+                info!(
+                    "Event schema for {}:{} removed from cache after update",
+                    template.product_id, template.event
                 );
             }
         }
@@ -373,7 +407,9 @@ pub async fn delete_event_valid_template(
         return Err(ApiError::not_found("Template not found"));
     }
 
-    if let Some(template) = template
+    // Borrow once so both the property and event cache-invalidation branches
+    // can read template fields without moving the Option.
+    if let Some(template) = template.as_ref()
         && template.event == "property"
     {
         if let Err(e) = state.cache._remove(&template.product_id).await {
@@ -382,6 +418,23 @@ pub async fn delete_event_valid_template(
             info!(
                 "Property schema for product_id {} removed from cache after delete",
                 template.product_id
+            );
+        }
+    }
+    if let Some(template) = template.as_ref()
+        && template.event != "property"
+    {
+        // An Active event schema may have been cached under
+        // `event:{product_id}:{event}`; drop it so event_post re-queries the
+        // DB and correctly treats the (product, event) pair as unvalidated
+        // after the template is removed.
+        let cache_key = format!("event:{}:{}", template.product_id, template.event);
+        if let Err(e) = state.cache._remove(&cache_key).await {
+            error!("Failed to remove event schema from cache: {}", e);
+        } else {
+            info!(
+                "Event schema for {}:{} removed from cache after delete",
+                template.product_id, template.event
             );
         }
     }
@@ -794,6 +847,10 @@ pub async fn create_ota_version(
 ) -> Result<StatusCode, ApiError> {
     let state = &state.admin;
     validate_identifier(&req.product_id, "product_id")?;
+    // `key` becomes part of the OTA object path / device lookup; reject empty,
+    // overlong, or path-traversal characters up front (mirrors product_id /
+    // device_id validation elsewhere in this module).
+    validate_identifier(&req.key, "key")?;
     validate_version_format(&req.version, "version")?;
     validate_version_format(&req.min_version, "min_version")?;
     if let Some(ref max_ver) = req.max_version {

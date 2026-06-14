@@ -297,11 +297,15 @@ impl S3Client {
         &self,
         key: &str,
     ) -> Result<s3::post_policy::PresignedPost, s3::error::S3Error> {
+        // Pin the S3 object key to the exact value the server chose. The
+        // previous StartsWith(key) policy allowed a client to upload to any
+        // key sharing the prefix, which is unnecessary here because the server
+        // fully controls the key (directory + UUID-prefixed file name) and
+        // widens the upload surface to unintended keys. rust-s3 0.37 supports
+        // PostPolicyValue::Exact, which emits an `{ "key": "<value>" }` policy
+        // condition (P1-7 audit fix).
         let post_policy = PostPolicy::new(self.config.expired_seconds)
-            .condition(
-                PostPolicyField::Key,
-                PostPolicyValue::StartsWith(Cow::from(key)),
-            )
+            .condition(PostPolicyField::Key, PostPolicyValue::Exact(Cow::from(key)))
             .unwrap();
         self.bucket.presign_post(post_policy).await
     }

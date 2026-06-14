@@ -723,3 +723,139 @@ async fn scenario_retry_loop_skips_future_retry(ctx: &mut TestContext) {
          ensuring the retry loop only processes due alarms"
     );
 }
+
+// ---------------------------------------------------------------------------
+// 10. Exhaustion transition: decrement to 0 returns Some(0); caller promotes
+//     the row to final_failed (webhook_status=2). PRD alarm-rule-engine.md §6
+//     "重试耗尽后标记为最终失败".
+// ---------------------------------------------------------------------------
+
+/// User story: Webhook retry exhaustion must reach a terminal failure state
+/// (design 4.7.1 path 5 + PRD alarm-rule-engine.md §6).
+/// Covers: An alarm in retry state (status=1, retries_left=1) has its final
+///         retry attempt fail. The background task calls
+///         decrement_retry_and_schedule_next, which returns Some(0). The task
+///         then calls mark_webhook_final_failure, transitioning webhook_status
+///         to 2 (final_failed) with retries_left=0 and next_retry_at=NULL.
+///         Without this promotion the alarm would be stuck in webhook_status=1
+///         forever — invisible to query_pending_retries but never marked as a
+///         terminal failure, so the frontend could not distinguish "retrying"
+///         from "permanently failed".
+#[test_context(TestContext)]
+#[tokio::test]
+async fn scenario_retry_exhaustion_promotes_to_final_failed(ctx: &mut TestContext) {
+    let repo = ctx._admin_state.db.alarm();
+
+    let alarm_id = repo
+        .insert_alarm(
+            12,
+            "exhaustion transition rule",
+            "rl_exh_trans_prod",
+            "rl_exh_trans_dev",
+            2,
+            Some("Final retry attempt"),
+            None,
+            "property",
+        )
+        .await
+        .expect("insert_alarm must succeed");
+
+    // One retry attempt remaining.
+    repo.update_alarm_webhook_status_with_retry(alarm_id, 1, 1, Some(OffsetDateTime::now_utc()))
+        .await
+        .expect("set last-retry state must succeed");
+
+    // The background task's failure branch: decrement first.
+    let remaining = repo
+        .decrement_retry_and_schedule_next(alarm_id)
+        .await
+        .expect("decrement_retry_and_schedule_next must succeed");
+    assert_eq!(
+        remaining,
+        Some(0),
+        "decrement must report the post-decrement count; Some(0) signals exhaustion"
+    );
+
+    // On Some(0) the task promotes the alarm to terminal final_failed.
+    repo.mark_webhook_final_failure(alarm_id)
+        .await
+        .expect("mark_webhook_final_failure must succeed");
+
+    let alarm = repo
+        .get_alarm_by_id(alarm_id)
+        .await
+        .expect("get_alarm_by_id must succeed")
+        .expect("alarm must exist");
+    assert_eq!(
+        alarm.webhook_status,
+        Some(2),
+        "webhook_status must be 2 (final_failed) after exhaustion"
+    );
+    assert_eq!(
+        alarm.webhook_retries_left, 0,
+        "retries_left must be 0 in terminal failure"
+    );
+    assert!(
+        alarm.webhook_next_retry_at.is_none(),
+        "next_retry_at must be NULL in terminal failure"
+    );
+
+    // The API layer must surface this as a distinct terminal state.
+    let api_record = crate::api::alarm_models::ApiAlarmRecord::from(alarm);
+    assert_eq!(
+        api_record.webhook_status.as_deref(),
+        Some("final_failed"),
+        "ApiAlarmRecord must expose webhook_status='final_failed' so the frontend can \
+         distinguish terminal failure from still-retrying"
+    );
+}
+
+/// User story: decrement on an already-exhausted alarm must not reschedule it.
+/// Covers: When retries_left is already 0 (e.g. concurrent retry tick, or an
+///         alarm manually set to exhausted state), decrement_retry_and_schedule_next
+///         must return None and leave the row untouched. This guards the
+///         background task against double-decrement races.
+#[test_context(TestContext)]
+#[tokio::test]
+async fn scenario_decrement_on_exhausted_returns_none(ctx: &mut TestContext) {
+    let repo = ctx._admin_state.db.alarm();
+
+    let alarm_id = repo
+        .insert_alarm(
+            13,
+            "already exhausted rule",
+            "rl_already_exh_prod",
+            "rl_already_exh_dev",
+            1,
+            Some("Already exhausted"),
+            None,
+            "property",
+        )
+        .await
+        .expect("insert_alarm must succeed");
+
+    // Exhausted state: retries_left=0.
+    repo.update_alarm_webhook_status_with_retry(alarm_id, 1, 0, Some(OffsetDateTime::now_utc()))
+        .await
+        .expect("set exhausted state must succeed");
+
+    let remaining = repo
+        .decrement_retry_and_schedule_next(alarm_id)
+        .await
+        .expect("decrement_retry_and_schedule_next must succeed");
+    assert_eq!(
+        remaining, None,
+        "decrement on an already-exhausted row must return None (no row updated)"
+    );
+
+    // Row state is unchanged: retries_left still 0.
+    let alarm = repo
+        .get_alarm_by_id(alarm_id)
+        .await
+        .expect("get_alarm_by_id must succeed")
+        .expect("alarm must exist");
+    assert_eq!(
+        alarm.webhook_retries_left, 0,
+        "retries_left must remain 0 when decrement was a no-op"
+    );
+}

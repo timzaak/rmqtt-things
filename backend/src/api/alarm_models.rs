@@ -183,6 +183,9 @@ pub struct ApiAlarmRecord {
     /// Alarm status: "active" / "acknowledged" / "cleared"
     pub status: String,
     /// Webhook status: None = not configured, Some("success") / Some("failed")
+    /// / Some("final_failed"). `failed` means a delivery is still pending
+    /// retry; `final_failed` means all retry attempts have been exhausted
+    /// (terminal failure, PRD alarm-rule-engine.md §6).
     pub webhook_status: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: time::OffsetDateTime,
@@ -200,6 +203,10 @@ impl From<AlarmRecord> for ApiAlarmRecord {
         let webhook_status = match record.webhook_status {
             None => None,
             Some(0) => Some("success".to_string()),
+            // 1 = pending retry (still failed but may yet succeed), 2 = retries
+            // exhausted (terminal failure). Any other value is unexpected;
+            // treat it as a generic non-terminal failure.
+            Some(2) => Some("final_failed".to_string()),
             Some(_) => Some("failed".to_string()),
         };
         let cleared_at = record.cleared_at.and_then(|t| {
@@ -366,10 +373,39 @@ fn validate_identifier_safe(id: &str, field_name: &str) -> Result<(), ApiError> 
 pub fn validate_create_rule_request(req: &CreateAlarmRuleRequest) -> Result<(), ApiError> {
     validate_trigger_config(&req.trigger_type, &req.trigger_config)?;
     validate_condition(&req.condition, "condition")?;
+    validate_device_trigger_condition(&req.trigger_type, &req.condition)?;
     if let Some(ref clear) = req.clear_condition {
         validate_condition(clear, "clear_condition")?;
     }
     validate_actions(&req.actions)?;
+    Ok(())
+}
+
+/// Enforce that device_online / device_offline trigger rules use the `always`
+/// condition (PRD alarm-rule-engine.md §5.3 "设备状态触发时，无需额外条件配置").
+///
+/// The rule engine evaluates device-status triggers against a fixed
+/// `actual_value = Null` (rule_engine/mod.rs::evaluate_and_trigger), so any
+/// non-`always` operator (e.g. `>`, `==`) silently evaluates to false and the
+/// rule never fires. Rejecting such misconfiguration at the API surface
+/// prevents a class of rules that would be accepted but never trigger.
+pub fn validate_device_trigger_condition(
+    trigger_type: &str,
+    condition: &JsonValue,
+) -> Result<(), ApiError> {
+    if !matches!(trigger_type, "device_online" | "device_offline") {
+        return Ok(());
+    }
+    let operator = condition
+        .as_object()
+        .and_then(|o| o.get("operator"))
+        .and_then(|v| v.as_str());
+    if operator != Some("always") {
+        return Err(ApiError::bad_request(format!(
+            "trigger_type '{trigger_type}' must use condition operator 'always' \
+             (device-status triggers carry no value to compare against)"
+        )));
+    }
     Ok(())
 }
 
@@ -561,6 +597,69 @@ mod rule_validation_tests {
             err_status(validate_create_rule_request(&req).unwrap_err()),
             400
         );
+    }
+
+    // --- validate_device_trigger_condition (P2-13) ------------------------
+
+    #[test]
+    fn device_online_rejects_non_always_operator() {
+        // A device_online rule with `>` would silently never fire (the rule
+        // engine evaluates device-status actual_value as Null). This must be
+        // rejected at validation time.
+        let err = validate_device_trigger_condition(
+            "device_online",
+            &json!({"operator": ">", "value": 1}),
+        )
+        .unwrap_err();
+        assert_eq!(err_status(err), 400);
+    }
+
+    #[test]
+    fn device_offline_rejects_non_always_operator() {
+        let err = validate_device_trigger_condition(
+            "device_offline",
+            &json!({"operator": "==", "value": "online"}),
+        )
+        .unwrap_err();
+        assert_eq!(err_status(err), 400);
+    }
+
+    #[test]
+    fn device_online_accepts_always_operator() {
+        assert!(
+            validate_device_trigger_condition("device_online", &json!({"operator": "always"}))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn device_trigger_validation_skipped_for_property() {
+        // Property triggers carry a real value; any supported operator is fine.
+        assert!(
+            validate_device_trigger_condition("property", &json!({"operator": ">", "value": 50}))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn create_request_device_online_with_non_always_rejected() {
+        let mut req = base_property_req();
+        req.trigger_type = "device_online".into();
+        req.trigger_config = json!({});
+        req.condition = json!({"operator": ">", "value": 1});
+        assert_eq!(
+            err_status(validate_create_rule_request(&req).unwrap_err()),
+            400
+        );
+    }
+
+    #[test]
+    fn create_request_device_online_with_always_accepted() {
+        let mut req = base_property_req();
+        req.trigger_type = "device_online".into();
+        req.trigger_config = json!({});
+        req.condition = json!({"operator": "always"});
+        assert!(validate_create_rule_request(&req).is_ok());
     }
 
     // Helper: extract the status code from an ApiError by value via

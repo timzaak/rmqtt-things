@@ -191,6 +191,9 @@ pub struct ApiConfig {
     #[serde(default = "default_openapi_enabled")]
     pub openapi_enabled: bool,
     pub serve_web_path: Option<String>,
+    /// 运行时 Schema 校验总开关。**同时**控制属性上报（property_post）和事件上报
+    ///（event_post）的 JSON Schema 校验；命名为 `property_schema_validator` 是历史
+    /// 原因，实际门控两类上报。默认 false（不校验）。
     #[serde(default = "default_property_schema_validator")]
     pub property_schema_validator: bool,
 }

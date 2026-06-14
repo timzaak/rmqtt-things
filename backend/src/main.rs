@@ -279,8 +279,35 @@ async fn webhook_retry_task(
                         }
                         Err(e) => {
                             warn!("Webhook retry failed for alarm {}: {}", alarm.id, e);
-                            if let Err(e) = alarm_repo.decrement_retry_and_schedule_next(alarm.id).await {
-                                error!("Failed to decrement retry for alarm {}: {}", alarm.id, e);
+                            // Decrement retries_left; if this was the last
+                            // attempt, transition the alarm to the terminal
+                            // final_failed state (PRD alarm-rule-engine.md §6).
+                            match alarm_repo
+                                .decrement_retry_and_schedule_next(alarm.id)
+                                .await
+                            {
+                                Ok(Some(remaining)) => {
+                                    if remaining <= 0
+                                        && let Err(e) = alarm_repo
+                                            .mark_webhook_final_failure(alarm.id)
+                                            .await
+                                    {
+                                        error!(
+                                            "Failed to mark final failure for alarm {}: {}",
+                                            alarm.id, e
+                                        );
+                                    }
+                                }
+                                Ok(None) => {
+                                    // Row was already exhausted (retries_left
+                                    // was 0); nothing to schedule.
+                                }
+                                Err(e) => {
+                                    error!(
+                                        "Failed to decrement retry for alarm {}: {}",
+                                        alarm.id, e
+                                    );
+                                }
                             }
                         }
                     }

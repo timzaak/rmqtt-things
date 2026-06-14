@@ -464,3 +464,53 @@ async fn scenario_delete_nonexistent_rule(ctx: &mut TestContext) {
     let (status, _) = request(&ctx.service, Method::DELETE, "/api/admin/alarm-rule/999999").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
+
+/// Negative: device_online / device_offline triggers must use the `always`
+/// condition operator. The rule engine evaluates device-status triggers
+/// against a fixed Null actual_value (rule_engine/mod.rs), so any non-always
+/// operator would silently make the rule never fire. The API must reject such
+/// misconfiguration up front (PRD alarm-rule-engine.md §5.3, P2-13).
+#[test_context(TestContext)]
+#[tokio::test]
+async fn scenario_create_device_online_rule_non_always_rejected(ctx: &mut TestContext) {
+    let model_no = "alarm_dev_online_prod";
+    create_test_product(ctx, model_no).await;
+
+    let body = json!({
+        "product_id": model_no,
+        "name": "Device online with bogus condition",
+        "trigger_type": "device_online",
+        "trigger_config": {},
+        // A comparison operator makes no sense for a device-status trigger;
+        // the rule would never fire.
+        "condition": { "operator": ">", "value": 1 },
+        "actions": [{ "type": "alarm", "level": "info" }]
+    });
+    let (status, _) =
+        request_json(&ctx.service, Method::POST, "/api/admin/alarm-rule", &body).await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "device_online rule with a non-always condition must be rejected"
+    );
+}
+
+/// Positive companion: device_online with `always` is accepted.
+#[test_context(TestContext)]
+#[tokio::test]
+async fn scenario_create_device_online_rule_always_accepted(ctx: &mut TestContext) {
+    let model_no = "alarm_dev_online_ok_prod";
+    create_test_product(ctx, model_no).await;
+
+    let body = json!({
+        "product_id": model_no,
+        "name": "Device online always rule",
+        "trigger_type": "device_online",
+        "trigger_config": {},
+        "condition": { "operator": "always" },
+        "actions": [{ "type": "alarm", "level": "info" }]
+    });
+    let (status, _) =
+        request_json(&ctx.service, Method::POST, "/api/admin/alarm-rule", &body).await;
+    assert_eq!(status, StatusCode::CREATED);
+}
