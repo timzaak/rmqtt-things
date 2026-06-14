@@ -77,6 +77,7 @@ export function ConfirmDialog({
             Cancel
           </button>
           <button
+            data-testid="confirm-dialog-confirm"
             onClick={() => {
               onConfirm()
               onOpenChange(false)

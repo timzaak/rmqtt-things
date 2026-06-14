@@ -200,16 +200,6 @@ test.describe('Alarm records list (US-PA-034)', () => {
     })
   })
 
-  test('[US-PA-034] filter alarm records by acknowledged status', async ({ request, page }) => {
-    await withTriggeredAlarm(request, {}, async (result) => {
-      const recordsPage = new AlarmRecordsListPage(page)
-      await recordsPage.gotoList(FRONTEND_URL)
-      await recordsPage.selectAcknowledgedFilter('false')
-      await recordsPage.clickSearch()
-      await recordsPage.waitForAlarmInList(result.ruleName)
-    })
-  })
-
   test('[US-PA-034] filter alarm records by level', async ({ request, page }) => {
     await withTriggeredAlarm(request, { level: 'warning' }, async (result) => {
       const recordsPage = new AlarmRecordsListPage(page)
@@ -236,8 +226,8 @@ test.describe('Acknowledge alarm (US-PA-035)', () => {
 
       await recordsPage.acknowledgeAlarm(result.alarmId)
 
-      const ackTag = recordsPage.getAcknowledgedTag(result.alarmId)
-      await expect(ackTag).toBeVisible({ timeout: 5_000 })
+      const statusTag = recordsPage.getStatusTag(result.alarmId)
+      await expect(statusTag).toHaveText(/acknowledged/i, { timeout: 5_000 })
       await expect(ackButton).toBeHidden({ timeout: 5_000 })
     })
   })
@@ -249,8 +239,9 @@ test.describe('Acknowledge alarm (US-PA-035)', () => {
       const recordsPage = new AlarmRecordsListPage(page)
       await recordsPage.gotoList(FRONTEND_URL)
 
-      const ackTag = recordsPage.getAcknowledgedTag(result.alarmId)
-      await expect(ackTag).toBeVisible({ timeout: 10_000 })
+      const statusTag = recordsPage.getStatusTag(result.alarmId)
+      await expect(statusTag).toBeVisible({ timeout: 10_000 })
+      await expect(statusTag).toHaveText(/acknowledged/i, { timeout: 5_000 })
 
       const ackButton = recordsPage.getAckButton(result.alarmId)
       await expect(ackButton).toBeHidden({ timeout: 5_000 })

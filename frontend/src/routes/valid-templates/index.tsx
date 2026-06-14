@@ -3,10 +3,15 @@ import { createRoute, Link } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
 import { rootRoute } from '../__root'
 import { useProducts } from '@/hooks/useProducts'
-import { useEventValidTemplates, useUpdateEventValidTemplateStatus } from '@/hooks/useEvents'
+import {
+  useEventValidTemplates,
+  useUpdateEventValidTemplateStatus,
+  useDeleteEventValidTemplate,
+} from '@/hooks/useEvents'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type {
   PaginatedResponseEventValidTemplate,
   EventValidTemplateStatus,
@@ -30,7 +35,7 @@ const statusOptions: { value: EventValidTemplateStatus; label: string }[] = [
   { value: 'Inactive', label: 'Inactive' },
 ]
 
-function useColumns() {
+function useColumns(onDelete: (row: TemplateRow) => void) {
   const updateStatus = useUpdateEventValidTemplateStatus()
 
   const handleStatusChange = (id: number, status: EventValidTemplateStatus) => {
@@ -94,6 +99,15 @@ function useColumns() {
           >
             View
           </Link>
+          {row.status !== 'Active' && (
+            <button
+              onClick={() => onDelete(row)}
+              style={{ fontSize: '13px', color: '#dc2626' }}
+              data-testid={`template-delete-button-${row.id}`}
+            >
+              Delete
+            </button>
+          )}
         </div>
       ),
     },
@@ -106,7 +120,20 @@ function ValidTemplatesIndexPage() {
   const [searchProductId, setSearchProductId] = useState<string>('')
   const [searchEvent, setSearchEvent] = useState<string>('')
   const [page, setPage] = useState(1)
-  const columns = useColumns()
+  const [deleteTarget, setDeleteTarget] = useState<TemplateRow | null>(null)
+  const deleteMutation = useDeleteEventValidTemplate()
+  const columns = useColumns(setDeleteTarget)
+
+  function handleDelete() {
+    if (!deleteTarget) return
+    deleteMutation.mutate(deleteTarget.id, {
+      onSuccess: () => setDeleteTarget(null),
+      onError: (error) => {
+        toast.error('Failed to delete template', { description: error.message })
+        setDeleteTarget(null)
+      },
+    })
+  }
 
   const { data: products } = useProducts()
   const { data: result, isLoading } = useEventValidTemplates({
@@ -172,6 +199,17 @@ function ValidTemplatesIndexPage() {
             : undefined
         }
         onPageChange={setPage}
+      />
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title="Delete Template"
+        description={`Are you sure you want to delete template "${deleteTarget?.event}"?`}
+        onConfirm={handleDelete}
+        confirmText="Delete"
+        variant="danger"
       />
     </div>
   )

@@ -6,6 +6,7 @@ import {
   getEventValidTemplate,
   updateEventValidTemplate,
   updateEventValidTemplateStatus,
+  deleteEventValidTemplate,
 } from '@/lib/api-generated/sdk.gen'
 import type {
   SimplePaginatedResponseEventHistory as EventHistoryPage,
@@ -114,6 +115,19 @@ export function useUpdateEventValidTemplateStatus() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['valid-templates'] })
       queryClient.invalidateQueries({ queryKey: ['valid-templates', variables.id] })
+    },
+  })
+}
+
+export function useDeleteEventValidTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await deleteEventValidTemplate({ path: { id }, throwOnError: true })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['valid-templates'] })
     },
   })
 }

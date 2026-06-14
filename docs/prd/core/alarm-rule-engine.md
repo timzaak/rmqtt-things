@@ -215,7 +215,7 @@
 
 ### 9.2 已确认决策
 
-- **Webhook 动作执行失败策略**：已确认采用自动重试机制。最大重试次数和重试间隔可配置。重试通过后台任务 `webhook_retry_task` 执行，基于 `alarm_records.webhook_retries_left` 和 `webhook_next_retry_at` 字段调度。重试耗尽后标记为最终失败。
+- **Webhook 动作执行失败策略**：已确认采用自动重试机制。最大重试次数和重试间隔可配置。重试通过后台任务 `webhook_retry_task` 执行，基于 `alarm.webhook_retries_left` 和 `webhook_next_retry_at` 字段调度。重试耗尽后标记为最终失败。
 
 ---
 

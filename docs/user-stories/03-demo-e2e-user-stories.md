@@ -794,3 +794,143 @@ Given 管理员正在查看证书详情页
 When 点击 Back to Certificates 链接
 Then 页面跳转回证书列表页
 ```
+
+---
+
+## Alarm Rules (Advanced Conditions)
+
+### 故事：告警规则持续时间条件验证 [DEMO-022]
+
+**关联**: US-PA-038
+
+**【用户故事】**
+**作为**：Platform Admin
+**我希望**：创建带持续时间条件（duration_minutes）的告警规则，并在创建表单看到持续时间字段
+**从而**：确认持续时间条件配置的 UI 与后端集成正常工作
+
+**【验收标准】**
+
+**场景 1：通过 API 创建带持续时间的规则并在列表可见 [US-PA-038]**
+```gherkin
+Given 后端已启动且前端可访问
+When 通过 API 创建属性阈值规则，设置 duration_minutes 为 5
+Then 规则创建成功，出现在告警规则列表中
+```
+
+**场景 2：创建表单展示持续时间字段且默认为 0 [US-PA-038]**
+```gherkin
+Given 管理员在创建告警规则页面，选择了 property 触发类型并填写条件
+When 页面渲染条件配置区域
+Then 持续时间（duration-minutes）输入框可见，且默认值为 0（即时触发）
+```
+
+**场景 3：通过表单提交即时持续时间（0）的规则 [US-PA-038]**
+```gherkin
+Given 管理员在创建告警规则页面完成属性阈值条件填写，持续时间保持默认 0
+When 提交创建表单
+Then 规则创建成功，页面跳转回规则列表并显示新规则
+```
+
+---
+
+### 故事：告警规则清除条件验证 [DEMO-023]
+
+**关联**: US-PA-039
+
+**【用户故事】**
+**作为**：Platform Admin
+**我希望**：创建带清除条件（clear_condition）的告警规则，且清除条件区域仅在 property 触发类型下出现
+**从而**：确认清除条件配置的 UI 展示规则与后端集成正常工作
+
+**【验收标准】**
+
+**场景 1：通过 API 创建带清除条件的规则并在列表可见 [US-PA-039]**
+```gherkin
+Given 后端已启动且前端可访问
+When 通过 API 创建属性阈值规则，设置 clear_condition 为 temperature < 50
+Then 规则创建成功，出现在告警规则列表中
+```
+
+**场景 2：property 触发类型展示清除条件区域 [US-PA-039]**
+```gherkin
+Given 管理员在创建告警规则页面
+When 选择触发类型为 property
+Then 清除条件（clear-condition）配置区域可见
+```
+
+**场景 3：event 触发类型不展示清除条件区域 [US-PA-039]**
+```gherkin
+Given 管理员在创建告警规则页面
+When 选择触发类型为 event
+Then 清除条件（clear-condition）配置区域不可见
+```
+
+---
+
+## Alarms (Lifecycle)
+
+### 故事：告警记录生命周期状态验证 [DEMO-024]
+
+**关联**: US-PA-040
+
+**【用户故事】**
+**作为**：Platform Admin
+**我希望**：在告警记录列表看到告警的三态生命周期标签（Active/Acknowledged/Cleared），并按状态筛选
+**从而**：确认告警生命周期状态的展示与筛选功能正常工作
+
+**【验收标准】**
+
+**场景 1：Active 告警展示 Active 状态标签 [US-PA-040]**
+```gherkin
+Given 通过 API 创建规则并通过 MQTT 触发一条告警
+When 管理员导航到 /alarms 列表页
+Then 该告警记录展示状态标签为 Active
+```
+
+**场景 2：确认后告警状态流转为 Acknowledged [US-PA-040]**
+```gherkin
+Given 存在一条 Active 状态的告警
+When 通过 API 确认该告警后刷新列表页
+Then 该告警状态标签变为 Acknowledged，且不再显示确认按钮但仍显示清除按钮
+```
+
+**场景 3：按状态筛选告警记录 [US-PA-040]**
+```gherkin
+Given 系统中存在不同状态的告警记录
+When 管理员在筛选器选择状态为 active 并搜索
+Then 列表仅展示 Active 状态的告警记录
+```
+
+---
+
+### 故事：手动清除告警验证 [DEMO-025]
+
+**关联**: US-PA-041
+
+**【用户故事】**
+**作为**：Platform Admin
+**我希望**：从告警记录列表手动清除 Active 或 Acknowledged 状态的告警，清除后状态变为 Cleared 且不再显示操作按钮
+**从而**：确认手动清除操作在 UI 与 API 两个路径上均正常工作
+
+**【验收标准】**
+
+**场景 1：从列表页手动清除 Active 告警 [US-PA-041]**
+```gherkin
+Given 通过 MQTT 触发一条 Active 状态的告警并打开列表页
+When 管理员点击该告警的清除操作
+Then 告警状态标签变为 Cleared，且不再显示确认和清除按钮
+```
+
+**场景 2：从列表页手动清除 Acknowledged 告警 [US-PA-041]**
+```gherkin
+Given 存在一条已确认（Acknowledged）状态的告警
+When 管理员点击该告警的清除操作
+Then 告警状态标签变为 Cleared
+```
+
+**场景 3：通过 API 清除后在 UI 验证状态 [US-PA-041]**
+```gherkin
+Given 通过 MQTT 触发一条告警
+When 通过 API 调用清除该告警后打开列表页
+Then 该告警状态标签为 Cleared，且不再显示确认和清除按钮
+```

@@ -7,11 +7,10 @@
  * - 编辑校验模板
  * - 查看校验模板详情
  * - 状态管理（Draft/Active/Inactive）
+ * - 删除校验模板（DELETE /api/admin/valid/event/{id}）
  *
  * 验证管理员可以通过后台进行 Schema Templates 的完整 CRUD 操作。
  * 前置条件：系统中已有产品（种子数据中有 demo_product）。
- *
- * 注意：后端没有 delete 端点，因此通过状态变更为 Inactive 来替代删除测试。
  */
 
 import { test, expect } from './fixtures/demo-auth.fixtures'
@@ -542,5 +541,52 @@ test.describe('Deactivate template', () => {
     } finally {
       await setTemplateStatus(request, template.id, 'Inactive').catch(() => {})
     }
+  })
+})
+
+test.describe('Delete template', () => {
+  test('deletes a template via DELETE endpoint and verifies removal', async ({ request }) => {
+    const template = await createTemplateViaApi(request, {
+      event: `delete_api_${Date.now()}`,
+    })
+
+    const deleteResponse = await request.delete(`/api/admin/valid/event/${template.id}`)
+    expect(deleteResponse.status()).toBe(200)
+
+    // Verify the template is gone from the list (hard delete)
+    const listBody = await getJson<TemplateListResponse>(
+      request,
+      `/api/admin/valid/event?product_id=${PRODUCT_ID}&page=1&page_size=50`,
+    )
+    expect(listBody.data.find((t) => t.id === template.id)).toBeUndefined()
+  })
+
+  test('deletes a template from list via Delete button and confirm dialog', async ({ page, request }) => {
+    const template = await createTemplateViaApi(request, {
+      event: `delete_ui_${Date.now()}`,
+      description: 'UI delete test',
+    })
+
+    await page.goto(`${FRONTEND_URL}/valid-templates`)
+
+    const row = page.getByRole('row').filter({ hasText: template.event })
+    await expect(row).toBeVisible()
+
+    // Delete button is shown for Draft (non-Active) templates
+    await row.locator(`[data-testid="template-delete-button-${template.id}"]`).click()
+
+    // Confirm dialog appears; confirm the deletion
+    await expect(page.getByText('Are you sure you want to delete template')).toBeVisible()
+    await page.locator('[data-testid="confirm-dialog-confirm"]').click()
+
+    // Row is removed from the list after refetch
+    await expect(page.getByRole('row').filter({ hasText: template.event })).toHaveCount(0)
+
+    // Cross-check via API that the template no longer exists
+    const listBody = await getJson<TemplateListResponse>(
+      request,
+      `/api/admin/valid/event?product_id=${PRODUCT_ID}&page=1&page_size=50`,
+    )
+    expect(listBody.data.find((t) => t.id === template.id)).toBeUndefined()
   })
 })

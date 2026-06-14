@@ -12,3 +12,4 @@
 |------|-----------|------|
 | 01-platform-admin-user-stories.md | Platform Admin | 平台管理员相关用户故事（产品/设备/证书/OTA/校验模板/告警规则/告警记录/设备自动注册） |
 | 02-iot-device-user-stories.md | IoT Device | 设备端交互相关用户故事 |
+| 03-demo-e2e-user-stories.md | Demo E2E | Demo 端到端用户故事（映射 E2E 测试到用户故事） |

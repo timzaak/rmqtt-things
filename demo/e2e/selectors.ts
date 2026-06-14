@@ -118,7 +118,6 @@ export const SELECTORS = {
     statusTag: (id: number) => `[data-testid="alarm-status-tag-${id}"]`,
     ackButton: (id: number) => `[data-testid="ack-alarm-button-${id}"]`,
     clearButton: (id: number) => `[data-testid="clear-alarm-button-${id}"]`,
-    acknowledgedTag: (id: number) => `[data-testid="alarm-acknowledged-tag-${id}"]`,
     statusFilter: '[data-testid="status-filter-select"]',
   },
 

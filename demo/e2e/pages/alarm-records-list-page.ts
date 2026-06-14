@@ -44,11 +44,6 @@ export class AlarmRecordsListPage extends BasePage {
     await levelSelect.selectOption(level)
   }
 
-  async selectAcknowledgedFilter(value: string): Promise<void> {
-    const acknowledgedSelect = this.searchForm.getByLabel('Acknowledged')
-    await acknowledgedSelect.selectOption(value)
-  }
-
   async selectStatusFilter(status: string): Promise<void> {
     const statusSelect = this.page.locator(SELECTORS.alarms.statusFilter)
     await statusSelect.selectOption(status)
@@ -69,10 +64,6 @@ export class AlarmRecordsListPage extends BasePage {
 
   getStatusTag(alarmId: number): Locator {
     return this.page.locator(SELECTORS.alarms.statusTag(alarmId))
-  }
-
-  getAcknowledgedTag(alarmId: number): Locator {
-    return this.page.locator(SELECTORS.alarms.acknowledgedTag(alarmId))
   }
 
   async acknowledgeAlarm(alarmId: number): Promise<void> {

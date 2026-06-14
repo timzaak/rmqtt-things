@@ -10,7 +10,7 @@
 |------|------|----------|
 | [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 41 |
 | [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 10 |
-| [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 6 |
+| [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 25 |
 
 ## 故事 ID 索引
 
@@ -64,12 +64,31 @@
 
 | ID | 标题 | 关联 | 文件 |
 |----|------|------|------|
-| DEMO-001 | 管理员查看已创建的产品 | US-PA-002 | 03-demo-e2e-user-stories.md |
+| DEMO-001 | 产品管理完整流程（创建/查看/编辑） | US-PA-001/002/003 | 03-demo-e2e-user-stories.md |
 | DEMO-002 | 管理员查看设备列表和详情 | US-PA-019 | 03-demo-e2e-user-stories.md |
 | DEMO-003 | 管理员查看证书列表并导航到签发页 | US-PA-005 | 03-demo-e2e-user-stories.md |
 | DEMO-004 | 管理员查看校验模板列表并导航到创建页 | US-PA-008 | 03-demo-e2e-user-stories.md |
 | DEMO-005 | 管理员查看 OTA 版本列表并导航到创建页 | US-PA-012 | 03-demo-e2e-user-stories.md |
 | DEMO-006 | 管理员签发设备证书完整 E2E 流程 | US-PA-004 | 03-demo-e2e-user-stories.md |
+| DEMO-007 | 设备上报属性、事件、接收命令和状态追踪 | US-DV-003/004/005/008/009 | 03-demo-e2e-user-stories.md |
+| DEMO-008 | 设备 ACL 权限控制验证 | US-DV-002 | 03-demo-e2e-user-stories.md |
+| DEMO-009 | 设备 HMAC 认证验证 | US-DV-001 | 03-demo-e2e-user-stories.md |
+| DEMO-010 | 属性命令下发完整流程 | US-PA-016 | 03-demo-e2e-user-stories.md |
+| DEMO-011 | 设备文件上传请求验证 | US-DV-007 | 03-demo-e2e-user-stories.md |
+| DEMO-012 | 认证集成验证 | US-PA-026/027/028 | 03-demo-e2e-user-stories.md |
+| DEMO-013 | 告警规则 CRUD 验证 | US-PA-029/030/031/032/033 | 03-demo-e2e-user-stories.md |
+| DEMO-014 | 告警记录查看与确认 | US-PA-034/035 | 03-demo-e2e-user-stories.md |
+| DEMO-015 | 设备自动注册验证 | US-DV-010 | 03-demo-e2e-user-stories.md |
+| DEMO-016 | 设备列表筛选与导航 | US-PA-014/019 | 03-demo-e2e-user-stories.md |
+| DEMO-017 | 产品自动注册开关验证 | US-PA-036 | 03-demo-e2e-user-stories.md |
+| DEMO-018 | 设备详情页面验证 | US-PA-020 | 03-demo-e2e-user-stories.md |
+| DEMO-019 | 证书和私钥下载验证 | US-PA-024/025 | 03-demo-e2e-user-stories.md |
+| DEMO-020 | 证书吊销/作废验证 | US-PA-006 | 03-demo-e2e-user-stories.md |
+| DEMO-021 | 证书详情页验证 | US-PA-023 | 03-demo-e2e-user-stories.md |
+| DEMO-022 | 告警规则持续时间条件验证 | US-PA-038 | 03-demo-e2e-user-stories.md |
+| DEMO-023 | 告警规则清除条件验证 | US-PA-039 | 03-demo-e2e-user-stories.md |
+| DEMO-024 | 告警记录生命周期状态验证 | US-PA-040 | 03-demo-e2e-user-stories.md |
+| DEMO-025 | 手动清除告警验证 | US-PA-041 | 03-demo-e2e-user-stories.md |
 
 ### IoT Device (US-DV-xxx)
 

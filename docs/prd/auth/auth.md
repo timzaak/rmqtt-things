@@ -173,6 +173,8 @@ rmqtt-things 要求 Herald 中预置以下权限点，用于管理端 API 的访
 
 > 具体端点与权限的映射关系见 `/t-design auth` 产出的技术设计文档。
 
+> **注意**：OTA 版本管理（`/admin/ota`）与证书签发/吊销（`/admin/ca`）有意合并到同一个 `cert` 资源（见上表"证书与固件"）。这是粗粒度 RBAC 的设计选择——管理证书的角色同时管理 OTA 固件，二者不独立授权。若将来需要独立划分 OTA 权限，需新增 `ota` 资源并在 Herald 中配置 `ota:read`/`ota:write` 权限点（同步修改 `backend/src/api/middleware/mod.rs` 的 `extract_permission` 与对应测试）。
+
 ### 兼容性要求
 
 - 现有设备端 HMAC 认证机制完全不变

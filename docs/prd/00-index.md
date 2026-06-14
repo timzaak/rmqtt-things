@@ -63,3 +63,19 @@ auth/auth
   --> integration/validation-template (校验模板 API 认证保护)
   --> integration/file-upload (文件上传 API 认证保护)
 ```
+
+## 命名别名表
+
+| 能力 | PRD | 设计文档 (.ai/design) | 前端路由 | Demo 测试 |
+|------|-----|------------------------|----------|-----------|
+| 产品/设备管理 | `core/product-device-management.md` | `product-management.md` + `frontend-device.md` | `products` / `devices` | `products-demo` / `devices-demo` |
+| 告警规则引擎 | `core/alarm-rule-engine.md` + `core/alarm-rule-check.md` | `alarm-rule-engine.md` + `alarm-rule-check.md` | `alarm-rules` / `alarms` | `alarm-rules-demo` / `alarms-demo` |
+| 设备自动注册 | `core/device-auto-provisioning.md` | `device-auto-provisioning.md` | (产品编辑页内) | `device-auto-registration-demo` / `product-auto-provisioning-demo` |
+| Admin 认证 | `auth/auth.md` | `auth.md` | (登录流程) | `auth-demo` |
+| 证书管理 | `integration/cert-management.md` | `certificate-management.md` | `certs` | `certs-demo` (+ cert-detail/download/revoke) |
+| OTA 管理 | `integration/ota-management.md` | `ota-version-management.md` | `ota` | `ota-demo` |
+| 校验模板 | `integration/validation-template.md` | `schema-template-management.md` | `valid-templates` | `valid-templates-demo` |
+| RMQTT WebHook | `integration/rmqtt-webhook.md` | `rule-cache-redis-graceful-shutdown-webhook-retry.md` | — | `mqtt-device-flow-demo` (+ device-acl/hmac) |
+| 文件上传 | `integration/file-upload.md` | (无独立 design) | — | `device-file-upload-demo` |
+
+> PRD (`docs/prd/**`) 是权威需求源；其他列为同一能力的不同层命名。检索某能力时按本表跨层对应。

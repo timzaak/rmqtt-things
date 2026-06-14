@@ -1,9 +1,12 @@
-import { createRoute, Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { createRoute, Link, useNavigate } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
-import { useEventValidTemplate } from '@/hooks/useEvents'
+import { useEventValidTemplate, useDeleteEventValidTemplate } from '@/hooks/useEvents'
 import { SchemaDisplay } from '@/components/schema/schema-display'
 import type { JSONSchema } from '@/components/schema/schema-editor'
 import { PageHeader } from '@/components/ui/page-header'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { toast } from '@/components/ui/sonner'
 import { formatDatetime } from '@/lib/utils'
 
 export const validTemplatesShowRoute = createRoute({
@@ -36,6 +39,19 @@ function ValidTemplatesShowPage() {
   const { id: idStr } = validTemplatesShowRoute.useParams()
   const id = Number(idStr)
   const { data: template, isLoading } = useEventValidTemplate(id)
+  const deleteMutation = useDeleteEventValidTemplate()
+  const navigate = useNavigate()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  function handleDelete() {
+    deleteMutation.mutate(id, {
+      onSuccess: () => navigate({ to: '/valid-templates' }),
+      onError: (error) => {
+        toast.error('Failed to delete template', { description: error.message })
+        setConfirmDelete(false)
+      },
+    })
+  }
 
   if (isLoading) {
     return <div style={{ fontSize: '13px', color: 'var(--color-text-muted)' }}>Loading...</div>
@@ -101,6 +117,22 @@ function ValidTemplatesShowPage() {
             Edit
           </Link>
         )}
+        {template.status !== 'Active' && (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{
+              borderRadius: '6px',
+              padding: '8px 16px',
+              fontSize: '13px',
+              fontWeight: 500,
+              background: '#dc2626',
+              color: '#fff',
+            }}
+            data-testid="template-show-delete-button"
+          >
+            Delete
+          </button>
+        )}
         <Link
           to="/valid-templates"
           style={{
@@ -116,6 +148,15 @@ function ValidTemplatesShowPage() {
           Back to List
         </Link>
       </div>
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete Template"
+        description={`Are you sure you want to delete template "${template.event}"?`}
+        onConfirm={handleDelete}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   )
 }
