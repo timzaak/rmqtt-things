@@ -15,6 +15,19 @@ pub struct PropertyLatest {
     pub updated_time: OffsetDateTime,
 }
 
+/// Persisted desired state per device. Stores bare desired property values
+/// (no `{value, time}` wrapping, unlike `PropertyLatest`). Upsert follows the
+/// RFC 7396 subset merge (null = delete key) implemented in the repository.
+#[derive(Debug, FromRow, Serialize, ToSchema)]
+#[allow(dead_code)]
+pub struct PropertyDesired {
+    pub product_id: String,
+    pub device_id: String,
+    pub desired: JsonValue,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_time: OffsetDateTime,
+}
+
 #[derive(Debug, FromRow, Serialize, ToSchema)]
 #[allow(dead_code)]
 pub struct PropertyHistory {

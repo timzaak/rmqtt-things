@@ -13,7 +13,7 @@ pub async fn send_property_command_to_device(
     device_id: &str,
 ) -> anyhow::Result<()> {
     // 更新 pending 状态的命令为 sent，并获取命令信息
-    let commands = db
+    let mut commands = db
         .update_pending_commands_to_sent(product_id, device_id)
         .await?;
 
@@ -22,7 +22,10 @@ pub async fn send_property_command_to_device(
         return Ok(());
     }
 
-    // 按 created_at 合并命令，保证最新值存在
+    // 按 created_time ASC, id ASC 排序后合并，保证同属性并发下发的 last-write-wins
+    //（后到者覆盖先到者）。RETURNING 无序，需在合并前显式排序。
+    commands.sort_by(|a, b| a.2.cmp(&b.2).then(a.0.cmp(&b.0)));
+
     let mut merged_command = serde_json::Map::new();
     let mut command_ids = Vec::new();
 

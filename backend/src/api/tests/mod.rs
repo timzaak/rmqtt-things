@@ -13,6 +13,7 @@ mod ota_tests;
 mod product_tests;
 mod redis_rule_state_scenarios;
 mod s3_tests;
+mod shadow_scenarios;
 mod simple_tests;
 mod validator_tests;
 mod webhook_retry_scenarios;

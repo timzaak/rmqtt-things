@@ -5,7 +5,7 @@ use crate::rmqtt_client::RmqttHttpClient;
 
 use anyhow::bail;
 use axum::Router;
-use axum::routing::{get, patch, post};
+use axum::routing::{get, patch, post, put};
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -31,6 +31,7 @@ pub mod middleware;
 pub mod openapi;
 pub mod ota_handlers;
 pub mod product_handlers;
+pub mod shadow;
 #[cfg(test)]
 mod tests;
 pub mod utils;
@@ -101,6 +102,14 @@ pub fn create_router(
             get(admin_handlers::get_property_commands)
                 .post(admin_handlers::create_property_command)
                 .delete(admin_handlers::delete_property_commands),
+        )
+        .route(
+            "/admin/property/shadow/desired",
+            put(admin_handlers::set_property_desired),
+        )
+        .route(
+            "/admin/property/shadow",
+            get(admin_handlers::get_property_shadow),
         )
         .route(
             "/admin/property/history",

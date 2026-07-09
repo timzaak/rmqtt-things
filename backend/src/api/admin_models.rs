@@ -210,3 +210,56 @@ pub struct UpdateOtaVersionRequest {
 }
 
 pub type OtaVersionListResponse = PaginatedResponse<crate::db::models::OtaVersion>;
+
+// ---- Shadow (desired state) DTOs (design shadow-device-support.md §5.2) ----
+
+/// Set-Desired request body: a partial patch over desired state.
+///
+/// `desired` follows the RFC 7396 subset: non-null values set/overwrite the
+/// desired key, `null` values delete it. An empty object `{}` is rejected by
+/// the handler (US-PA-042 scenario 4) before reaching the repository.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SetDesiredRequest {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID
+    pub device_id: String,
+    /// 期望属性 patch（RFC 7396 子集：非 null 覆盖、null 删除）
+    pub desired: serde_json::Map<String, JsonValue>,
+}
+
+/// Set-Desired response: the merged desired document, the delta computed for
+/// this write, and whether a delta command was enqueued for delivery.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct SetDesiredResponse {
+    /// 合并后的完整 desired 文档（裸值）
+    pub desired: JsonValue,
+    /// 本次 Set-Desired 触发的 delta（待收敛属性，裸期望值）
+    pub delta: JsonValue,
+    /// 是否插入了 delta 命令（delta 非空为 true；在线即时/离线排队均为 true）
+    pub pushed: bool,
+}
+
+/// Get-Delta response: the current desired document, the reported snapshot
+/// (kept in the `{value, time}` shape for frontend consistency), and the
+/// per-property delta.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ShadowView {
+    /// 当前 desired 文档（裸值）；无则 `{}`
+    pub desired: JsonValue,
+    /// 当前 reported 快照（沿用 `{value, time}` 结构）；无则 `{}`
+    pub reported: JsonValue,
+    /// 逐属性 delta（裸期望值）；空表示已收敛
+    pub delta: JsonValue,
+}
+
+/// Get-Delta query parameters. Field naming follows the existing
+/// `PropertyCommandQuery` convention (snake_case query keys).
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ShadowQuery {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID
+    pub device_id: String,
+}

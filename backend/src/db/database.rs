@@ -883,4 +883,212 @@ impl DatabaseService {
         .await?;
         Ok(template)
     }
+
+    // Read a single property_latest row (reported snapshot) by (product_id, device_id).
+    // Dedicated point-read for Get-Delta; does not reuse the paginated query_property_latest.
+    pub async fn get_property_latest_one(
+        &self,
+        product_id: &str,
+        device_id: &str,
+    ) -> anyhow::Result<Option<PropertyLatest>> {
+        let row = sqlx::query_as::<_, PropertyLatest>(
+            r#"
+            SELECT product_id, device_id, properties, updated_time
+            FROM property_latest
+            WHERE product_id = $1 AND device_id = $2
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    // Read a single property_desired row by (product_id, device_id).
+    // Returns None when no desired state has been persisted for the device.
+    pub async fn get_property_desired(
+        &self,
+        product_id: &str,
+        device_id: &str,
+    ) -> anyhow::Result<Option<PropertyDesired>> {
+        let row = sqlx::query_as::<_, PropertyDesired>(
+            r#"
+            SELECT product_id, device_id, desired, updated_time
+            FROM property_desired
+            WHERE product_id = $1 AND device_id = $2
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    // RFC 7396 subset merge upsert for desired state.
+    //
+    // desired stores bare property values. The patch follows RFC 7396 subset:
+    //   - non-null value -> set/overwrite that desired key
+    //   - null value      -> remove that desired key
+    // JSONB `||` cannot express deletion, so the merged document is computed in
+    // Rust and written back as a whole-document update.
+    //
+    // Concurrency: a Set-Desired patch is a read-merge-write over the whole
+    // `desired` column. To keep concurrent patches on the SAME device from
+    // clobbering each other, the row is locked for the duration of the
+    // transaction. `FOR UPDATE` only locks an existing row, so the first write
+    // for a device is bootstrapped with an `INSERT ... ON CONFLICT DO NOTHING`
+    // of an empty document; whichever transaction wins the insert creates the
+    // row, and the loser's insert becomes a no-op. Both then `SELECT ... FOR
+    // UPDATE`, where the loser blocks until the winner commits, so it merges
+    // against the just-written document instead of a stale `{}()`. This matches
+    // the `get_event_valid_template_by_id_for_update` locking convention.
+    pub async fn upsert_property_desired(
+        &self,
+        product_id: &str,
+        device_id: &str,
+        desired_patch: &serde_json::Map<String, JsonValue>,
+    ) -> anyhow::Result<PropertyDesired> {
+        let mut tx = self.pool.begin().await?;
+
+        // Ensure the row exists. ON CONFLICT DO NOTHING makes the insert a no-op
+        // if a concurrent transaction already created it; the value written here
+        // is a placeholder and is always overwritten by the locked read-merge-write
+        // below, so it never leaks into a response.
+        sqlx::query(
+            r#"
+            INSERT INTO property_desired (product_id, device_id, desired, updated_time)
+            VALUES ($1, $2, '{}'::jsonb, CURRENT_TIMESTAMP)
+            ON CONFLICT (product_id, device_id) DO NOTHING
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .execute(&mut *tx)
+        .await?;
+
+        // Lock the row and read the committed document. A concurrent patch on
+        // the same device blocks here until the holder commits, then sees the
+        // freshly-written desired state.
+        let existing = sqlx::query_as::<_, PropertyDesired>(
+            r#"
+            SELECT product_id, device_id, desired, updated_time
+            FROM property_desired
+            WHERE product_id = $1 AND device_id = $2
+            FOR UPDATE
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let current_map = existing.desired.as_object().cloned().unwrap_or_default();
+
+        let merged = merge_desired(&current_map, desired_patch);
+        let merged_value = JsonValue::Object(merged);
+        let now = OffsetDateTime::now_utc();
+
+        let row = sqlx::query_as::<_, PropertyDesired>(
+            r#"
+            UPDATE property_desired
+            SET desired = $3, updated_time = $4
+            WHERE product_id = $1 AND device_id = $2
+            RETURNING product_id, device_id, desired, updated_time
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .bind(&merged_value)
+        .bind(now)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(row)
+    }
+}
+
+/// RFC 7396 subset merge for desired state (pure in-memory computation).
+///
+/// - non-null patch value -> overwrite that key in `current`
+/// - null patch value     -> remove that key from `current` (deletion)
+///
+/// Kept at the db layer because it is invoked by `upsert_property_desired`;
+/// `compute_delta` lives in the api layer (`api/shadow.rs`) for the Get-Delta
+/// handler.
+fn merge_desired(
+    current: &serde_json::Map<String, JsonValue>,
+    patch: &serde_json::Map<String, JsonValue>,
+) -> serde_json::Map<String, JsonValue> {
+    let mut result = current.clone();
+    for (key, val) in patch.iter() {
+        if val.is_null() {
+            result.remove(key);
+        } else {
+            result.insert(key.clone(), val.clone());
+        }
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge_desired;
+    use serde_json::{Value as JsonValue, json};
+
+    fn map_of(value: JsonValue) -> serde_json::Map<String, JsonValue> {
+        match value {
+            JsonValue::Object(map) => map,
+            _ => panic!("expected JSON object"),
+        }
+    }
+
+    #[test]
+    fn merge_desired_null_value_deletes_key() {
+        // null in patch removes the key from current.
+        let current = map_of(json!({"brightness": 80, "mode": "eco"}));
+        let patch = map_of(json!({"brightness": null}));
+        let result = merge_desired(&current, &patch);
+        assert_eq!(JsonValue::Object(result), json!({"mode": "eco"}));
+    }
+
+    #[test]
+    fn merge_desired_non_null_value_overrides_existing() {
+        let current = map_of(json!({"brightness": 80}));
+        let patch = map_of(json!({"brightness": 50}));
+        let result = merge_desired(&current, &patch);
+        assert_eq!(JsonValue::Object(result), json!({"brightness": 50}));
+    }
+
+    #[test]
+    fn merge_desired_inserts_new_key() {
+        let current = map_of(json!({"brightness": 80}));
+        let patch = map_of(json!({"color": "red"}));
+        let result = merge_desired(&current, &patch);
+        assert_eq!(
+            JsonValue::Object(result),
+            json!({"brightness": 80, "color": "red"})
+        );
+    }
+
+    #[test]
+    fn merge_desired_empty_patch_leaves_current_unchanged() {
+        let current = map_of(json!({"brightness": 80, "mode": "eco"}));
+        let patch = serde_json::Map::new();
+        let result = merge_desired(&current, &patch);
+        assert_eq!(
+            JsonValue::Object(result),
+            json!({"brightness": 80, "mode": "eco"})
+        );
+    }
+
+    #[test]
+    fn merge_desired_all_null_patch_clears_document() {
+        let current = map_of(json!({"brightness": 80, "mode": "eco"}));
+        let patch = map_of(json!({"brightness": null, "mode": null}));
+        let result = merge_desired(&current, &patch);
+        assert_eq!(JsonValue::Object(result), json!({}));
+    }
 }

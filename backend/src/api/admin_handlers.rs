@@ -2,6 +2,7 @@ use crate::api::ApiState;
 use crate::api::admin_models::*;
 use crate::api::error::ApiError;
 use crate::api::handlers::is_file_upload_directory_allowed;
+use crate::api::shadow::compute_delta;
 use crate::api::utils::{
     send_property_command_to_device, validate_identifier, validate_version_format,
 };
@@ -13,6 +14,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum_extra::extract::Query;
+use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -516,6 +518,175 @@ pub async fn create_property_command(
     }
 
     Ok(StatusCode::CREATED)
+}
+
+// PUT /admin/property/shadow/desired - Set-Desired：upsert desired，计算 delta，
+// 非空则借命令通道投递（设计 shadow-device-support.md §5.2）。
+#[utoipa::path(
+    put,
+    path = "/api/admin/property/shadow/desired",
+    tag = "admin",
+    request_body = SetDesiredRequest,
+    responses((status = 200, description = "Desired state updated", body = SetDesiredResponse))
+)]
+pub async fn set_property_desired(
+    State(state): State<Arc<ApiState>>,
+    Json(request): Json<SetDesiredRequest>,
+) -> Result<Json<SetDesiredResponse>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&request.product_id, "product_id")?;
+    validate_identifier(&request.device_id, "device_id")?;
+
+    // 空对象 patch 无任何操作，返回 400（US-PA-042 场景 4）。
+    // 注：patch 只含 null（如 `{"key": null}`）合法——它有删除操作，
+    // 合并后文档即使变空也不返回 400。
+    if request.desired.is_empty() {
+        return Err(ApiError::bad_request(
+            "desired must be a non-empty JSON object",
+        ));
+    }
+
+    // RFC 7396 子集合并 upsert，返回合并后的完整 desired 文档。
+    let merged = state
+        .db
+        .upsert_property_desired(&request.product_id, &request.device_id, &request.desired)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    let reported_row = state
+        .db
+        .get_property_latest_one(&request.product_id, &request.device_id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+    let reported_map = reported_row
+        .as_ref()
+        .and_then(|r| r.properties.as_object())
+        .cloned()
+        .unwrap_or_default();
+
+    let desired_map = merged.desired.as_object().cloned().unwrap_or_default();
+    let delta_map = compute_delta(&desired_map, &reported_map);
+
+    // delta 非空则入 Pending + 在线投递；离线/查询失败留队。pushed = delta 非空。
+    let pushed = !delta_map.is_empty();
+    let delta = JsonValue::Object(delta_map);
+    if pushed {
+        state
+            .db
+            .insert_property_command(&request.product_id, &request.device_id, &delta)
+            .await
+            .map_err(|e| {
+                error!("Database error: {}", e);
+                ApiError::internal("Database operation failed")
+            })?;
+
+        match state
+            .rmqtt_client
+            .is_subscribed_to_properties(&request.product_id, &request.device_id)
+            .await
+        {
+            Ok(is_subscribed) => {
+                if is_subscribed {
+                    info!(
+                        "Device {} is subscribed to properties, sending desired delta immediately",
+                        request.device_id
+                    );
+                    // 在线则排空 Pending 下发；发送失败仅日志，命令留 DB
+                    // （参照 create_property_command，不返回错误）。
+                    if let Err(e) = send_property_command_to_device(
+                        &state.db,
+                        &state.rmqtt_client,
+                        &request.product_id,
+                        &request.device_id,
+                    )
+                    .await
+                    {
+                        error!(
+                            "Failed to send desired delta to device {}: {}",
+                            request.device_id, e
+                        );
+                    }
+                } else {
+                    info!(
+                        "Device {} is not subscribed to properties, desired delta will be sent when device comes online",
+                        request.device_id
+                    );
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to check device {} subscription status: {}, desired delta will be sent when device comes online",
+                    request.device_id, e
+                );
+            }
+        }
+    }
+
+    Ok(Json(SetDesiredResponse {
+        desired: merged.desired,
+        delta,
+        pushed,
+    }))
+}
+
+// GET /admin/property/shadow - Get-Delta：返回 desired / reported / delta
+// （设计 shadow-device-support.md §5.2）。
+#[utoipa::path(
+    get,
+    path = "/api/admin/property/shadow",
+    tag = "admin",
+    params(ShadowQuery),
+    responses((status = 200, description = "Shadow view", body = ShadowView))
+)]
+pub async fn get_property_shadow(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<ShadowQuery>,
+) -> Result<Json<ShadowView>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&query.product_id, "product_id")?;
+    validate_identifier(&query.device_id, "device_id")?;
+
+    let desired_row = state
+        .db
+        .get_property_desired(&query.product_id, &query.device_id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+    let desired = desired_row
+        .as_ref()
+        .map(|d| d.desired.clone())
+        .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+
+    let reported_row = state
+        .db
+        .get_property_latest_one(&query.product_id, &query.device_id)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+    let reported = reported_row
+        .as_ref()
+        .map(|r| r.properties.clone())
+        .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+
+    let desired_map = desired.as_object().cloned().unwrap_or_default();
+    let reported_map = reported.as_object().cloned().unwrap_or_default();
+    let delta = JsonValue::Object(compute_delta(&desired_map, &reported_map));
+
+    Ok(Json(ShadowView {
+        desired,
+        reported,
+        delta,
+    }))
 }
 
 // DELETE /admin/property/command - 删除属性命令
