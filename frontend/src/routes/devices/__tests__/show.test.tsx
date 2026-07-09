@@ -1,8 +1,8 @@
 import { describe, test, expect, vi } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
-import type { DeviceStatusWithSource } from '@/lib/api-generated/types.gen'
+import type { DeviceStatusWithSource, ShadowView } from '@/lib/api-generated/types.gen'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
@@ -49,6 +49,8 @@ const mockUsePropertyHistory = vi.fn()
 const mockUsePropertyCommands = vi.fn()
 const mockUseCreatePropertyCommand = vi.fn()
 const mockUseDeletePropertyCommands = vi.fn()
+const mockUsePropertyShadow = vi.fn()
+const mockUseSetDesired = vi.fn()
 
 vi.mock('@/hooks/useProperties', () => ({
   usePropertyLatest: (...args: unknown[]) => mockUsePropertyLatest(...args),
@@ -56,6 +58,8 @@ vi.mock('@/hooks/useProperties', () => ({
   usePropertyCommands: (...args: unknown[]) => mockUsePropertyCommands(...args),
   useCreatePropertyCommand: () => mockUseCreatePropertyCommand(),
   useDeletePropertyCommands: () => mockUseDeletePropertyCommands(),
+  usePropertyShadow: (...args: unknown[]) => mockUsePropertyShadow(...args),
+  useSetDesired: () => mockUseSetDesired(),
 }))
 
 const mockUseEventHistory = vi.fn()
@@ -101,6 +105,11 @@ function setupMocks(deviceData = mockDevice) {
   })
   mockUseCreatePropertyCommand.mockReturnValue({ mutate: vi.fn(), isPending: false })
   mockUseDeletePropertyCommands.mockReturnValue({ mutate: vi.fn(), isPending: false })
+  mockUsePropertyShadow.mockReturnValue({
+    data: { desired: {}, reported: {}, delta: {} },
+    isLoading: false,
+  })
+  mockUseSetDesired.mockReturnValue({ mutate: vi.fn(), isPending: false, error: null })
 }
 
 describe('DevicesShowPage', () => {
@@ -261,5 +270,196 @@ describe('DevicesShowPage', () => {
     renderWithProviders(<Page />)
 
     expect(screen.getByText('Loading...')).toBeInTheDocument()
+  })
+})
+
+// --- Property Shadow section fixtures ---
+
+/**
+ * Build a converged shadow view: desired present but delta empty.
+ */
+function makeConvergedShadow(): ShadowView {
+  return {
+    desired: { brightness: 80 },
+    reported: { brightness: { value: 80, time: '2025-01-01T10:00:00Z' } },
+    delta: {},
+  }
+}
+
+/**
+ * Build a pending shadow view: delta non-empty (desired not yet converged).
+ */
+function makePendingShadow(): ShadowView {
+  return {
+    desired: { brightness: 80, colorTemp: 4000 },
+    reported: {
+      brightness: { value: 80, time: '2025-01-01T10:00:00Z' },
+      colorTemp: { value: 3000, time: '2025-01-01T10:00:00Z' },
+    },
+    delta: { colorTemp: 4000 },
+  }
+}
+
+describe('Property Shadow section', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('renders shadow section title and container', () => {
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByText('Desired State (Shadow)')).toBeInTheDocument()
+    expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
+  })
+
+  test('renders delta rows when delta is not empty', () => {
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makePendingShadow(), isLoading: false })
+
+    renderWithProviders(<Page />)
+
+    const table = screen.getByTestId('shadow-delta-table')
+    expect(table).toBeInTheDocument()
+    // colorTemp -> kebab-case "color-temp"
+    expect(screen.getByTestId('shadow-status-color-temp')).toBeInTheDocument()
+    // The delta key value should appear in the desired-value column
+    expect(table.textContent).toContain('4000')
+    // Reported value (3000) should also appear
+    expect(table.textContent).toContain('3000')
+  })
+
+  test('shows converged state when delta is empty', () => {
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makeConvergedShadow(), isLoading: false })
+
+    renderWithProviders(<Page />)
+
+    // desired present + delta empty => DataTable renders the "Converged" empty message
+    expect(screen.getByTestId('shadow-delta-table')).toBeInTheDocument()
+    expect(screen.getByText('Converged')).toBeInTheDocument()
+  })
+
+  test('opens editor on set button click', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    // Editor is not present initially
+    expect(screen.queryByTestId('shadow-desired-editor')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('shadow-set-button'))
+
+    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
+  })
+
+  test('closes editor on cancel button click', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    await user.click(screen.getByTestId('shadow-set-button'))
+    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('shadow-cancel-button'))
+
+    expect(screen.queryByTestId('shadow-desired-editor')).not.toBeInTheDocument()
+  })
+
+  test('calls mutate with valid JSON', async () => {
+    const user = userEvent.setup()
+    const mockMutate = vi.fn()
+    setupMocks()
+    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
+
+    renderWithProviders(<Page />)
+
+    await user.click(screen.getByTestId('shadow-set-button'))
+    const editor = screen.getByTestId('shadow-desired-editor')
+    fireEvent.change(editor, { target: { value: '{"brightness": 90}' } })
+
+    await user.click(screen.getByTestId('shadow-submit-button'))
+
+    expect(mockMutate).toHaveBeenCalledTimes(1)
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        product_id: 'product-a',
+        device_id: 'test-device-001',
+        desired: { brightness: 90 },
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      })
+    )
+  })
+
+  test('shows parse error for invalid JSON', async () => {
+    const user = userEvent.setup()
+    const mockMutate = vi.fn()
+    setupMocks()
+    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
+
+    renderWithProviders(<Page />)
+
+    await user.click(screen.getByTestId('shadow-set-button'))
+    const editor = screen.getByTestId('shadow-desired-editor')
+    fireEvent.change(editor, { target: { value: 'not valid json' } })
+
+    await user.click(screen.getByTestId('shadow-submit-button'))
+
+    expect(screen.getByText('Invalid JSON')).toBeInTheDocument()
+    expect(mockMutate).not.toHaveBeenCalled()
+  })
+
+  test('shows backend error when submitting empty desired object', async () => {
+    const user = userEvent.setup()
+    const mockMutate = vi.fn()
+    setupMocks()
+    // A desired view already exists so the table/desired area stays intact.
+    mockUsePropertyShadow.mockReturnValue({ data: makeConvergedShadow(), isLoading: false })
+    // Simulate the backend rejecting `{}`; the real error path surfaces via the
+    // mutation's onError callback into a sonner toast.
+    mockUseSetDesired.mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+      error: null,
+    })
+
+    renderWithProviders(<Page />)
+
+    await user.click(screen.getByTestId('shadow-set-button'))
+    const editor = screen.getByTestId('shadow-desired-editor')
+    fireEvent.change(editor, { target: { value: '{}' } })
+
+    await user.click(screen.getByTestId('shadow-submit-button'))
+
+    // Empty object is a valid JSON object, so mutate IS called with desired: {}
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        product_id: 'product-a',
+        device_id: 'test-device-001',
+        desired: {},
+      },
+      expect.objectContaining({ onError: expect.any(Function) })
+    )
+
+    // Drive the backend error path: invoke the onError callback the component
+    // registered, surfacing the backend rejection message via the sonner toast.
+    const onError = mockMutate.mock.calls[0][1].onError as (e: unknown) => void
+    onError(new Error('desired must be a non-empty JSON object'))
+
+    const { toast } = await import('sonner')
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to set desired state', {
+        description: 'desired must be a non-empty JSON object',
+      })
+    })
+
+    // Existing desired view is not destroyed by the failed submit
+    expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
+    // The dialog stays open on failure (editor remains available)
+    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
   })
 })

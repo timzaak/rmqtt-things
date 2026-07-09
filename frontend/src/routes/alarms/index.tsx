@@ -8,7 +8,7 @@ import { SearchForm } from '@/components/ui/search-form'
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/components/ui/sonner'
-import { formatDatetime } from '@/lib/utils'
+import { extractErrorMessage, formatDatetime } from '@/lib/utils'
 
 export const alarmsIndexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -146,12 +146,7 @@ function AlarmsIndexPage() {
               onClick={() => {
                 clearMutation.mutate(row.id, {
                   onError: (error) => {
-                    const msg =
-                      error instanceof Error
-                        ? error.message
-                        : typeof error === 'object' && error !== null && 'message' in error
-                          ? String((error as { message: unknown }).message)
-                          : String(error)
+                    const msg = extractErrorMessage(error)
                     if (msg.includes('already cleared')) {
                       toast.error('Alarm already cleared')
                     } else {

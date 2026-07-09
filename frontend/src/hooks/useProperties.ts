@@ -5,12 +5,16 @@ import {
   getPropertyCommands,
   createPropertyCommand,
   deletePropertyCommands,
+  getPropertyShadow,
+  setPropertyDesired,
 } from '@/lib/api-generated/sdk.gen'
 import type {
   SimplePaginatedResponsePropertyLatest as PropertyLatestPage,
   SimplePaginatedResponsePropertyHistory as PropertyHistoryPage,
   PaginatedResponsePropertyCommand as PropertyCommandPage,
   CreatePropertyCommandRequest,
+  ShadowView,
+  SetDesiredRequest,
 } from '@/lib/api-generated/types.gen'
 
 interface PropertyLatestParams {
@@ -115,6 +119,42 @@ export function useDeletePropertyCommands() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['property-commands'] })
+    },
+  })
+}
+
+interface PropertyShadowParams {
+  product_id: string
+  device_id: string
+}
+
+export const usePropertyShadow = (params: PropertyShadowParams) => {
+  return useQuery({
+    queryKey: ['property-shadow', params],
+    queryFn: async () => {
+      const res = await getPropertyShadow({
+        query: {
+          product_id: params.product_id,
+          device_id: params.device_id,
+        },
+        throwOnError: true,
+      })
+      return res.data as unknown as ShadowView
+    },
+  })
+}
+
+export const useSetDesired = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (body: SetDesiredRequest) => {
+      const res = await setPropertyDesired({ body, throwOnError: true })
+      return res.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['property-shadow'] })
+      queryClient.invalidateQueries({ queryKey: ['property-commands'] })
+      queryClient.invalidateQueries({ queryKey: ['property-latest'] })
     },
   })
 }
