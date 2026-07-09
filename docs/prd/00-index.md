@@ -5,7 +5,7 @@
 | 域 | PRD 数量 | 说明 |
 |----|----------|------|
 | auth | 1 | Admin 认证与权限管理（Herald 集成） |
-| core | 3 | 产品与设备管理、告警规则引擎、设备自动注册（核心业务） |
+| core | 4 | 产品与设备管理、告警规则引擎、设备自动注册、影子设备支持（核心业务） |
 | integration | 5 | 证书管理、OTA 固件升级、事件校验模板、RMQTT WebHook 集成、文件上传 |
 
 ## PRD 列表
@@ -16,6 +16,7 @@
 | [alarm-rule-engine.md](core/alarm-rule-engine.md) | core | P0 | 告警规则引擎：属性阈值/事件/设备状态触发、规则 CRUD、告警记录管理 |
 | [alarm-rule-check.md](core/alarm-rule-check.md) | core | P0 | 告警规则增强：持续时间条件、清除条件、三态生命周期（Active/Acknowledged/Cleared） |
 | [device-auto-provisioning.md](core/device-auto-provisioning.md) | core | P0 | 设备自动注册：产品级自动注册开关、首次 HMAC 认证自动创建设备身份记录、注册来源标记 |
+| [shadow-device-support.md](core/shadow-device-support.md) | core | P1 | 影子设备支持：持久期望状态（desired）视图、被动收敛、null=删除合并规则、delta 借属性命令通道投递 |
 | [cert-management.md](integration/cert-management.md) | integration | P0 | TLS 证书签发/吊销、HMAC 设备认证、ACL 控制 |
 | [ota-management.md](integration/ota-management.md) | integration | P1 | OTA 固件版本管理、设备版本上报与升级推送 |
 | [validation-template.md](integration/validation-template.md) | integration | P0 | 事件/属性校验模板管理、JSON Schema 校验 |
@@ -36,6 +37,10 @@ core/product-device-management
 core/alarm-rule-engine
   --> core/product-device-management (规则绑定产品维度)
   <-- integration/rmqtt-webhook (规则评估在回调流程中触发)
+
+core/shadow-device-support
+  --> core/product-device-management (复用属性命令通道、reported 快照)
+  <-- integration/rmqtt-webhook (属性上报/订阅/回复回调来源)
 
 integration/cert-management
   --> core/product-device-management (产品关联)
@@ -71,6 +76,7 @@ auth/auth
 | 产品/设备管理 | `core/product-device-management.md` | `product-management.md` + `frontend-device.md` | `products` / `devices` | `products-demo` / `devices-demo` |
 | 告警规则引擎 | `core/alarm-rule-engine.md` + `core/alarm-rule-check.md` | `alarm-rule-engine.md` + `alarm-rule-check.md` | `alarm-rules` / `alarms` | `alarm-rules-demo` / `alarms-demo` |
 | 设备自动注册 | `core/device-auto-provisioning.md` | `device-auto-provisioning.md` | (产品编辑页内) | `device-auto-registration-demo` / `product-auto-provisioning-demo` |
+| 影子设备支持 | `core/shadow-device-support.md` | `shadow-device-support.md` | (设备详情页内) | `device-shadow-demo` |
 | Admin 认证 | `auth/auth.md` | `auth.md` | (登录流程) | `auth-demo` |
 | 证书管理 | `integration/cert-management.md` | `certificate-management.md` | `certs` | `certs-demo` (+ cert-detail/download/revoke) |
 | OTA 管理 | `integration/ota-management.md` | `ota-version-management.md` | `ota` | `ota-demo` |
