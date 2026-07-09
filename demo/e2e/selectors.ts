@@ -160,6 +160,22 @@ export const SELECTORS = {
     /** option text in the filter dropdown */
     registrationManualOption: 'Manual',
   },
+
+  /**
+   * Property Shadow 面板选择器 (US-PA-042/043/044)
+   *
+   * 对应组件 frontend/src/components/property-shadow/PropertyShadowSection.tsx。
+   * 仅收集静态 data-testid；动态 testid `shadow-status-${kebabKey}` 由测试文件
+   * 内联 helper 构造（key 随测试数据变化，无法表达为常量）。
+   */
+  shadow: {
+    section: '[data-testid="shadow-section"]',
+    deltaTable: '[data-testid="shadow-delta-table"]',
+    setButton: '[data-testid="shadow-set-button"]',
+    desiredEditor: '[data-testid="shadow-desired-editor"]',
+    submitButton: '[data-testid="shadow-submit-button"]',
+    cancelButton: '[data-testid="shadow-cancel-button"]',
+  },
 }
 
 /**

@@ -108,13 +108,15 @@ def _get_pids_by_port_windows_powershell(port: int) -> set[str]:
             ["powershell", "-NoProfile", "-Command", command],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=5,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return set()
 
-    if result.returncode != 0:
+    if result.returncode != 0 or result.stdout is None:
         return set()
 
     return {
@@ -131,13 +133,15 @@ def _get_pids_by_port_windows_netstat(port: int) -> set[str]:
             ["netstat", "-ano", "-p", "tcp"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=False,
             timeout=5,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return set()
 
-    if result.returncode != 0:
+    if result.returncode != 0 or result.stdout is None:
         return set()
 
     pids: set[str] = set()
