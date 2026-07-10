@@ -82,7 +82,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test('[Scenario A] US-PA-042/US-PA-044 set desired online via UI, device replies, delta converges', async ({
     page,
     request,
-    demoLogger,
+    demoLogger: _demoLogger,
   }) => {
     // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
     const productId = await findSeedProductId(request)
@@ -135,7 +135,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
             request,
             `/api/admin/property/shadow?product_id=${PRODUCT_ID}&device_id=${deviceId}`,
           )
-          return (body.delta ?? {}).hasOwnProperty('brightness')
+          return Object.prototype.hasOwnProperty.call(body.delta ?? {}, 'brightness')
         },
         { timeout: POLL_TIMEOUT },
       ).toBe(false)
@@ -151,7 +151,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test('[Scenario B] US-PA-042 set desired while offline, delta queued then delivered on connect', async ({
     page,
     request,
-    demoLogger,
+    demoLogger: _demoLogger,
   }) => {
     // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
     const productId = await findSeedProductId(request)
@@ -225,7 +225,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test('[Scenario C] US-PA-043 one-shot command does not pollute desired, delta stays visible', async ({
     page,
     request,
-    demoLogger,
+    demoLogger: _demoLogger,
   }) => {
     // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
     const productId = await findSeedProductId(request)
@@ -303,7 +303,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test('[Scenario D] US-PA-042 empty desired object is rejected with 400', async ({
     page,
     request,
-    demoLogger,
+    demoLogger: _demoLogger,
   }) => {
     // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
     const productId = await findSeedProductId(request)
@@ -351,7 +351,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test('[Scenario E] US-PA-043 command Failed leaves desired intact', async ({
     page,
     request,
-    demoLogger,
+    demoLogger: _demoLogger,
   }) => {
     // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
     const productId = await findSeedProductId(request)
