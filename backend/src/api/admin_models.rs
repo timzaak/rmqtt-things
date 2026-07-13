@@ -5,6 +5,7 @@ use crate::db::models::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use time::OffsetDateTime;
 use utoipa::{IntoParams, ToSchema};
 
 // 通用查询参数结构
@@ -242,7 +243,8 @@ pub struct SetDesiredResponse {
 
 /// Get-Delta response: the current desired document, the reported snapshot
 /// (kept in the `{value, time}` shape for frontend consistency), and the
-/// per-property delta.
+/// per-property delta. Document-level timestamps let the frontend show when
+/// desired / reported were last updated without a per-key metadata layer.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ShadowView {
     /// 当前 desired 文档（裸值）；无则 `{}`
@@ -251,6 +253,12 @@ pub struct ShadowView {
     pub reported: JsonValue,
     /// 逐属性 delta（裸期望值）；空表示已收敛
     pub delta: JsonValue,
+    /// desired 文档最后更新时间；无 desired 行则 null
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub desired_updated_time: Option<OffsetDateTime>,
+    /// reported 快照最后更新时间；无 reported 行则 null
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub reported_updated_time: Option<OffsetDateTime>,
 }
 
 /// Get-Delta query parameters. Field naming follows the existing

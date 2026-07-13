@@ -45,12 +45,14 @@ CREATE TABLE IF NOT EXISTS property_command (
     device_id    text  NOT NULL,
     command      JSONB NOT NULL, -- 下发属性 {"brightness":80,"mode":"eco"}
     status       int2  NOT NULL DEFAULT 0, -- 0: pending, 1:sent, 2:success, 3:failed
+    source       int2  NOT NULL DEFAULT 0, -- 0: one-shot command, 1: desired delta
     created_time TIMESTAMPTZ    DEFAULT CURRENT_TIMESTAMP,
     updated_time TIMESTAMPTZ    DEFAULT CURRENT_TIMESTAMP,
     product_id TEXT NOT NULL
 );
 
 COMMENT ON COLUMN property_command.status IS '0: pending, 1:sent, 2:success, 3:failed, 4:deleted';
+COMMENT ON COLUMN property_command.source IS '0: one-shot command, 1: desired delta';
 
 
 -- 为属性下发表创建索引

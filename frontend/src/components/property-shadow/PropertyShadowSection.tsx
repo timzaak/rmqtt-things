@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { toast } from '@/components/ui/sonner'
-import { usePropertyShadow, useSetDesired } from '@/hooks/useProperties'
+import { usePropertyCommands, usePropertyShadow, useSetDesired } from '@/hooks/useProperties'
 import { extractErrorMessage } from '@/lib/utils'
-import type { SetDesiredRequest, ShadowView } from '@/lib/api-generated/types.gen'
+import { formatDatetime } from '@/lib/utils'
+import type { CommandSource, SetDesiredRequest, ShadowView } from '@/lib/api-generated/types.gen'
 
 const sectionHeading: React.CSSProperties = {
   color: 'var(--color-text-primary)',
@@ -18,11 +19,20 @@ const subtitleStyle: React.CSSProperties = {
   marginBottom: '16px',
 }
 
-interface DeltaRow {
+const metaStyle: React.CSSProperties = {
+  color: 'var(--color-text-muted)',
+  fontSize: '12px',
+  marginTop: '4px',
+}
+
+interface DesiredRow {
   key: string
   desiredValue: unknown
   reportedValue: unknown
+  reportedTime: string | null
   statusTestid: string
+  statusLabel: string
+  statusColor: string
   [key: string]: unknown
 }
 
@@ -60,32 +70,137 @@ function formatValue(value: unknown): string {
   return String(value)
 }
 
+/** Unwrap a reported entry `{ value, time }` into its bare value. */
+function unwrapReportedValue(entry: unknown): unknown {
+  if (
+    entry !== null &&
+    typeof entry === 'object' &&
+    'value' in (entry as Record<string, unknown>)
+  ) {
+    return (entry as { value: unknown }).value
+  }
+  return entry
+}
+
+/** Extract the `time` field from a reported `{ value, time }` entry. */
+function unwrapReportedTime(entry: unknown): string | null {
+  if (entry !== null && typeof entry === 'object' && 'time' in (entry as Record<string, unknown>)) {
+    const t = (entry as { time: unknown }).time
+    return typeof t === 'string' ? t : null
+  }
+  return null
+}
+
+/** Status colors mirroring CommandHistorySection (show.$id.tsx). */
+const STATUS_COLORS = {
+  converged: '#059669',
+  pending: '#d97706',
+  failed: '#dc2626',
+} as const
+
 /**
- * Build delta table rows from the shadow view.
+ * Resolve the display status for a desired property key, combining whether the
+ * reported value has converged with the delivery status of the most recent
+ * DesiredDelta command targeting that key.
+ *
+ * - converged (reported == desired) -> "Converged" (green)
+ * - not converged + command Failed  -> "Delivery failed" (red)
+ * - not converged + command Pending -> "Queued" (amber)
+ * - not converged + command Sent    -> "Sent" (amber)
+ * - not converged + command Success -> "Replied, not converged" (amber)
+ * - not converged + no command      -> "Pending convergence" (amber, original wording)
+ */
+function resolveStatus(
+  converged: boolean,
+  commandStatus: 'Pending' | 'Sent' | 'Success' | 'Failed' | undefined
+): { label: string; color: string } {
+  if (converged) {
+    return { label: 'Converged', color: STATUS_COLORS.converged }
+  }
+  switch (commandStatus) {
+    case 'Failed':
+      return { label: 'Delivery failed', color: STATUS_COLORS.failed }
+    case 'Pending':
+      return { label: 'Queued', color: STATUS_COLORS.pending }
+    case 'Sent':
+      return { label: 'Sent', color: STATUS_COLORS.pending }
+    case 'Success':
+      return { label: 'Replied, not converged', color: STATUS_COLORS.pending }
+    default:
+      // No DesiredDelta command found for this key yet.
+      return { label: 'Pending convergence', color: STATUS_COLORS.pending }
+  }
+}
+
+interface DesiredDeltaIndex {
+  /** key -> most recent DesiredDelta command status (commands already sorted updated_time DESC by backend) */
+  byKey: Map<string, 'Pending' | 'Sent' | 'Success' | 'Failed'>
+}
+
+/**
+ * Build an index from property key -> latest DesiredDelta command status.
+ * Only commands whose `source === 'DesiredDelta'` and whose `command` JSON
+ * contains the key are considered. The backend returns commands ordered by
+ * `updated_time DESC`, so the first match per key wins.
+ */
+function indexDesiredDeltaCommands(
+  commands: Array<{ command: unknown; status: string; source: CommandSource }>
+): DesiredDeltaIndex {
+  const byKey = new Map<string, 'Pending' | 'Sent' | 'Success' | 'Failed'>()
+  for (const cmd of commands) {
+    if (cmd.source !== 'DesiredDelta') continue
+    if (
+      cmd.status !== 'Pending' &&
+      cmd.status !== 'Sent' &&
+      cmd.status !== 'Success' &&
+      cmd.status !== 'Failed'
+    ) {
+      continue
+    }
+    const obj =
+      cmd.command !== null && typeof cmd.command === 'object' && !Array.isArray(cmd.command)
+        ? (cmd.command as Record<string, unknown>)
+        : null
+    if (!obj) continue
+    for (const key of Object.keys(obj)) {
+      // First occurrence wins (most recent due to DESC ordering).
+      if (!byKey.has(key)) {
+        byKey.set(key, cmd.status)
+      }
+    }
+  }
+  return { byKey }
+}
+
+/**
+ * Build table rows from the shadow view, covering ALL desired keys (not just
+ * the delta). Each row reports desired/reported values, the reported time, and
+ * a status derived from convergence + the latest DesiredDelta command.
  *
  * Per backend `compute_delta` (shadow.rs): `delta` is a map of property key ->
  * bare desired value (only keys that have NOT converged). `desired` holds bare
  * values; `reported` holds values wrapped as `{ value, time }`.
  */
-function buildDeltaRows(shadow: ShadowView): DeltaRow[] {
-  const deltaObj = (shadow.delta ?? {}) as Record<string, unknown>
+function buildDesiredRows(shadow: ShadowView, deltaIndex: DesiredDeltaIndex): DesiredRow[] {
   const desiredObj = (shadow.desired ?? {}) as Record<string, unknown>
   const reportedObj = (shadow.reported ?? {}) as Record<string, unknown>
 
-  return Object.keys(deltaObj).map((key) => {
+  return Object.keys(desiredObj).map((key) => {
     const desiredValue = desiredObj[key]
-    const reportedEntry = reportedObj[key] as { value?: unknown } | unknown
-    const reportedValue =
-      reportedEntry !== null &&
-      typeof reportedEntry === 'object' &&
-      'value' in (reportedEntry as Record<string, unknown>)
-        ? (reportedEntry as { value: unknown }).value
-        : reportedEntry
+    const reportedEntry = reportedObj[key]
+    const reportedValue = unwrapReportedValue(reportedEntry)
+    const reportedTime = unwrapReportedTime(reportedEntry)
+    const converged = reportedValue === desiredValue
+    const commandStatus = deltaIndex.byKey.get(key)
+    const { label, color } = resolveStatus(converged, commandStatus)
     return {
       key,
       desiredValue,
       reportedValue,
+      reportedTime,
       statusTestid: statusTestidFor(key),
+      statusLabel: label,
+      statusColor: color,
     }
   })
 }
@@ -100,27 +215,42 @@ export function PropertyShadowSection({ productId, deviceId }: PropertyShadowSec
     product_id: productId,
     device_id: deviceId,
   })
+  // Fetch commands to correlate each desired key with its latest DesiredDelta
+  // delivery status. page_size 100 is generous; a single device rarely has
+  // more than a handful of recent commands. useSetDesired already invalidates
+  // ['property-commands'] on success, so this stays fresh.
+  const { data: commandsData } = usePropertyCommands({
+    product_id: productId,
+    device_id: deviceId,
+    page: 1,
+    page_size: 100,
+  })
   const setDesired = useSetDesired()
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const desiredDoc = (shadow?.desired ?? {}) as Record<string, unknown>
   const hasDesired = Object.keys(desiredDoc).length > 0
 
-  const deltaRows = shadow ? buildDeltaRows(shadow) : []
+  const deltaIndex = indexDesiredDeltaCommands(commandsData?.data ?? [])
+  const desiredRows = shadow ? buildDesiredRows(shadow, deltaIndex) : []
 
-  const columns: Column<DeltaRow>[] = [
+  const columns: Column<DesiredRow>[] = [
     { header: 'Property', accessor: 'key' },
     { header: 'Desired Value', accessor: (row) => formatValue(row.desiredValue) },
     { header: 'Reported Value', accessor: (row) => formatValue(row.reportedValue) },
+    {
+      header: 'Reported Time',
+      accessor: (row) => (row.reportedTime ? formatDatetime(row.reportedTime) : '-'),
+    },
     {
       header: 'Status',
       accessor: (row) => (
         <span
           data-testid={row.statusTestid}
           className="text-[12px] font-semibold"
-          style={{ color: '#d97706' }}
+          style={{ color: row.statusColor }}
         >
-          Pending convergence
+          {row.statusLabel}
         </span>
       ),
     },
@@ -134,6 +264,9 @@ export function PropertyShadowSection({ productId, deviceId }: PropertyShadowSec
           <p style={subtitleStyle}>
             The platform does not auto-repush; the admin decides whether to set again.
           </p>
+          {shadow?.desired_updated_time && (
+            <p style={metaStyle}>Desired updated: {formatDatetime(shadow.desired_updated_time)}</p>
+          )}
         </div>
         <button
           data-testid="shadow-set-button"
@@ -160,7 +293,7 @@ export function PropertyShadowSection({ productId, deviceId }: PropertyShadowSec
         <div data-testid="shadow-delta-table">
           <DataTable
             columns={columns}
-            data={deltaRows}
+            data={desiredRows}
             loading={isLoading}
             emptyMessage="Converged"
           />

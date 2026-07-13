@@ -9,7 +9,7 @@ use crate::api::utils::{
 use crate::api::web_models::{FileUploadRequest, FileUploadResponse};
 use crate::cache::SchemaCacheManager;
 use crate::db::database::ACTIVE_TEMPLATE_SCHEMA_ERR;
-use crate::db::models::OtaVersion;
+use crate::db::models::{CommandSource, OtaVersion};
 use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -467,7 +467,12 @@ pub async fn create_property_command(
     // 插入命令到数据库
     state
         .db
-        .insert_property_command(&request.product_id, &request.device_id, &request.command)
+        .insert_property_command(
+            &request.product_id,
+            &request.device_id,
+            &request.command,
+            CommandSource::OneShot,
+        )
         .await
         .map_err(|e| {
             error!("Database error: {}", e);
@@ -579,7 +584,12 @@ pub async fn set_property_desired(
     if pushed {
         state
             .db
-            .insert_property_command(&request.product_id, &request.device_id, &delta)
+            .insert_property_command(
+                &request.product_id,
+                &request.device_id,
+                &delta,
+                CommandSource::DesiredDelta,
+            )
             .await
             .map_err(|e| {
                 error!("Database error: {}", e);
@@ -664,6 +674,7 @@ pub async fn get_property_shadow(
         .as_ref()
         .map(|d| d.desired.clone())
         .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+    let desired_updated_time = desired_row.as_ref().map(|d| d.updated_time);
 
     let reported_row = state
         .db
@@ -677,6 +688,7 @@ pub async fn get_property_shadow(
         .as_ref()
         .map(|r| r.properties.clone())
         .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+    let reported_updated_time = reported_row.as_ref().map(|r| r.updated_time);
 
     let desired_map = desired.as_object().cloned().unwrap_or_default();
     let reported_map = reported.as_object().cloned().unwrap_or_default();
@@ -686,6 +698,8 @@ pub async fn get_property_shadow(
         desired,
         reported,
         delta,
+        desired_updated_time,
+        reported_updated_time,
     }))
 }
 

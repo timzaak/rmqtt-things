@@ -287,7 +287,7 @@ impl DatabaseService {
         page_size: i64,
     ) -> anyhow::Result<(Vec<PropertyCommand>, i64)> {
         let mut query_builder = QueryBuilder::new(
-            "SELECT id, product_id, device_id, command, status, created_time, updated_time FROM property_command WHERE 1=1",
+            "SELECT id, product_id, device_id, command, status, source, created_time, updated_time FROM property_command WHERE 1=1",
         );
 
         Self::add_device_product_filter(&mut query_builder, product_id, device_id);
@@ -395,23 +395,26 @@ impl DatabaseService {
         Ok(events)
     }
 
-    // 插入属性命令（用于管理接口）
+    // 插入属性命令（用于管理接口）。source 标记命令来源：
+    // OneShot（一次性命令）/ DesiredDelta（Set-Desired delta）。
     pub async fn insert_property_command(
         &self,
         product_id: &str,
         device_id: &str,
         command: &JsonValue,
+        source: CommandSource,
     ) -> anyhow::Result<i64> {
         let row = sqlx::query(
             r#"
-            INSERT INTO property_command (product_id, device_id, command)
-            VALUES ($1, $2, $3)
+            INSERT INTO property_command (product_id, device_id, command, source)
+            VALUES ($1, $2, $3, $4)
             RETURNING id
             "#,
         )
         .bind(product_id)
         .bind(device_id)
         .bind(command)
+        .bind(source)
         .fetch_one(&self.pool)
         .await?;
 

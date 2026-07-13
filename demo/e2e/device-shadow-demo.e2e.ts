@@ -241,16 +241,18 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
 
       // 通过 API 设 desired { colorTemp: 400 }
       const desiredPayload = { colorTemp: 400 }
+      // 在触发 PUT 之前注册 command waiter，避免 eager publish-on-trigger
+      // 导致 delta 命令在 waiter 注册前就已下发而丢失（与 Scenario A/E 一致）。
+      const shadowCommandPromise = device.waitForCommand()
       const putResponse = await request.put('/api/admin/property/shadow/desired', {
         data: { product_id: PRODUCT_ID, device_id: deviceId, desired: desiredPayload },
       })
       expect(putResponse.status()).toBe(200)
 
-      // 等待可能的 delta 命令投递并回复，避免堆积在队列里
-      const shadowCommand = await device.waitForCommand().catch(() => null)
-      if (shadowCommand) {
-        await device.replyCommand(shadowCommand)
-      }
+      // 等待 delta 命令投递并回复，使其状态收敛为 Success
+      const shadowCommand = await shadowCommandPromise
+      expect(shadowCommand.data).toMatchObject(desiredPayload)
+      await device.replyCommand(shadowCommand)
 
       // 通过一次性属性命令通道（非 shadow desired 端点）下发与 desired 不同的值
       const oneShotPayload = { colorTemp: 999 }
@@ -284,13 +286,15 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredColorTemp: 400, deltaColorTemp: 400 })
 
-      // 辅助 UI 断言：导航到详情页，delta 行可见且 Pending convergence（非主验收）
+      // 辅助 UI 断言：导航到详情页，delta 行可见。DesiredDelta 命令已被设备
+      // ack（Success）但 reported 仍偏离期望值（一次性命令覆盖为 999），
+      // 故 Status 显示 "Replied, not converged"（非主验收）。
       await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
       await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
       await expect(
         shadowSection(page).locator(shadowStatusSelector('colorTemp')),
       ).toBeVisible({ timeout: POLL_TIMEOUT })
-      await expect(shadowSection(page).getByText('Pending convergence')).toBeVisible()
+      await expect(shadowSection(page).getByText('Replied, not converged')).toBeVisible()
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
@@ -400,13 +404,14 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredBrightness: 60, cmdStatus: 'Failed' })
 
-      // 辅助 UI 断言：delta 行可见且 Pending convergence（持久业务状态）
+      // 辅助 UI 断言：delta 行可见。DesiredDelta 命令设备回复失败（Failed），
+      // 故 Status 显示 "Delivery failed"（持久业务状态为主验收）。
       await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
       await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
       await expect(
         shadowSection(page).locator(shadowStatusSelector('brightness')),
       ).toBeVisible({ timeout: POLL_TIMEOUT })
-      await expect(shadowSection(page).getByText('Pending convergence')).toBeVisible()
+      await expect(shadowSection(page).getByText('Delivery failed')).toBeVisible()
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })

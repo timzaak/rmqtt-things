@@ -283,6 +283,8 @@ function makeConvergedShadow(): ShadowView {
     desired: { brightness: 80 },
     reported: { brightness: { value: 80, time: '2025-01-01T10:00:00Z' } },
     delta: {},
+    desired_updated_time: '2025-01-01T09:00:00Z',
+    reported_updated_time: '2025-01-01T10:00:00Z',
   }
 }
 
@@ -297,6 +299,8 @@ function makePendingShadow(): ShadowView {
       colorTemp: { value: 3000, time: '2025-01-01T10:00:00Z' },
     },
     delta: { colorTemp: 4000 },
+    desired_updated_time: '2025-01-01T09:00:00Z',
+    reported_updated_time: '2025-01-01T10:00:00Z',
   }
 }
 
@@ -334,7 +338,8 @@ describe('Property Shadow section', () => {
 
     renderWithProviders(<Page />)
 
-    // desired present + delta empty => DataTable renders the "Converged" empty message
+    // desired present + delta empty => every desired key has converged, so the
+    // table renders a row whose Status cell shows "Converged" (green).
     expect(screen.getByTestId('shadow-delta-table')).toBeInTheDocument()
     expect(screen.getByText('Converged')).toBeInTheDocument()
   })
@@ -461,5 +466,157 @@ describe('Property Shadow section', () => {
     expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
     // The dialog stays open on failure (editor remains available)
     expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
+  })
+
+  test('shows delivery failed status when desired delta command failed', () => {
+    setupMocks()
+    // desired brightness=80, reported missing => not converged.
+    mockUsePropertyShadow.mockReturnValue({
+      data: {
+        desired: { brightness: 80 },
+        reported: {},
+        delta: { brightness: 80 },
+        desired_updated_time: '2025-01-01T09:00:00Z',
+        reported_updated_time: null,
+      },
+      isLoading: false,
+    })
+    // Latest DesiredDelta command for brightness is Failed.
+    mockUsePropertyCommands.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 1,
+            product_id: 'product-a',
+            device_id: 'test-device-001',
+            command: { brightness: 80 },
+            status: 'Failed',
+            source: 'DesiredDelta',
+            created_time: '2025-01-01T09:00:00Z',
+            updated_time: '2025-01-01T09:01:00Z',
+          },
+        ],
+        pagination: undefined,
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Delivery failed')
+  })
+
+  test('shows queued status when desired delta command is pending', () => {
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({
+      data: {
+        desired: { brightness: 80 },
+        reported: {},
+        delta: { brightness: 80 },
+        desired_updated_time: '2025-01-01T09:00:00Z',
+        reported_updated_time: null,
+      },
+      isLoading: false,
+    })
+    mockUsePropertyCommands.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 1,
+            product_id: 'product-a',
+            device_id: 'test-device-001',
+            command: { brightness: 80 },
+            status: 'Pending',
+            source: 'DesiredDelta',
+            created_time: '2025-01-01T09:00:00Z',
+            updated_time: '2025-01-01T09:00:00Z',
+          },
+        ],
+        pagination: undefined,
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Queued')
+  })
+
+  test('shows replied not converged when command succeeded but reported still differs', () => {
+    setupMocks()
+    // desired brightness=80, reported brightness=50 => not converged despite ack.
+    mockUsePropertyShadow.mockReturnValue({
+      data: {
+        desired: { brightness: 80 },
+        reported: { brightness: { value: 50, time: '2025-01-01T10:00:00Z' } },
+        delta: { brightness: 80 },
+        desired_updated_time: '2025-01-01T09:00:00Z',
+        reported_updated_time: '2025-01-01T10:00:00Z',
+      },
+      isLoading: false,
+    })
+    mockUsePropertyCommands.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 1,
+            product_id: 'product-a',
+            device_id: 'test-device-001',
+            command: { brightness: 80 },
+            status: 'Success',
+            source: 'DesiredDelta',
+            created_time: '2025-01-01T09:00:00Z',
+            updated_time: '2025-01-01T09:01:00Z',
+          },
+        ],
+        pagination: undefined,
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent(
+      'Replied, not converged'
+    )
+  })
+
+  test('ignores one-shot commands when resolving desired status', () => {
+    setupMocks()
+    // desired brightness=80, reported missing => not converged, no DesiredDelta
+    // command exists. A one-shot command on the same key must NOT be correlated.
+    mockUsePropertyShadow.mockReturnValue({
+      data: {
+        desired: { brightness: 80 },
+        reported: {},
+        delta: { brightness: 80 },
+        desired_updated_time: '2025-01-01T09:00:00Z',
+        reported_updated_time: null,
+      },
+      isLoading: false,
+    })
+    mockUsePropertyCommands.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 1,
+            product_id: 'product-a',
+            device_id: 'test-device-001',
+            command: { brightness: 10 },
+            status: 'Success',
+            source: 'OneShot',
+            created_time: '2025-01-01T08:00:00Z',
+            updated_time: '2025-01-01T08:01:00Z',
+          },
+        ],
+        pagination: undefined,
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    // One-shot command ignored => falls back to "Pending convergence".
+    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Pending convergence')
   })
 })

@@ -282,7 +282,7 @@ Dockerfile 用多阶段构建，一共五个阶段：
 
 | 阶段 | 基础镜像 | 做什么 |
 |------|---------|--------|
-| chef | rust:1.91-slim | 安装 cargo-chef |
+| chef | rust:1.96.1-slim | 安装 cargo-chef |
 | planner | chef | 分析依赖图，生成 recipe.json |
 | builder | chef | 先编译依赖（缓存层），再编译项目 |
 | frontend-builder | node:20-slim | 从 builder 导出 OpenAPI spec，生成前端 API 客户端，构建前端 |

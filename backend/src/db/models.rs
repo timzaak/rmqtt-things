@@ -67,6 +67,19 @@ pub enum CommandStatus {
     Deleted = 4,
 }
 
+/// Origin of a `property_command` row. Lets the frontend correlate a desired
+/// delta with its delivery status without inspecting command contents.
+/// Mirrors the `CommandStatus` derive pattern.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize, ToSchema,
+)]
+#[repr(i16)]
+#[sqlx(type_name = "int2")]
+pub enum CommandSource {
+    OneShot = 0,
+    DesiredDelta = 1,
+}
+
 #[derive(Debug, FromRow, Serialize, Deserialize, ToSchema)]
 #[allow(dead_code)]
 pub struct PropertyCommand {
@@ -75,6 +88,9 @@ pub struct PropertyCommand {
     pub device_id: String,
     pub command: JsonValue,
     pub status: CommandStatus,
+    /// Command origin: `OneShot` (POST /admin/property/command) or
+    /// `DesiredDelta` (PUT /admin/property/shadow/desired).
+    pub source: CommandSource,
     #[serde(with = "time::serde::rfc3339")]
     pub created_time: OffsetDateTime,
     #[serde(with = "time::serde::rfc3339")]

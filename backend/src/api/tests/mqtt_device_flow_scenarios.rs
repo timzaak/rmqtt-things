@@ -629,6 +629,7 @@ impl AsyncTestContext for MergeOrderTestContext {
 #[test_context(MergeOrderTestContext)]
 #[tokio::test]
 async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
+    use crate::db::models::CommandSource;
     let product_id = "mrg_product_create";
     let device_id = "mrg_device_create";
 
@@ -641,12 +642,22 @@ async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
     // the real create_property_command path.
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 10 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 10 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 20 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 20 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
 
@@ -703,23 +714,39 @@ async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
 #[test_context(MergeOrderTestContext)]
 #[tokio::test]
 async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestContext) {
+    use crate::db::models::CommandSource;
     let product_id = "mrg_product_subscribe";
     let device_id = "mrg_device_subscribe";
 
     // Queue three Pending commands on the same key with increasing created_time.
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 10 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 10 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 20 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 20 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 30 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 30 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
 
@@ -776,6 +803,7 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
 #[test_context(MergeOrderTestContext)]
 #[tokio::test]
 async fn scenario_merge_order_set_desired(ctx: &mut MergeOrderTestContext) {
+    use crate::db::models::CommandSource;
     let product_id = "mrg_product_desired";
     let device_id = "mrg_device_desired";
 
@@ -784,12 +812,22 @@ async fn scenario_merge_order_set_desired(ctx: &mut MergeOrderTestContext) {
     // drained.
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 10 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 10 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
     ctx._admin_state
         .db
-        .insert_property_command(product_id, device_id, &json!({ "brightness": 20 }))
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 20 }),
+            CommandSource::OneShot,
+        )
         .await
         .unwrap();
 

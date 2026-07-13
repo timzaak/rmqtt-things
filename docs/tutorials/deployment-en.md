@@ -282,7 +282,7 @@ The Dockerfile uses a multi-stage build with five stages:
 
 | Stage | Base Image | Purpose |
 |-------|-----------|---------|
-| chef | rust:1.91-slim | Installs cargo-chef |
+| chef | rust:1.96.1-slim | Installs cargo-chef |
 | planner | chef | Analyzes the dependency graph, generates recipe.json |
 | builder | chef | Compiles dependencies first (cache layer), then compiles the project |
 | frontend-builder | node:20-slim | Exports OpenAPI spec from builder, generates frontend API client, builds the frontend |

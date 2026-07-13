@@ -43,6 +43,10 @@ spec.md
 conf/*.key
 conf/*.pem
 .ai
+.zcode/
+
+# Generated OpenAPI export at non-canonical backend path
+backend/api.json
 
 # Generated HTML previews
 docs/**/*.html
