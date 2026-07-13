@@ -6,6 +6,14 @@
 
 **在线演示：** https://mqtt.fornetcode.com
 
+演示登录账号（Herald）：
+
+| 字段 | 值 |
+|---|---|
+| 邮箱 | `admin@rmqtt-things.local` |
+| 密码 | `password` |
+| Realm | `rmqtt` |
+
 <!-- TODO: 添加管理界面截图 -->
 
 ## 为什么关注这个项目

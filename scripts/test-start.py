@@ -444,6 +444,11 @@ url = "http://localhost:13000"
 
 [jwt]
 secret = "rmqtt-things-test-jwt-secret"
+
+# Required by Herald ≥0.3.x: startup guard rejects an empty ask_key/cname_target.
+[custom_domain]
+ask_key = "rmqtt-things-test-custom-domain-ask-key"
+cname_target = "custom.test.rmqtt-things.local"
 """,
         encoding="utf-8",
     )
@@ -472,7 +477,7 @@ def _start_herald() -> bool:
             f"type=bind,source={str((TEST_CONFIG_DIR / 'herald' / 'config.toml').resolve())},target=/app/config.toml,readonly",
             "-p",
             f"{HERALD_PORT}:3000",
-            os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.2.1"),
+            os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.3.2"),
         ]
     )
     if not cid:

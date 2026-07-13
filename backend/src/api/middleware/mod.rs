@@ -48,7 +48,7 @@ pub async fn herald_auth_middleware(
             request.extensions_mut().insert(CurrentUser { user_id });
             next.run(request).await
         }
-        // Herald 0.1.6: session not found/expired returns allowed=false with no user_id
+        // Session not found/expired returns allowed=false with no user_id
         Ok(permission) if permission.user_id.is_none() => ApiError::unauthorized().into_response(),
         Ok(_) => ApiError::forbidden().into_response(),
         Err(error) => classify_auth_error(&error).into_response(),

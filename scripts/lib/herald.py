@@ -100,10 +100,30 @@ BEGIN
     VALUES (v_user_id, '{realm}', 'Test Admin')
         ON CONFLICT (id, realm_id) DO NOTHING;
 
-    -- 9. Assign role to user (0.1.6: includes principal_type/principal_id)
-    INSERT INTO user_roles (id, user_id, role_id, realm_id, client_id, principal_type, principal_id)
-    VALUES (uuidv7(), v_user_id, v_role_id, '{realm}', '{client}', 'user', v_user_id::text)
-        ON CONFLICT (realm_id, principal_type, principal_id, role_id) DO NOTHING;
+    -- 8b. Pre-record legal agreement consent for the demo user. 0.3.x added a
+    -- consent gate: login returns consentRequired and refuses to set the
+    -- X-Auth session cookie until the user accepts the current effective
+    -- terms_of_service / privacy_policy versions. Seeding consent here keeps
+    -- the demo/test login flow frictionless (no UI consent screen).
+    INSERT INTO user_agreement_consent (id, user_id, realm_id, agreement_type, consented_version_id)
+    SELECT uuidv7(), v_user_id, '{realm}', v.agreement_type, v.id
+    FROM legal_agreement_version v
+    WHERE v.id IN (
+        SELECT DISTINCT ON (lv.agreement_type) lv.id
+        FROM legal_agreement_version lv
+        WHERE (lv.realm_id IS NULL OR lv.realm_id = '{realm}')
+        ORDER BY lv.agreement_type, (lv.realm_id IS NULL), lv.version_no DESC
+    )
+    ON CONFLICT (user_id, agreement_type) DO UPDATE SET
+        consented_version_id = EXCLUDED.consented_version_id,
+        consented_at = CURRENT_TIMESTAMP;
+
+    -- 9. Assign role to user. 0.3.x: user_roles.source defaults to 'manual' and
+    -- the unique constraint is a partial index scoped to source = 'manual', so
+    -- we set source explicitly and infer the partial index via the matching WHERE.
+    INSERT INTO user_roles (id, user_id, role_id, realm_id, client_id, principal_type, principal_id, source)
+    VALUES (uuidv7(), v_user_id, v_role_id, '{realm}', '{client}', 'user', v_user_id::text, 'manual')
+        ON CONFLICT (realm_id, principal_type, principal_id, role_id) WHERE source = 'manual' DO NOTHING;
 
     -- 10. Insert API key for backend herald_sdk client
     SELECT id INTO v_client_app_id FROM client_app

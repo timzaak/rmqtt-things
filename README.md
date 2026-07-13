@@ -6,6 +6,14 @@ IoT thing-model management platform built on [RMQTT](https://github.com/rmqtt/rm
 
 **Live demo:** https://mqtt.fornetcode.com
 
+Demo login (Herald):
+
+| Field | Value |
+|---|---|
+| Email | `admin@rmqtt-things.local` |
+| Password | `password` |
+| Realm | `rmqtt` |
+
 <!-- TODO: Add screenshot of management UI -->
 
 ## Why this project matters
