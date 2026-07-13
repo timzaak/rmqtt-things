@@ -488,3 +488,113 @@ async fn test_event_template_update_invalidates_cache(ctx: &mut TestContext) {
          invalidated so the strict v2 schema rejects severity='panic'"
     );
 }
+
+// Activation scope regression test (P0 audit fix).
+//
+// Active validation-template uniqueness is per (product_id, event)
+// (validation-template.md §3.1/§5; DB partial unique index
+// event_valid_template_active_product_id_event_id_idx). Activating a template
+// must only deactivate other Active templates of the SAME event, never
+// templates of a different event. Before the fix, the deactivation UPDATE in
+// DatabaseService::update_event_valid_template_status filtered only by
+// product_id, so activating an event template silently deactivated the
+// product's 'property' template and broke property schema validation.
+//
+// This test asserts both halves of the contract:
+//   - cross-event: activating an event template leaves the property template
+//     Active (the P0 regression);
+//   - same-event: activating a second property template still deactivates the
+//     first (the intended uniqueness behaviour the fix must preserve).
+#[test_context(TestContext)]
+#[tokio::test]
+async fn test_activate_template_scoped_to_same_event(ctx: &mut TestContext) {
+    let product_id = "evt_scope_prod".to_string();
+    let schema = json!({"type": "object"});
+
+    // Create a template and return its id. Create returns 201 with no body,
+    // so the id is looked up via the list endpoint.
+    async fn create_template(
+        service: &Router,
+        product_id: &str,
+        event: &str,
+        schema: serde_json::Value,
+    ) -> i64 {
+        let req = CreateEventValidTemplateRequest {
+            product_id: product_id.to_string(),
+            event: event.to_string(),
+            description: Some(format!("{event} template")),
+            schema,
+        };
+        let (status, _) = request_json(service, Method::POST, "/api/admin/valid/event", &req).await;
+        assert_eq!(status, StatusCode::CREATED);
+
+        let (status, body) = request(
+            service,
+            Method::GET,
+            &format!("/api/admin/valid/event?product_id={product_id}&event={event}"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let list: serde_json::Value = serde_json::from_str(&body).unwrap();
+        list["data"][0]["id"]
+            .as_i64()
+            .expect("template id must be present in list response")
+    }
+
+    async fn set_status(service: &Router, id: i64, status: EventValidTemplateStatus) {
+        let req = UpdateEventValidTemplateStatusRequest { status };
+        let (code, _) = request_json(
+            service,
+            Method::PATCH,
+            &format!("/api/admin/valid/event/{id}/status"),
+            &req,
+        )
+        .await;
+        assert_eq!(code, StatusCode::OK);
+    }
+
+    async fn get_status(service: &Router, id: i64) -> String {
+        let (code, body) = request(
+            service,
+            Method::GET,
+            &format!("/api/admin/valid/event/{id}"),
+        )
+        .await;
+        assert_eq!(code, StatusCode::OK);
+        let t: serde_json::Value = serde_json::from_str(&body).unwrap();
+        t["status"]
+            .as_str()
+            .expect("template status must serialize as a string")
+            .to_string()
+    }
+
+    let prop_v1 = create_template(&ctx.service, &product_id, "property", schema.clone()).await;
+    set_status(&ctx.service, prop_v1, EventValidTemplateStatus::Active).await;
+    assert_eq!(get_status(&ctx.service, prop_v1).await, "Active");
+
+    // Before the P0 fix, activating a template of a different event wrongly
+    // deactivated the property template.
+    let evt = create_template(&ctx.service, &product_id, "alert", schema.clone()).await;
+    set_status(&ctx.service, evt, EventValidTemplateStatus::Active).await;
+
+    assert_eq!(
+        get_status(&ctx.service, prop_v1).await,
+        "Active",
+        "activating an event template must not deactivate the property template \
+         (Active uniqueness is per (product_id, event))"
+    );
+
+    let prop_v2 = create_template(&ctx.service, &product_id, "property", schema.clone()).await;
+    set_status(&ctx.service, prop_v2, EventValidTemplateStatus::Active).await;
+
+    assert_eq!(
+        get_status(&ctx.service, prop_v1).await,
+        "Inactive",
+        "activating a second property template must deactivate the first (same event)"
+    );
+    assert_eq!(
+        get_status(&ctx.service, evt).await,
+        "Active",
+        "property template activation must not affect the event template"
+    );
+}

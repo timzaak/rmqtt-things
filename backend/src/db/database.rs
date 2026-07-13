@@ -757,18 +757,24 @@ impl DatabaseService {
         let template = template.unwrap();
 
         if status == EventValidTemplateStatus::Active {
-            // set other active to inactive
+            // Set other active templates of the SAME event to inactive.
+            // Active uniqueness is per (product_id, event) — see the partial
+            // unique index event_valid_template_active_product_id_event_id_idx.
+            // Scoping by event is required: without it, activating an event
+            // template would also deactivate the product's property ('property')
+            // validation template and break property schema validation.
             sqlx::query(
                 r#"
                 UPDATE event_valid_template
                 SET status = $1
-                WHERE product_id = $2 AND status = $3 AND id != $4
+                WHERE product_id = $2 AND status = $3 AND id != $4 AND event = $5
                 "#,
             )
             .bind(EventValidTemplateStatus::Inactive)
             .bind(&template.product_id)
             .bind(EventValidTemplateStatus::Active)
             .bind(id)
+            .bind(&template.event)
             .execute(&mut *tx)
             .await?;
         }
