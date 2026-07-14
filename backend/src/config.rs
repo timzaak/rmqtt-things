@@ -233,14 +233,21 @@ pub struct AccessConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AuthConfig {
     pub suffix: String,
+    #[serde(default = "default_auth_timestamp_tolerance_secs")]
+    pub timestamp_tolerance_secs: i64,
 }
 
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
             suffix: "default_suffix".to_string(),
+            timestamp_tolerance_secs: default_auth_timestamp_tolerance_secs(),
         }
     }
+}
+
+fn default_auth_timestamp_tolerance_secs() -> i64 {
+    300
 }
 
 fn default_webhook_max_retries() -> i16 {

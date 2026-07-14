@@ -22,6 +22,10 @@ retries = 2
 
 [mqtt.access.auth]
 suffix = "suffix_go"
+# How many seconds a device's HMAC timestamp may differ from server time.
+# Default 300 (5 min) is tight for real devices with synced clocks; the demo
+# uses a larger value so a password generated once stays usable for MQTTX testing.
+timestamp_tolerance_secs = 604800
 
 [otel]
 

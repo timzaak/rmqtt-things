@@ -33,7 +33,7 @@ PASSWORD="${NONCE}.${TIMESTAMP}.${HASH}"
 echo "Password: $PASSWORD"
 ```
 
-timestamp 与服务器时间差不能超过 5 分钟。如果你的开发机和服务器时间不同步，先同步一下。
+timestamp 与服务器时间差不能超过配置的容差（默认 5 分钟；测试时想一次密码用更久，调大 `timestamp_tolerance_secs`）。如果你的开发机和服务器时间不同步，先同步一下。
 
 其他语言（JavaScript、Python、C）的密码生成代码见 [设备端开发参考](device-guide.md)。
 

@@ -78,12 +78,14 @@ Device authentication settings.
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `suffix` | string | `default_suffix` | Client ID suffix, used to distinguish devices across different deployment environments |
+| `timestamp_tolerance_secs` | integer | `300` | How many seconds a device's HMAC timestamp may differ from server time. A password is rejected outside this window. Raise it for testing (e.g. `604800` = 7 days, so one password lasts longer); keep the default for production, where a tight window limits replay attacks. |
 
 If you have multiple RMQTT Things instances sharing a single RMQTT cluster, use a different `suffix` for each. Always change this in production — do not use the default value.
 
 ```toml
 [mqtt.access.auth]
 suffix = "my_deployment"
+timestamp_tolerance_secs = 300
 ```
 
 ## otel

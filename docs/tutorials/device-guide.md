@@ -19,7 +19,7 @@
 密码格式：`nonce.timestamp.hex(hmac_sha1(suffix, deviceId.nonce.timestamp.suffix))`
 
 - `nonce`：6 位随机十六进制字符串
-- `timestamp`：当前 Unix 时间戳（秒），与服务器时间差不得超过 5 分钟
+- `timestamp`：当前 Unix 时间戳（秒），与服务器时间差不得超过配置的容差（默认 5 分钟，由 `timestamp_tolerance_secs` 设置）
 - `suffix`：共享密钥，后端配置 `[mqtt.access.auth]` 中的 `suffix` 字段，默认 `suffix_go`
 
 ### JavaScript / TypeScript
@@ -103,7 +103,7 @@ void generate_password(const char *device_id, const char *suffix,
 RMQTT 的 auth-http 插件在设备连接时调用后端 `/api/access/auth` 验证 HMAC 密码。验证流程：
 
 1. 拆分密码，检查 nonce 长度 6 位、时间戳格式正确
-2. 时间戳与当前时间差超过 300 秒（5 分钟），拒绝
+2. 时间戳与当前时间差超过配置的容差（默认 300 秒），拒绝
 3. 用配置里的 `suffix` 作为密钥，对 `{clientId}.{nonce}.{timestamp}.{suffix}` 算 HMAC-SHA1
 4. 比对哈希值，一致返回 `"allow"`，否则 `"deny"`
 

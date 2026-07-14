@@ -16,6 +16,37 @@
 
 <!-- TODO: 添加管理界面截图 -->
 
+## 模拟设备接入（MQTTX）
+
+用 [MQTTX](https://mqttx.app/) 模拟一台设备接入演示服务器。鉴权为 HMAC-SHA1 签名密码——演示服务器的时间戳容差为 7 天（`timestamp_tolerance_secs`），生成一次即可反复测试：
+
+> 真实设备：先用 SNTP 或通信模组校准时钟；每次发送 MQTT `CONNECT`（含自动重连）前都要重新生成密码，禁止用过期密码重连——生产默认容差为 5 分钟。
+
+```bash
+DEVICE_ID="mqttx_demo_001"; SUFFIX="4f39c2635d373677b95edc460bb99ba4"
+NONCE="a1b2c3"; TS=$(date +%s)
+HASH=$(printf '%s' "${DEVICE_ID}.${NONCE}.${TS}.${SUFFIX}" | openssl dgst -sha1 -hmac "$SUFFIX" | awk '{print $NF}')
+echo "${NONCE}.${TS}.${HASH}"   # 粘贴到 MQTTX 的 Password
+```
+
+MQTTX 连接：Host `152.32.249.178`，Port `1883`（明文 TCP），Client ID = `mqttx_demo_001`，Username = `test-1`（产品 `model_no`）。`test-1` 已开启自动注册，新设备 ID 首次连接即自动建档。
+
+发布属性到 `test-1/mqttx_demo_001/thing/event/property/post`：
+
+```json
+{"id":"1","params":{"temperature":25.5,"humidity":60},"ack":0}
+```
+
+验证：`curl -s "https://mqtt.fornetcode.com/api/admin/property?product_id=test-1&device_id=mqttx_demo_001"`
+
+命令由 `test-1/mqttx_demo_001/thing/service/property/set` 下发（自动订阅，无需手动 SUBSCRIBE）。在 `.../set_reply` 回复，`id` 用收到的值：
+
+```json
+{"id":"<收到的id>","code":200,"data":{}}
+```
+
+完整 topic 规范与多语言密码生成代码见[物模型规范](docs/tutorials/thing-model-spec.md)与[设备接入指南](docs/tutorials/device-integration.md)。
+
 ## 为什么关注这个项目
 
 这个项目不是又一个 IoT 平台。它的重点是：**展示如何用 AI 完整开发一个生产级项目，并且让后续迭代也能用 AI 完成。**

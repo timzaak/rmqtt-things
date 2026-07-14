@@ -22,6 +22,9 @@ retries = 2
 
 [mqtt.access.auth]
 suffix = "CHANGE_ME_SUFFIX"
+# Allowed skew (seconds) between device HMAC timestamp and server time.
+# Omit to use the 5-minute default; raise only if device clocks are unreliable.
+# timestamp_tolerance_secs = 300
 
 [api]
 openapi_enabled = false

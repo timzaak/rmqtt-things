@@ -94,6 +94,7 @@ impl AsyncTestContext for MqttTestContext {
                 access: AccessConfig {
                     auth: AuthConfig {
                         suffix: AUTH_SUFFIX.to_string(),
+                        ..AuthConfig::default()
                     },
                 },
             },

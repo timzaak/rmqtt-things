@@ -19,7 +19,7 @@ For a complete reference implementation, see [`demo/e2e/helpers/mqtt-device.ts`]
 Password format: `nonce.timestamp.hex(hmac_sha1(suffix, deviceId.nonce.timestamp.suffix))`
 
 - `nonce`: 6-character random hex string
-- `timestamp`: Current Unix timestamp (seconds); must not differ from server time by more than 5 minutes
+- `timestamp`: Current Unix timestamp (seconds); must not differ from server time by more than the configured tolerance (default 5 minutes, set by `timestamp_tolerance_secs`)
 - `suffix`: Shared secret, configured in `[mqtt.access.auth]` `suffix` field on the backend; defaults to `suffix_go`
 
 ### JavaScript / TypeScript
@@ -103,7 +103,7 @@ void generate_password(const char *device_id, const char *suffix,
 When a device connects, RMQTT's auth-http plugin calls the backend `/api/access/auth` endpoint to verify the HMAC password. The verification flow:
 
 1. Split the password; check that the nonce is 6 characters and the timestamp format is valid
-2. If the timestamp differs from the current time by more than 300 seconds (5 minutes), reject
+2. If the timestamp differs from the current time by more than the configured tolerance (default 300 seconds), reject
 3. Use the configured `suffix` as the key to compute HMAC-SHA1 over `{clientId}.{nonce}.{timestamp}.{suffix}`
 4. Compare the hash; return `"allow"` on match, otherwise `"deny"`
 

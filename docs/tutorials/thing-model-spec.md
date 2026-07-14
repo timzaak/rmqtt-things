@@ -143,7 +143,7 @@ hmac_sha1_hex(shared_key, "{clientId}.{nonce}.{timestamp}.{suffix}")
 ### 验证流程
 
 1. 拆分密码，检查 nonce 长度 6 位、时间戳格式正确
-2. 时间戳和当前时间差超过 300 秒（5 分钟），拒绝。防重放攻击
+2. 时间戳和当前时间差超过配置的容差（默认 300 秒），拒绝。防重放攻击
 3. 用 suffix 作为密钥，对 `{clientId}.{nonce}.{timestamp}.{suffix}` 算 HMAC-SHA1
 4. 比对哈希值
 

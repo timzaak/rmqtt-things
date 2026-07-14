@@ -470,8 +470,7 @@ pub async fn auth(
     let now = OffsetDateTime::now_utc().unix_timestamp();
     let time_diff = (now - timestamp).abs();
 
-    if time_diff > 300 {
-        // 5 minutes
+    if time_diff > state.config.mqtt.access.auth.timestamp_tolerance_secs {
         warn!(
             clientid = %payload.client_id,
             time_diff = time_diff,

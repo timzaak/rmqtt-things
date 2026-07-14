@@ -143,7 +143,7 @@ hmac_sha1_hex(shared_key, "{clientId}.{nonce}.{timestamp}.{suffix}")
 ### Verification Flow
 
 1. Split the password and verify the nonce is 6 characters and the timestamp format is correct
-2. If the timestamp differs from the current time by more than 300 seconds (5 minutes), reject. This prevents replay attacks
+2. If the timestamp differs from the current time by more than the configured tolerance (default 300 seconds), reject. This prevents replay attacks
 3. Compute HMAC-SHA1 of `{clientId}.{nonce}.{timestamp}.{suffix}` using `suffix` as the key
 4. Compare the hash values
 

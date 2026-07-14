@@ -27,6 +27,10 @@ openapi_enabled = true
 
 [mqtt.access.auth]
 suffix = "suffix_go"
+# Allowed skew (seconds) between a device's HMAC timestamp and server time.
+# Default 300 (5 min). Raise for dev/testing (e.g. 604800 = 7 days) so a
+# generated password stays valid longer; keep the default for production.
+timestamp_tolerance_secs = 300
 
 [s3]
 endpoint = "http://localhost:9000"

@@ -33,7 +33,7 @@ PASSWORD="${NONCE}.${TIMESTAMP}.${HASH}"
 echo "Password: $PASSWORD"
 ```
 
-The timestamp must not differ from the server time by more than 5 minutes. If your development machine and server clocks are out of sync, synchronize them first.
+The timestamp must not differ from server time by more than the configured tolerance (default 5 minutes; raise it via `timestamp_tolerance_secs` if you want one password to last longer during testing). If your development machine and server clocks are out of sync, synchronize them first.
 
 Password generation code in other languages (JavaScript, Python, C) is available in the [Device Development Reference](device-guide-en.md).
 

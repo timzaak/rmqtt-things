@@ -16,6 +16,37 @@ Demo login (Herald):
 
 <!-- TODO: Add screenshot of management UI -->
 
+## Simulating a Device with MQTTX
+
+Use [MQTTX](https://mqttx.app/) to simulate a device against the demo server. Auth is an HMAC-SHA1 password — the demo server accepts a 7-day skew (`timestamp_tolerance_secs`), so one password lasts for testing:
+
+> For real devices: sync the clock (SNTP) first, and regenerate the password before every MQTT `CONNECT` including reconnection — the production default is a 5-minute skew.
+
+```bash
+DEVICE_ID="mqttx_demo_001"; SUFFIX="4f39c2635d373677b95edc460bb99ba4"
+NONCE="a1b2c3"; TS=$(date +%s)
+HASH=$(printf '%s' "${DEVICE_ID}.${NONCE}.${TS}.${SUFFIX}" | openssl dgst -sha1 -hmac "$SUFFIX" | awk '{print $NF}')
+echo "${NONCE}.${TS}.${HASH}"   # paste this as the MQTTX password
+```
+
+MQTTX connection: Host `152.32.249.178`, Port `1883` (plain TCP), Client ID = `mqttx_demo_001`, Username = `test-1` (the product `model_no`). `test-1` has auto-provisioning on, so new device ids register on first connect.
+
+Publish properties to `test-1/mqttx_demo_001/thing/event/property/post`:
+
+```json
+{"id":"1","params":{"temperature":25.5,"humidity":60},"ack":0}
+```
+
+Verify: `curl -s "https://mqtt.fornetcode.com/api/admin/property?product_id=test-1&device_id=mqttx_demo_001"`
+
+Commands arrive on `test-1/mqttx_demo_001/thing/service/property/set` (auto-subscribed — no manual SUBSCRIBE needed). Reply on `.../set_reply` with the received `id`:
+
+```json
+{"id":"<received-id>","code":200,"data":{}}
+```
+
+Full topic spec and other-language password code: [Thing model spec](docs/tutorials/thing-model-spec-en.md), [Device integration guide](docs/tutorials/device-integration-en.md).
+
 ## Why this project matters
 
 This isn't just another IoT platform. The point is: **a production-grade project fully built by AI, with a workflow that lets AI handle ongoing development.**
