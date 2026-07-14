@@ -149,8 +149,6 @@ listener.tcp.external.message_expiry_interval = "5m"
 #The maximum number of topics that a single client is allowed to subscribe to
 #0 means unlimited, default value: 0
 listener.tcp.external.max_subscriptions = 0
-#Shared subscription switch, default value: true
-listener.tcp.external.shared_subscription = true
 #topic alias maximum, default value: 0, topic aliases not enabled. (MQTT 5.0)
 listener.tcp.external.max_topic_aliases = 32
 #Limit subscription switch, default value: false

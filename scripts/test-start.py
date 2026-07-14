@@ -288,7 +288,6 @@ listener.tcp.external.max_session_expiry_interval = "0h"
 listener.tcp.external.message_retry_interval = "20s"
 listener.tcp.external.message_expiry_interval = "5m"
 listener.tcp.external.max_subscriptions = 0
-listener.tcp.external.shared_subscription = true
 listener.tcp.external.max_topic_aliases = 32
 listener.tcp.external.limit_subscription = false
 listener.tcp.external.delayed_publish = false
@@ -527,7 +526,7 @@ def _start_rmqtt() -> bool:
             f"{RMQTT_MQTT_PORT}:1883",
             "-p",
             f"{RMQTT_HTTP_PORT}:6060",
-            "rmqtt/rmqtt:0.21.0",
+            "rmqtt/rmqtt:0.22.0",
             "-f",
             "conf/rmqtt.toml",
         ]
