@@ -30,6 +30,7 @@ suffix = "CHANGE_ME_SUFFIX"
 openapi_enabled = false
 serve_web_path = "/app/web"
 
+# Runtime requires CA files in ca_dir; generate with `rmqtt-things --generate-ca`
 [ca]
 ca_dir = "conf"
 name = "RMQTT Things Production CA"

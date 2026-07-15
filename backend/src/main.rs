@@ -34,6 +34,10 @@ struct Args {
     /// Export OpenAPI JSON to the specified file and exit
     #[arg(long)]
     export_openapi: Option<PathBuf>,
+
+    /// Generate CA and server certificates into ca_dir and exit
+    #[arg(long)]
+    generate_ca: bool,
 }
 
 #[tokio::main]
@@ -46,8 +50,13 @@ async fn main() -> anyhow::Result<()> {
     let config_path = env::var("APP_CONFIG").unwrap_or_else(|_| "config.toml".to_string());
     let config = Arc::new(Config::from_file(&config_path)?);
 
-    // Generate or validate CA files
-    ca::init_ca(&config.ca).await?;
+    if args.generate_ca {
+        ca::generate_ca_files(&config.ca).await?;
+        return Ok(());
+    }
+
+    // Validate CA files exist and are valid (BYO-CA: never auto-generate at runtime)
+    ca::load_ca(&config.ca).await?;
 
     let log_filter = || {
         EnvFilter::builder()

@@ -57,11 +57,20 @@ cp config.example.toml config.toml
 | `mqtt.url` | `http://127.0.0.1:6060/api/v1` | 如果你把 RMQTT 的 HTTP 端口改了 |
 | `api.openapi_enabled` | `true` | 关掉可以隐藏 Swagger UI |
 | `s3.*` | MinIO 默认配置 | 文件上传功能依赖对象存储，本地开发可以先不管 |
-| `ca.*` | 自签名 CA | 证书颁发功能用的，本地开发可以不改 |
+| `ca.*` | 自签名 CA | 证书颁发功能用的，本地开发可以不改；运行时需要 CA 文件，用 `--generate-ca` 生成 |
 
 如果你 PostgreSQL 和 RMQTT 都是按上面的命令启动的，那 `database.url` 和 `mqtt.url` 都不用动，直接能用。
 
 ## 启动后端
+
+首次运行需要先生成 CA 证书（运行时不再自动生成）：
+
+```bash
+cd backend
+cargo run --bin rmqtt-things -- --generate-ca
+```
+
+生成后启动后端：
 
 ```bash
 cd backend

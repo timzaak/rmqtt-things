@@ -216,7 +216,13 @@ CA 证书配置。系统用这些参数生成和管理设备 TLS 证书。
 | `valid_days` | i64 | `36503`（约 100 年） | 签发证书的有效天数 |
 | `domain` | string | `*.fornetcode.com` | 证书域名，支持通配符 |
 
-系统启动时检查 `ca_dir` 目录下有没有 CA 证书文件，没有就自动生成。`valid_days` 默认 100 年基本不用改。`domain` 改成你实际使用的域名。
+系统启动时**只加载/校验** `ca_dir` 下的 CA 证书（`ca.pem`、`ca.key`），不会自动生成。CA 缺失或无效时启动直接失败。首次部署用一次性命令生成 CA 和服务器证书：
+
+```bash
+rmqtt-things --generate-ca
+```
+
+该命令按 `ca_dir`/`name`/`valid_days`/`domain` 生成 `ca.pem`、`ca.key`、`server.pem`、`server.key` 四个文件后退出；已存在时拒绝覆盖（需先删除旧文件）。`domain` 改成你实际使用的域名。
 
 ```toml
 [ca]

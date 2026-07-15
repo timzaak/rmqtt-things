@@ -216,7 +216,13 @@ CA certificate configuration. The system uses these parameters to generate and m
 | `valid_days` | i64 | `36503` (~100 years) | Validity period in days for issued certificates |
 | `domain` | string | `*.fornetcode.com` | Certificate domain; supports wildcards |
 
-On startup, the system checks `ca_dir` for existing CA certificate files and auto-generates them if none are found. The default `valid_days` of 100 years rarely needs changing. Update `domain` to your actual domain.
+On startup, the system **only loads/validates** the CA files (`ca.pem`, `ca.key`) in `ca_dir` — it never auto-generates them. If the CA is missing or invalid, startup fails. Generate the CA and server certificates once with:
+
+```bash
+rmqtt-things --generate-ca
+```
+
+This generates `ca.pem`, `ca.key`, `server.pem`, `server.key` into `ca_dir` (using `ca_dir`/`name`/`valid_days`/`domain`) and exits; it refuses to overwrite existing files (delete them first to regenerate). Update `domain` to your actual domain.
 
 ```toml
 [ca]

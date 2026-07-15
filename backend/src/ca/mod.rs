@@ -7,7 +7,35 @@ use tracing::info;
 
 pub mod generator;
 
-pub async fn init_ca(config: &CAConfig) -> anyhow::Result<()> {
+pub async fn load_ca(config: &CAConfig) -> anyhow::Result<()> {
+    let ca_dir = Path::new(&config.ca_dir);
+    let ca_cert_path = ca_dir.join("ca.pem");
+    let ca_key_path = ca_dir.join("ca.key");
+
+    let cert_pem = fs::read_to_string(&ca_cert_path).await.map_err(|_| {
+        anyhow::anyhow!(
+            "CA certificate not found at {}; generate one with `--generate-ca`",
+            ca_cert_path.display()
+        )
+    })?;
+    let key_pem = fs::read_to_string(&ca_key_path).await.map_err(|_| {
+        anyhow::anyhow!(
+            "CA key not found at {}; generate one with `--generate-ca`",
+            ca_key_path.display()
+        )
+    })?;
+    let valid = KeyPair::from_pem(&key_pem).and_then(|kp| Issuer::from_ca_cert_pem(&cert_pem, kp));
+    if valid.is_err() {
+        anyhow::bail!(
+            "CA certificate/key at {} are invalid; regenerate with `--generate-ca`",
+            ca_dir.display()
+        );
+    }
+    info!("CA certificate and key loaded from {}", config.ca_dir);
+    Ok(())
+}
+
+pub async fn generate_ca_files(config: &CAConfig) -> anyhow::Result<()> {
     let ca_dir = Path::new(&config.ca_dir);
 
     let ca_cert_path = ca_dir.join("ca.pem");
@@ -15,44 +43,34 @@ pub async fn init_ca(config: &CAConfig) -> anyhow::Result<()> {
     let server_cert_path = ca_dir.join("server.pem");
     let server_key_path = ca_dir.join("server.key");
 
-    let regen_ca = if !ca_cert_path.exists() || !ca_key_path.exists() {
-        info!("CA certificate or key not found.");
-        true
-    } else {
-        let cert_pem = fs::read_to_string(&ca_cert_path).await?;
-        let key_pem = fs::read_to_string(&ca_key_path).await?;
-        let key_pair = KeyPair::from_pem(&key_pem);
-        let cert = key_pair.and_then(|kp| Issuer::from_ca_cert_pem(&cert_pem, kp));
-        if cert.is_err() {
-            info!("CA certificate or key is invalid.");
-            true
-        } else {
-            false
-        }
-    };
-
-    if regen_ca {
-        info!("Generating new CA certificate and key...");
-        if !ca_dir.exists() {
-            fs::create_dir_all(ca_dir).await?;
-        }
-        let (ca_cert_pem, ca_key_pem) = generator::generate_ca(&config.name, config.valid_days)?;
-        let now = OffsetDateTime::now_utc();
-        let (server_pem, server_key_pem) = generator::issue_server_cert(
-            &ca_cert_pem,
-            &ca_key_pem,
-            vec![SanType::DnsName(config.domain.clone().try_into()?)],
-            now,
-            now + Duration::days(config.valid_days),
-        )?;
-        fs::write(&ca_cert_path, ca_cert_pem).await?;
-        fs::write(&ca_key_path, ca_key_pem).await?;
-        fs::write(&server_key_path, server_key_pem).await?;
-        fs::write(&server_cert_path, server_pem).await?;
-        info!("New CA generated and saved in {}", config.ca_dir);
-    } else {
-        info!("CA certificate and key are valid.");
+    if ca_cert_path.exists() || ca_key_path.exists() {
+        anyhow::bail!(
+            "CA already exists at {}; refusing to overwrite (delete it first to regenerate)",
+            config.ca_dir
+        );
     }
+
+    if !ca_dir.exists() {
+        fs::create_dir_all(ca_dir).await?;
+    }
+    info!("Generating new CA certificate and key...");
+    let (ca_cert_pem, ca_key_pem) = generator::generate_ca(&config.name, config.valid_days)?;
+    let now = OffsetDateTime::now_utc();
+    let (server_pem, server_key_pem) = generator::issue_server_cert(
+        &ca_cert_pem,
+        &ca_key_pem,
+        vec![SanType::DnsName(config.domain.clone().try_into()?)],
+        now,
+        now + Duration::days(config.valid_days),
+    )?;
+    fs::write(&ca_cert_path, ca_cert_pem).await?;
+    fs::write(&ca_key_path, ca_key_pem).await?;
+    fs::write(&server_key_path, server_key_pem).await?;
+    fs::write(&server_cert_path, server_pem).await?;
+    info!(
+        "CA and server certificates generated and saved in {}",
+        config.ca_dir
+    );
     Ok(())
 }
 

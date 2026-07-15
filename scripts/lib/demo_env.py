@@ -688,6 +688,21 @@ def start_environment(
         if BACKEND_PORT != 8080:
             backend_env["PORT"] = str(BACKEND_PORT)
 
+        # Ensure CA files exist (runtime no longer auto-generates; BYO-CA)
+        ca_pem = REPO_ROOT / "conf" / "ca.pem"
+        if not ca_pem.exists():
+            gen_result = subprocess.run(
+                [cargo, "run", "--bin", "rmqtt-things", "--", "--generate-ca"],
+                cwd=REPO_ROOT / "backend",
+                env=backend_env,
+                capture_output=True,
+                text=True,
+            )
+            if gen_result.returncode != 0:
+                logger.error("CA generation failed")
+                logger.error(gen_result.stderr or gen_result.stdout)
+                return False
+
         from .proc import spawn_background
 
         spawn_background(

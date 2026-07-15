@@ -209,6 +209,19 @@ docker logs rmqtt-things-rmqtt --tail 20
 
 ### App
 
+首次部署需要生成 CA 证书（一次性，之后启动不再生成）：
+
+```bash
+docker run --rm \
+    -e APP_CONFIG=/app/config.toml \
+    -v /opt/rmqtt-things/config.production.toml:/app/config.toml:ro \
+    -v /opt/rmqtt-things/conf:/app/conf \
+    ghcr.io/<owner>/rmqtt-things:<tag> \
+    --generate-ca
+```
+
+生成后启动 App：
+
 ```bash
 docker run -d \
     --name rmqtt-things-app \
@@ -216,10 +229,11 @@ docker run -d \
     --restart unless-stopped \
     -e APP_CONFIG=/app/config.toml \
     -v /opt/rmqtt-things/config.production.toml:/app/config.toml:ro \
+    -v /opt/rmqtt-things/conf:/app/conf \
     ghcr.io/<owner>/rmqtt-things:<tag>
 ```
 
-把 `<owner>` 换成你的 GitHub 用户名或组织名，`<tag>` 换成版本号（比如 `v0.1.0`）。
+把 `<owner>` 换成你的 GitHub 用户名或组织名，`<tag>` 换成版本号（比如 `v0.1.0`）。`conf` 卷挂载让 CA 证书持久化（App 用它签发设备证书），并与 RMQTT 共享同一份。
 
 App 启动时会自动运行数据库迁移（`sqlx::migrate!`）。你不需要手动建表。但每次部署新版本前建议备份数据库，因为迁移不可逆。
 

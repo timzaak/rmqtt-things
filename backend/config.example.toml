@@ -41,6 +41,9 @@ bucket = "rmqtt-things"
 directories = ["${productId}/${deviceId}/*", "public/*"]
 expired_seconds = 600
 
+# CA certificates: runtime requires external CA files (ca.pem/ca.key) in ca_dir.
+# Generate them once with: rmqtt-things --generate-ca
+# (refuses to overwrite; delete ca.pem/ca.key first to regenerate)
 [ca]
 ca_dir = "conf"
 name = "RMQTT Thing CA"

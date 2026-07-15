@@ -570,7 +570,7 @@ impl AsyncTestContext for MergeOrderTestContext {
         };
         config.ca.ca_dir = temp_dir.path().to_str().unwrap().to_string();
         let config = Arc::new(config);
-        crate::ca::init_ca(&config.ca).await.unwrap();
+        crate::ca::generate_ca_files(&config.ca).await.unwrap();
 
         let rmqtt_client = RmqttHttpClient::new(config.mqtt.clone());
         let schema_cache = SchemaCache::InMemory(Arc::new(InMemorySchemaCache::new()));

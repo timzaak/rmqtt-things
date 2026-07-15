@@ -9,7 +9,7 @@ For a complete reference implementation, see [`demo/e2e/helpers/mqtt-device.ts`]
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | Broker address | `mqtt://host:1883` | Plain TCP connection |
-| Broker address (TLS) | `mqtts://host:8883` | Requires client certificate |
+| Broker address (TLS) | `mqtts://host:8883` | Requires client certificate; not enabled by default — operator must configure a TLS listener in RMQTT (loading `server.pem`/`ca.pem`) |
 | `client_id` | Device ID | Globally unique |
 | `username` | Product `model_no` | Specified when creating the product |
 | `password` | HMAC-SHA1 generated value | See below |

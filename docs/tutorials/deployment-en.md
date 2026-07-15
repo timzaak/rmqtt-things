@@ -209,6 +209,19 @@ Look for log entries confirming that the `rmqtt-web-hook` and `rmqtt-auth-http` 
 
 ### App
 
+Generate the CA certificates once before first deployment (startup no longer auto-generates them):
+
+```bash
+docker run --rm \
+    -e APP_CONFIG=/app/config.toml \
+    -v /opt/rmqtt-things/config.production.toml:/app/config.toml:ro \
+    -v /opt/rmqtt-things/conf:/app/conf \
+    ghcr.io/<owner>/rmqtt-things:<tag> \
+    --generate-ca
+```
+
+Then start the App:
+
 ```bash
 docker run -d \
     --name rmqtt-things-app \
@@ -216,10 +229,11 @@ docker run -d \
     --restart unless-stopped \
     -e APP_CONFIG=/app/config.toml \
     -v /opt/rmqtt-things/config.production.toml:/app/config.toml:ro \
+    -v /opt/rmqtt-things/conf:/app/conf \
     ghcr.io/<owner>/rmqtt-things:<tag>
 ```
 
-Replace `<owner>` with your GitHub username or organization, and `<tag>` with the version (e.g., `v0.1.0`).
+Replace `<owner>` with your GitHub username or organization, and `<tag>` with the version (e.g., `v0.1.0`). The `conf` volume mount persists the CA certificates (used by the App to issue device certificates) and shares them with RMQTT.
 
 The App runs database migrations automatically on startup (`sqlx::migrate!`). You do not need to create tables manually. However, back up the database before each deployment since migrations are irreversible.
 

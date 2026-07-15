@@ -9,7 +9,7 @@
 | 参数 | 值 | 说明 |
 |------|-----|------|
 | Broker 地址 | `mqtt://host:1883` | TCP 明文连接 |
-| Broker 地址（TLS） | `mqtts://host:8883` | 需要客户端证书 |
+| Broker 地址（TLS） | `mqtts://host:8883` | 需要客户端证书；默认部署未启用，需运维在 RMQTT 侧配置 TLS listener（加载 `server.pem`/`ca.pem`） |
 | `client_id` | 设备 ID | 全局唯一 |
 | `username` | 产品的 `model_no` | 创建产品时指定 |
 | `password` | HMAC-SHA1 生成值 | 见下方 |

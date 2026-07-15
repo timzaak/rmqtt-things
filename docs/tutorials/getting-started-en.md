@@ -57,11 +57,20 @@ Then take a look at `config.toml`. The defaults work out of the box; adjust the 
 | `mqtt.url` | `http://127.0.0.1:6060/api/v1` | If you changed the RMQTT HTTP port |
 | `api.openapi_enabled` | `true` | Set to `false` to hide the Swagger UI |
 | `s3.*` | MinIO defaults | File upload depends on object storage; can ignore for local development |
-| `ca.*` | Self-signed CA | Used by the certificate issuance feature; can leave as-is for local development |
+| `ca.*` | Self-signed CA | Used by the certificate issuance feature; can leave as-is for local development. Runtime requires CA files — generate with `--generate-ca` |
 
 If you started PostgreSQL and RMQTT with the commands above, `database.url` and `mqtt.url` require no changes — they will work as-is.
 
 ## Start the Backend
+
+Generate the CA certificates once before the first run (runtime no longer auto-generates them):
+
+```bash
+cd backend
+cargo run --bin rmqtt-things -- --generate-ca
+```
+
+Then start the backend:
 
 ```bash
 cd backend

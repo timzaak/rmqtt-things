@@ -33,6 +33,7 @@ timestamp_tolerance_secs = 604800
 openapi_enabled = true
 property_schema_validator = false
 
+# Runtime requires CA files in ca_dir; generate with `rmqtt-things --generate-ca`
 [ca]
 ca_dir = "../conf"
 name = "RMQTT Thing Demo CA"

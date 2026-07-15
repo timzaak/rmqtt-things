@@ -63,7 +63,7 @@ SQLx does compile-time SQL checking. When you write `sqlx::query!()`, you know i
 
 ### rcgen Self-Signed CA
 
-Production environments use internal CAs or Let's Encrypt, but IoT device certificates are different: there are many devices, they need batch issuance, and CNs must contain productId/deviceId. rcgen is a pure Rust certificate generation library that doesn't require OpenSSL and can auto-generate a CA at startup.
+Production environments use internal CAs or Let's Encrypt, but IoT device certificates are different: there are many devices, they need batch issuance, and CNs must contain productId/deviceId. rcgen is a pure Rust certificate generation library that doesn't require OpenSSL. The CA is generated once with `--generate-ca`; at runtime it is only loaded/validated (BYO-CA: startup fails if missing).
 
 ### Cache: In-Memory or Redis
 
@@ -163,7 +163,7 @@ The backend needs to send messages to the Broker (reply to devices, deliver comm
 
 ### ca/ -- Certificate Management
 
-At startup, `init_ca()` checks whether `conf/ca.pem` and `conf/ca.key` exist and are valid. If not, they are regenerated. The CA has a default validity of 100 years. The server certificate is signed after the CA is generated, with CN set to the configured domain (wildcards supported).
+At startup, `load_ca()` only validates that `conf/ca.pem` and `conf/ca.key` exist and are valid — startup fails if they are missing or invalid (BYO-CA). The CA and server certificate are generated once via `rmqtt-things --generate-ca` (refuses to overwrite if already present). The CA has a default validity of 100 years. The server certificate is signed after the CA is generated, with CN set to the configured domain (wildcards supported).
 
 Client certificates are issued on demand, with CN in the format `{productId}/{deviceId}`, used for mTLS scenarios. Issuance records are stored in the `cert_issue` table.
 
