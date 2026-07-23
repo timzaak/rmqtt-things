@@ -22,6 +22,7 @@ pub struct HeraldAuthTestContext {
     pub _app_state: Arc<AppState>,
     pub _admin_state: Arc<AdminAppState>,
     pub session_token: String,
+    pub refresh_token: String,
     pub _temp_dir: TempDir,
 }
 
@@ -99,8 +100,10 @@ impl AsyncTestContext for HeraldAuthTestContext {
             crate::api::tests::simple_tests::empty_factory_auth_state(),
         );
 
-        // Obtain a valid session token by logging in to Herald
-        let session_token = login_to_herald(&herald_url).await;
+        // Obtain a valid access + refresh token pair by logging in to Herald.
+        // Since Herald 0.3.3, login returns a JSON BrowserTokenResponse body and
+        // no longer sets an X-Auth cookie — so we read tokens from the body.
+        let (session_token, refresh_token) = login_to_herald(&herald_url).await;
 
         HeraldAuthTestContext {
             service: router,
@@ -109,6 +112,7 @@ impl AsyncTestContext for HeraldAuthTestContext {
             _app_state: app_state,
             _admin_state: admin_state,
             session_token,
+            refresh_token,
             _temp_dir: temp_dir,
         }
     }
@@ -118,8 +122,10 @@ impl AsyncTestContext for HeraldAuthTestContext {
     }
 }
 
-/// Log in to Herald and return the `X-Auth` cookie value.
-async fn login_to_herald(herald_url: &str) -> String {
+/// Log in to Herald and return `(access_token, refresh_token)` from the JSON
+/// `BrowserTokenResponse` body. Herald 0.3.3 dropped the `X-Auth` Set-Cookie in
+/// favour of returning the token family as JSON.
+async fn login_to_herald(herald_url: &str) -> (String, String) {
     let client = reqwest::Client::new();
     let login_url = format!("{herald_url}/api/auth/rmqtt/login");
     let resp = client
@@ -140,28 +146,21 @@ async fn login_to_herald(herald_url: &str) -> String {
         resp.text().await.unwrap_or_default()
     );
 
-    // Extract X-Auth cookie from Set-Cookie header
-    let set_cookie = resp
-        .headers()
-        .get_all("set-cookie")
-        .iter()
-        .find_map(|v| {
-            let val = v.to_str().ok()?;
-            if val.starts_with("X-Auth=") {
-                Some(val.to_string())
-            } else {
-                None
-            }
-        })
-        .expect("Herald login response did not contain X-Auth cookie");
-
-    // Parse out just the cookie value (before any semicolon)
-    set_cookie
-        .trim_start_matches("X-Auth=")
-        .split(';')
-        .next()
-        .expect("Failed to parse X-Auth cookie value")
-        .to_string()
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .expect("Herald login response was not valid JSON");
+    let access_token = body
+        .get("accessToken")
+        .and_then(|v| v.as_str())
+        .expect("Herald login response missing accessToken")
+        .to_string();
+    let refresh_token = body
+        .get("refreshToken")
+        .and_then(|v| v.as_str())
+        .expect("Herald login response missing refreshToken")
+        .to_string();
+    (access_token, refresh_token)
 }
 
 /// Helper to send a request through the oneshot router with an optional Cookie header.
@@ -226,5 +225,147 @@ async fn test_scenario_herald_auth_protects_admin_routes(ctx: &mut HeraldAuthTes
     assert!(
         status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN,
         "Expected 401 or 403 with invalid token, got {status}: {body}"
+    );
+}
+
+/// Like `request_with_cookie` but also returns the Set-Cookie headers so the
+/// refresh/logout tests can assert cookie rotation/clearing.
+async fn request_returning_cookies(
+    service: &Router,
+    method: Method,
+    uri: &str,
+    cookie_value: Option<&str>,
+) -> (StatusCode, String, Vec<String>) {
+    let mut builder = Request::builder().method(method).uri(uri);
+    if let Some(cookie) = cookie_value {
+        builder = builder.header(header::COOKIE, cookie);
+    }
+    let response = service
+        .clone()
+        .oneshot(builder.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status();
+    let cookies: Vec<String> = response
+        .headers()
+        .get_all(header::SET_COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok().map(str::to_string))
+        .collect();
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, String::from_utf8(body.to_vec()).unwrap(), cookies)
+}
+
+/// Refreshing a valid token rotates BOTH cookies and reports the access TTL.
+///
+/// Why: Herald 0.3.3 made access tokens expire every 900s. The web console must
+/// call /api/auth/refresh before the access cookie lapses; this is the end-to-end
+/// proof that the rotation path works against a live Herald.
+#[test_context(HeraldAuthTestContext)]
+#[tokio::test]
+async fn test_scenario_refresh_rotates_both_cookies(ctx: &mut HeraldAuthTestContext) {
+    let cookie = format!(
+        "X-Auth={}; X-Auth-Refresh={}",
+        ctx.session_token, ctx.refresh_token
+    );
+    let (status, body, cookies) = request_returning_cookies(
+        &ctx.service,
+        Method::POST,
+        "/api/auth/refresh",
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Expected 200 from /api/auth/refresh, got {status}: {body}"
+    );
+
+    // Body carries expiresIn so the client can schedule the next refresh.
+    let json: serde_json::Value =
+        serde_json::from_str(&body).expect("refresh response body was not JSON");
+    let expires_in = json
+        .get("expiresIn")
+        .and_then(|v| v.as_i64())
+        .expect("refresh response missing expiresIn");
+    assert!(
+        expires_in > 0 && expires_in <= 900,
+        "access TTL should be the 15-min Herald value, got {expires_in}"
+    );
+
+    // Both cookies rotate (refresh is a token-rotation flow).
+    let x_auth = cookies.iter().find(|c| c.starts_with("X-Auth="));
+    let x_auth_refresh = cookies.iter().find(|c| c.starts_with("X-Auth-Refresh="));
+    assert!(
+        x_auth.is_some(),
+        "refresh response missing X-Auth Set-Cookie"
+    );
+    assert!(
+        x_auth_refresh.is_some(),
+        "refresh response missing X-Auth-Refresh Set-Cookie"
+    );
+    // The new refresh cookie should outlive the access cookie (family lifetime
+    // is 1–90d vs the 900s access token), proving we propagate both TTLs.
+    let refresh_max_age = x_auth_refresh
+        .and_then(|c| c.split("Max-Age=").nth(1))
+        .and_then(|s| s.split(';').next())
+        .and_then(|s| s.parse::<i64>().ok())
+        .unwrap_or(0);
+    assert!(
+        refresh_max_age >= 86_400,
+        "refresh cookie Max-Age should be >= 1 day, got {refresh_max_age}"
+    );
+}
+
+/// A missing or rejected refresh token yields 401, not a new session.
+#[test_context(HeraldAuthTestContext)]
+#[tokio::test]
+async fn test_scenario_refresh_rejects_missing_cookie(ctx: &mut HeraldAuthTestContext) {
+    let (status, _body, cookies) =
+        request_returning_cookies(&ctx.service, Method::POST, "/api/auth/refresh", None).await;
+    assert_eq!(
+        status,
+        StatusCode::UNAUTHORIZED,
+        "refresh without X-Auth-Refresh should be 401"
+    );
+    assert!(
+        cookies.is_empty(),
+        "a rejected refresh must not set any cookies"
+    );
+}
+
+/// Logout clears both auth cookies so the client session ends locally.
+#[test_context(HeraldAuthTestContext)]
+#[tokio::test]
+async fn test_scenario_logout_clears_cookies(ctx: &mut HeraldAuthTestContext) {
+    let cookie = format!(
+        "X-Auth={}; X-Auth-Refresh={}",
+        ctx.session_token, ctx.refresh_token
+    );
+    let (status, body, cookies) = request_returning_cookies(
+        &ctx.service,
+        Method::POST,
+        "/api/auth/logout",
+        Some(&cookie),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "Expected 200 from /api/auth/logout, got {status}: {body}"
+    );
+
+    let cleared = |name: &str| {
+        cookies.iter().any(|c| {
+            c.starts_with(&format!("{name}="))
+                && c.split("Max-Age=")
+                    .nth(1)
+                    .is_some_and(|s| s.split(';').next().is_some_and(|v| v.trim() == "0"))
+        })
+    };
+    assert!(cleared("X-Auth"), "logout did not clear X-Auth (Max-Age=0)");
+    assert!(
+        cleared("X-Auth-Refresh"),
+        "logout did not clear X-Auth-Refresh (Max-Age=0)"
     );
 }

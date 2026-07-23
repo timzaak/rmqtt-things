@@ -52,13 +52,13 @@ CREATE INDEX IF NOT EXISTS idx_fca_device_sn
 -- very first report; `after` always carries the new snapshot.
 CREATE TABLE IF NOT EXISTS factory_metadata_change_log (
     id           BIGSERIAL   PRIMARY KEY,
-    component_sn TEXT        NOT NULL,
+    sn           TEXT        NOT NULL,
     before       JSONB,
     after        JSONB       NOT NULL,
     actor        TEXT        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Time-descending paginated change-log lookup per component_sn (admin API D).
-CREATE INDEX IF NOT EXISTS idx_fmcl_component_sn_created_at
-    ON factory_metadata_change_log (component_sn, created_at DESC);
+-- Time-descending paginated change-log lookup per sn (admin API D).
+CREATE INDEX IF NOT EXISTS idx_fmcl_sn_created_at
+    ON factory_metadata_change_log (sn, created_at DESC);

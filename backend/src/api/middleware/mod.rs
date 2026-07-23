@@ -34,7 +34,7 @@ pub async fn herald_auth_middleware(
     let response = auth_state
         .herald_sdk
         .check_permission(PermissionCheckRequest {
-            token,
+            access_token: token,
             rules: Some(vec![rule]),
             client_id: auth_state.client_id.to_string(),
         })

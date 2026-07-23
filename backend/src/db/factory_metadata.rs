@@ -14,7 +14,9 @@
 //!   out-of-order normal). Returns `None` only when the device has neither
 //!   associations nor device-level metadata (→ handler 404).
 
-use crate::db::models::{FactoryComponentMetadata, FactoryMetadataChangeLog};
+use crate::db::models::{
+    FactoryComponentMetadata, FactoryDeviceMetadata, FactoryMetadataChangeLog,
+};
 use serde_json::{Value as JsonValue, json};
 use sqlx::{PgPool, Postgres, QueryBuilder, Row};
 
@@ -62,6 +64,19 @@ pub struct FactoryDeviceViewRow {
     pub updated_at: Option<time::OffsetDateTime>,
 }
 
+/// Read row for `get_device_metadata` (design §5.1). Defined locally rather than
+/// reusing the `FactoryDeviceMetadata` model: the model's `metadata`/
+/// `file_attachments` are non-`Option` `JsonValue` (matching the table's NOT NULL
+/// columns), but the handler-side normalisation from `Option<JsonValue>` →
+/// `Vec<JsonValue>` (see `map_row_to_component_view`) needs the `Option` to
+/// preserve null semantics. This row mirrors that shape.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FactoryDeviceMetadataRow {
+    pub metadata: Option<JsonValue>,
+    pub file_attachments: Option<JsonValue>,
+    pub updated_at: Option<time::OffsetDateTime>,
+}
+
 #[derive(Clone)]
 pub struct FactoryMetadataRepo {
     pool: PgPool,
@@ -88,11 +103,11 @@ impl FactoryMetadataRepo {
     ) -> Result<UpsertOutcome, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
 
-        // Read the before-snapshot (None on first report). Plain SELECT is
-        // sufficient: the subsequent ON CONFLICT upsert serialises concurrent
-        // writers on the component_sn PK; the worst case under concurrency is a
-        // log row whose `before` reflects a slightly earlier committed state,
-        // which still satisfies the "overwrite is logged" invariant.
+        // Serialize the complete read/write/log sequence for this SN. Row locks
+        // cannot cover concurrent first inserts because no row exists yet.
+        lock_metadata_sn(&mut tx, component_sn).await?;
+
+        // Read the before-snapshot (None on the first report).
         let before: Option<FactoryComponentMetadata> =
             sqlx::query_as::<_, FactoryComponentMetadata>(
                 r#"
@@ -144,17 +159,87 @@ impl FactoryMetadataRepo {
                     "file_attachments": &after.file_attachments,
                     "updated_at":       after.updated_at,
                 });
-                sqlx::query(
-                    r#"
-                    INSERT INTO factory_metadata_change_log (component_sn, before, after, actor)
-                    VALUES ($1, $2, $3, 'factory')
-                    "#,
-                )
-                .bind(component_sn)
-                .bind(&before_json)
-                .bind(&after_json)
-                .execute(&mut *tx)
-                .await?;
+                append_change_log(&mut tx, component_sn, &before_json, &after_json).await?;
+                UpsertOutcome::Overwritten {
+                    before: Some(before_json),
+                }
+            }
+        };
+
+        tx.commit().await?;
+        Ok(outcome)
+    }
+
+    /// Upsert a device's device-level metadata (design §5.1, symmetric to
+    /// `upsert_component`).
+    ///
+    /// Same transactional shape as `upsert_component` — read before-snapshot,
+    /// `INSERT ... ON CONFLICT DO UPDATE`, and — only on overwrite — append a
+    /// `factory_metadata_change_log` row carrying the before/after JSONB
+    /// snapshots. The device-level snapshots deliberately contain **no
+    /// `component_type`** (devices have no component type); this is the key
+    /// difference from the component-level snapshots (design §1.4, §4.2.1).
+    pub async fn upsert_device_metadata(
+        &self,
+        device_sn: &str,
+        metadata: &JsonValue,
+        file_attachments: &JsonValue,
+    ) -> Result<UpsertOutcome, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        // Use the same SN-keyed lock as component metadata so the neutral
+        // change-log history remains ordered even if namespaces overlap.
+        lock_metadata_sn(&mut tx, device_sn).await?;
+
+        // Read the before-snapshot (None on the first report).
+        let before: Option<FactoryDeviceMetadata> = sqlx::query_as::<_, FactoryDeviceMetadata>(
+            r#"
+            SELECT device_sn, metadata, file_attachments, updated_at, created_at
+            FROM factory_device_metadata
+            WHERE device_sn = $1
+            "#,
+        )
+        .bind(device_sn)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        // RETURNING gives the authoritative after-snapshot (updated_at is set
+        // by the DB).
+        let after: FactoryDeviceMetadata = sqlx::query_as::<_, FactoryDeviceMetadata>(
+            r#"
+            INSERT INTO factory_device_metadata (device_sn, metadata, file_attachments, updated_at)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+            ON CONFLICT (device_sn) DO UPDATE SET
+                metadata         = EXCLUDED.metadata,
+                file_attachments = EXCLUDED.file_attachments,
+                updated_at       = CURRENT_TIMESTAMP
+            RETURNING device_sn, metadata, file_attachments, updated_at, created_at
+            "#,
+        )
+        .bind(device_sn)
+        .bind(metadata)
+        .bind(file_attachments)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let outcome = match &before {
+            None => UpsertOutcome::Created,
+            Some(before_row) => {
+                // Write the change log row with before/after JSONB snapshots.
+                // Device-level snapshots have NO component_type (design §1.4 —
+                // devices have no component type), unlike the component-level
+                // snapshots in `upsert_component`.
+                let before_json = json!({
+                    "metadata":         &before_row.metadata,
+                    "file_attachments": &before_row.file_attachments,
+                    "updated_at":       before_row.updated_at,
+                });
+                let after_json = json!({
+                    "metadata":         &after.metadata,
+                    "file_attachments": &after.file_attachments,
+                    "updated_at":       after.updated_at,
+                });
+                append_change_log(&mut tx, device_sn, &before_json, &after_json).await?;
                 UpsertOutcome::Overwritten {
                     before: Some(before_json),
                 }
@@ -285,14 +370,37 @@ impl FactoryMetadataRepo {
         }
     }
 
-    /// Time-descending paginated query of a component's change log.
+    /// Read a device's device-level metadata row, or `None` when no row exists
+    /// (design §5.1). The handler maps this into `FactoryDeviceMetadataView`;
+    /// `None` here does NOT by itself drive a 404 — the 404 decision is made by
+    /// `get_device_view` (associations + device-metadata existence), this method
+    /// only reads the content (design §6.3).
+    pub async fn get_device_metadata(
+        &self,
+        device_sn: &str,
+    ) -> Result<Option<FactoryDeviceMetadataRow>, sqlx::Error> {
+        let row: Option<FactoryDeviceMetadataRow> = sqlx::query_as::<_, FactoryDeviceMetadataRow>(
+            r#"
+            SELECT metadata, file_attachments, updated_at
+            FROM factory_device_metadata
+            WHERE device_sn = $1
+            "#,
+        )
+        .bind(device_sn)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Time-descending paginated query of an SN's change log (device SN or
+    /// sub-component SN — the table is sn-neutral after the `component_sn` →
+    /// `sn` generalization, design §4.1/§6.3).
     ///
     /// `page` is 1-based. Returns `(rows, total)`; `total` is the row count
-    /// matching `component_sn` (used by handlers to populate a
-    /// `PaginatedResponse`).
+    /// matching `sn` (used by handlers to populate a `PaginatedResponse`).
     pub async fn query_change_log(
         &self,
-        component_sn: &str,
+        sn: &str,
         page: u32,
         page_size: u32,
     ) -> Result<(Vec<FactoryMetadataChangeLog>, u64), sqlx::Error> {
@@ -302,14 +410,14 @@ impl FactoryMetadataRepo {
 
         let rows: Vec<FactoryMetadataChangeLog> = sqlx::query_as::<_, FactoryMetadataChangeLog>(
             r#"
-            SELECT id, component_sn, before, after, actor, created_at
+            SELECT id, sn, before, after, actor, created_at
             FROM factory_metadata_change_log
-            WHERE component_sn = $1
+            WHERE sn = $1
             ORDER BY created_at DESC
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(component_sn)
+        .bind(sn)
         .bind(page_size)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -319,14 +427,54 @@ impl FactoryMetadataRepo {
             r#"
             SELECT COUNT(*) AS count
             FROM factory_metadata_change_log
-            WHERE component_sn = $1
+            WHERE sn = $1
             "#,
         )
-        .bind(component_sn)
+        .bind(sn)
         .fetch_one(&self.pool)
         .await?
         .get::<i64, _>("count");
 
         Ok((rows, total as u64))
     }
+}
+
+/// Serialize metadata snapshot/upsert/audit work for one SN, including the
+/// first insert where no table row exists to lock yet. Hash collisions only
+/// serialize unrelated SNs; they cannot compromise correctness.
+async fn lock_metadata_sn(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    sn: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(sn)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// Append one change-log row carrying the before/after JSONB snapshots to
+/// `factory_metadata_change_log`, actor hard-coded to `'factory'` (R5). Shared
+/// by `upsert_component` and `upsert_device_metadata` so every metadata
+/// overwrite writes exactly one row through a single path (the snapshot shapes
+/// differ — component-level carries `component_type`, device-level does not —
+/// but the INSERT is identical).
+async fn append_change_log(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    sn: &str,
+    before: &JsonValue,
+    after: &JsonValue,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO factory_metadata_change_log (sn, before, after, actor)
+        VALUES ($1, $2, $3, 'factory')
+        "#,
+    )
+    .bind(sn)
+    .bind(before)
+    .bind(after)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
 }

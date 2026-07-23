@@ -351,12 +351,12 @@ pub struct AlarmRecord {
 
 // --- Factory metadata models (support-multiple-device feature, design §5.1) ---
 // All four derive ToSchema so the BE-D03 merged-view DTO can reference them and
-// OpenAPI generation stays uniform. `factory_device_metadata` has no write entry
-// point this round but its model is needed for the device-level metadata field.
+// OpenAPI generation stays uniform.
 
-/// Device-level factory metadata. Reserved this round (no write entry point):
-/// the table exists so the `FactoryDeviceView.deviceMetadata` response slot
-/// has a stable schema extension target.
+/// Device-level factory metadata, written via `PUT /api/factory/devices/{deviceSn}`
+/// and read back into the merged view's `deviceMetadata` slot (design §4.2.1/§5.1).
+/// `#[allow(dead_code)]` stays because `device_sn`/`created_at` are populated by
+/// `FromRow` from the SELECT/RETURNING columns but are not read by the Rust code.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 #[allow(dead_code)]
 pub struct FactoryDeviceMetadata {
@@ -398,7 +398,7 @@ pub struct FactoryComponentAssociation {
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
 pub struct FactoryMetadataChangeLog {
     pub id: i64,
-    pub component_sn: String,
+    pub sn: String,
     pub before: Option<JsonValue>,
     pub after: JsonValue,
     pub actor: String,

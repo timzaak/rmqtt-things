@@ -50,7 +50,7 @@ RMQTT_IMAGE = "rmqtt/rmqtt:0.22.0"
 LOCALSTACK_CONTAINER = "t-demo-localstack"
 LOCALSTACK_PORT = 4566
 HERALD_CONTAINER = "t-demo-herald"
-HERALD_IMAGE = os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.3.2")
+HERALD_IMAGE = os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.3.3")
 HERALD_PORT = 13000
 HERALD_DB = "herald_demo"
 

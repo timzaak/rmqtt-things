@@ -27,7 +27,7 @@ export const useComponentChangeLog = (componentSn: string, page: number) => {
     enabled: !!componentSn,
     queryFn: async () => {
       const res = await queryComponentChangesHandler({
-        path: { componentSn },
+        path: { sn: componentSn },
         query: { page, page_size: 10 },
         throwOnError: true,
       })

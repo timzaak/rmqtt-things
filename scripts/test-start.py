@@ -476,7 +476,7 @@ def _start_herald() -> bool:
             f"type=bind,source={str((TEST_CONFIG_DIR / 'herald' / 'config.toml').resolve())},target=/app/config.toml,readonly",
             "-p",
             f"{HERALD_PORT}:3000",
-            os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.3.2"),
+            os.environ.get("HERALD_IMAGE", "ghcr.io/timzaak/herald:0.3.3"),
         ]
     )
     if not cid:

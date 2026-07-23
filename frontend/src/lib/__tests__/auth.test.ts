@@ -6,13 +6,19 @@ import {
   handle401,
   resetAuthCheck,
 } from '@/lib/auth'
+import { client } from '@/lib/api-generated/client.gen'
 
 function mockFetch(responses: Record<string, { body?: string; status: number }>) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((input: RequestInfo | URL) => {
+      // The SDK client calls `fetch(new Request(...))`; Request.toString() does
+      // not yield its URL in this jsdom, so read `.url` directly. getAuthConfig
+      // still passes a plain string URL.
+      const url =
+        typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString()
       for (const [pattern, config] of Object.entries(responses)) {
-        if (url.startsWith(pattern)) {
+        if (url.includes(pattern)) {
           return Promise.resolve(new Response(config.body ?? null, { status: config.status }))
         }
       }
@@ -20,6 +26,13 @@ function mockFetch(responses: Record<string, { body?: string; status: number }>)
     })
   )
 }
+
+/**
+ * The SDK client builds `new Request(url)` which rejects relative URLs in jsdom.
+ * Give it an absolute base so the probe resolves; the mock fetch matches on the
+ * path substring regardless of host.
+ */
+const TEST_BASE_URL = 'http://localhost:3000'
 
 const authEnabled = {
   body: JSON.stringify({
@@ -37,6 +50,7 @@ describe('auth helpers', () => {
     vi.stubEnv('VITE_APP_BASE_URL', 'https://app.example.com')
     window.history.replaceState({}, '', '/devices?status=Online')
     resetAuthCheck()
+    client.setConfig({ baseUrl: TEST_BASE_URL })
   })
 
   test('skips auth probe when backend reports auth disabled', async () => {
@@ -51,6 +65,18 @@ describe('auth helpers', () => {
 
     await expect(checkAuth()).resolves.toBe(true)
     expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  test('treats only a 401 auth probe response as unauthenticated', async () => {
+    mockFetch({ '/api/auth/config': authEnabled, '/api/admin/product': { status: 401 } })
+
+    await expect(checkAuth()).resolves.toBe(false)
+  })
+
+  test('surfaces a transient auth probe server error', async () => {
+    mockFetch({ '/api/auth/config': authEnabled, '/api/admin/product': { status: 503 } })
+
+    await expect(checkAuth()).rejects.toThrow('Auth probe failed with HTTP 503')
   })
 
   test('returns the login_url from config', async () => {

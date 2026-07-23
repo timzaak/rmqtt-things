@@ -24,7 +24,9 @@ use crate::api::utils::{extract_and_validate_product_id, validate_identifier};
 use crate::api::web_models::{
     FileUploadRequest, FileUploadResponse, MqttResponse, RMqttPublishMessage,
 };
-use crate::db::factory_metadata::{ComponentAssociationInput, FactoryDeviceViewRow};
+use crate::db::factory_metadata::{
+    ComponentAssociationInput, FactoryDeviceMetadataRow, FactoryDeviceViewRow,
+};
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -61,6 +63,26 @@ pub struct UpsertComponentRequest {
     /// File-attachment references. Defaults to `[]`. Each `fileKey` must be
     /// obtained from `POST /api/factory/file/upload` first (factory API Key
     /// authentication, NOT the admin/thing upload paths — see design §4.5).
+    #[serde(rename = "fileAttachments", default)]
+    pub file_attachments: Option<Vec<FileAttachment>>,
+}
+
+/// Request body for `PUT /api/factory/devices/{deviceSn}` (design §4.2.2 —
+/// device-level write, symmetric to `UpsertComponentRequest` but **without
+/// `componentType`**, since devices have no component type).
+///
+/// `metadata` and `fileAttachments` default to `{}` and `[]` respectively. A
+/// request with every field omitted creates an empty placeholder row
+/// (intentional — callers may upsert associations first).
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpsertDeviceMetadataRequest {
+    /// Structured device-level metadata (serial-number label, QC report
+    /// reference, firmware version, etc.). Defaults to `{}`.
+    #[serde(default)]
+    pub metadata: Option<Map<String, JsonValue>>,
+    /// File-attachment references. Defaults to `[]`. Each `fileKey` must be
+    /// obtained from `POST /api/factory/file/upload` first (factory API Key
+    /// authentication — see design §4.5).
     #[serde(rename = "fileAttachments", default)]
     pub file_attachments: Option<Vec<FileAttachment>>,
 }
@@ -228,6 +250,64 @@ pub async fn upsert_component_handler(
     Ok(StatusCode::NO_CONTENT)
 }
 
+// PUT /api/factory/devices/{deviceSn} — upsert device-level metadata.
+//
+// Symmetric to `upsert_component_handler` but without componentType: devices
+// have no component type (design §1.4). Validates the path SN, validates each
+// file attachment's `fileKey`, normalises optionals to their DB defaults
+// (metadata → `{}`, file_attachments → `[]`), and delegates to
+// `FactoryMetadataRepo::upsert_device_metadata` (which writes the change_log
+// inside the same tx when an overwrite happens — design §5.1, R5). The handler
+// does NOT inspect the `UpsertOutcome`; the change-log row is sufficient
+// side-effect for R5; no response body is returned (204).
+#[utoipa::path(
+    put,
+    path = "/api/factory/devices/{deviceSn}",
+    tag = "factory",
+    params(
+        ("deviceSn" = String, Path, description = "Device SN (same namespace as MQTT client_id)")
+    ),
+    request_body = UpsertDeviceMetadataRequest,
+    responses(
+        (status = 204, description = "Device metadata upserted"),
+        (status = 400, description = "Invalid deviceSn or fileAttachments"),
+        (status = 401, description = "Invalid or missing factory API key"),
+        (status = 500, description = "Server error")
+    ),
+    security(())
+)]
+pub async fn upsert_device_metadata_handler(
+    State(state): State<Arc<ApiState>>,
+    Path(device_sn): Path<String>,
+    Json(req): Json<UpsertDeviceMetadataRequest>,
+) -> Result<StatusCode, ApiError> {
+    validate_identifier(&device_sn, "deviceSn")?;
+    validate_file_attachments(req.file_attachments.as_deref())?;
+
+    // Normalise optionals. No component_type normalisation — devices have none.
+    let metadata = JsonValue::Object(req.metadata.unwrap_or_default());
+    let file_attachments = match req.file_attachments {
+        Some(items) => serde_json::to_value(&items).map_err(|e| {
+            error!("Failed to serialise file attachments: {}", e);
+            ApiError::internal("Failed to serialise file attachments")
+        })?,
+        None => json!([]),
+    };
+
+    let _ = state
+        .app
+        .db
+        .factory_metadata()
+        .upsert_device_metadata(&device_sn, &metadata, &file_attachments)
+        .await
+        .map_err(|e| {
+            error!("Database error on factory device metadata upsert: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // PUT /api/factory/devices/{deviceSn}/components — full-replace associations.
 //
 // Validates the path device SN and each component SN, then delegates to
@@ -311,18 +391,35 @@ fn validate_file_attachments(items: Option<&[FileAttachment]>) -> Result<(), Api
 
 /// Admin merged-view response for a device (design §4.2.2 C).
 ///
-/// `device_metadata` is reserved and always `null` this round (there is no
-/// device-level metadata write entry point yet). `components` is the left-join
-/// of associations with component metadata; components whose metadata has not
+/// `device_metadata` carries the device-level factory metadata row when present
+/// (written via `PUT /api/factory/devices/{deviceSn}`), or `null` when no
+/// device-level metadata has been reported yet. `components` is the left-join of
+/// associations with component metadata; components whose metadata has not
 /// arrived yet surface with `metadata: null` and `file_attachments: []` (R3).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct FactoryDeviceView {
     #[serde(rename = "deviceSn")]
     pub device_sn: String,
-    /// Reserved device-level metadata slot (always `null` this round).
+    /// Device-level factory metadata (symmetric to `FactoryComponentView` minus
+    /// componentType/componentSn). `null` when no device-level metadata has been
+    /// reported yet.
     #[serde(rename = "deviceMetadata")]
-    pub device_metadata: Option<Map<String, JsonValue>>,
+    pub device_metadata: Option<FactoryDeviceMetadataView>,
     pub components: Vec<FactoryComponentView>,
+}
+
+/// Device-level factory metadata view (design §4.2.2, §5.1). Symmetric to
+/// `FactoryComponentView` minus `componentType`/`componentSn` — devices have no
+/// component type or sub-component SN at this level. `file_attachments` is
+/// normalised from the raw JSONB to an array (Array passthrough, Null → empty,
+/// scalar → wrapped), matching `map_row_to_component_view`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct FactoryDeviceMetadataView {
+    pub metadata: Option<JsonValue>,
+    #[serde(rename = "fileAttachments")]
+    pub file_attachments: Vec<JsonValue>,
+    #[serde(rename = "updatedAt", with = "time::serde::rfc3339::option")]
+    pub updated_at: Option<OffsetDateTime>,
 }
 
 /// Single component in a `FactoryDeviceView` (design §4.2.2 C).
@@ -388,35 +485,51 @@ pub async fn get_factory_device_view_handler(
     let components: Vec<FactoryComponentView> =
         rows.into_iter().map(map_row_to_component_view).collect();
 
+    // Device-level metadata is read in a second repo call (design §5.1: keep
+    // `get_device_view` single-responsibility). The 404 decision above is driven
+    // solely by `get_device_view`; this call only reads the content — None here
+    // does NOT change the 404 outcome (design §6.3).
+    let device_metadata = state
+        .admin
+        .db
+        .factory_metadata()
+        .get_device_metadata(&device_sn)
+        .await
+        .map_err(|e| {
+            error!("Database error on factory device metadata read: {}", e);
+            ApiError::internal("Database operation failed")
+        })?
+        .map(map_row_to_device_metadata_view);
+
     Ok(Json(FactoryDeviceView {
         device_sn,
-        device_metadata: None,
+        device_metadata,
         components,
     }))
 }
 
-// GET /api/admin/factory/components/{componentSn}/changes — change log
+// GET /api/admin/factory/sn/{sn}/changes — change log
 // (design §4.2.2 D, time-descending pagination).
 #[utoipa::path(
     get,
-    path = "/api/admin/factory/components/{componentSn}/changes",
+    path = "/api/admin/factory/sn/{sn}/changes",
     tag = "admin",
     params(
-        ("componentSn" = String, Path, description = "Sub-component SN"),
+        ("sn" = String, Path, description = "SN (device SN or sub-component SN)"),
         FactoryChangeLogQuery
     ),
     responses(
         (status = 200, description = "Paginated change log", body = PaginatedResponse<crate::db::models::FactoryMetadataChangeLog>),
-        (status = 400, description = "Invalid componentSn"),
+        (status = 400, description = "Invalid sn"),
         (status = 500, description = "Server error")
     )
 )]
 pub async fn query_component_changes_handler(
     State(state): State<Arc<ApiState>>,
-    Path(component_sn): Path<String>,
+    Path(sn): Path<String>,
     Query(query): Query<FactoryChangeLogQuery>,
 ) -> Result<Json<PaginatedResponse<crate::db::models::FactoryMetadataChangeLog>>, ApiError> {
-    validate_identifier(&component_sn, "componentSn")?;
+    validate_identifier(&sn, "sn")?;
 
     // Clamp page/page_size and reflect the clamped inputs in the pagination
     // echo. i64 -> u32 is safe after clamp (negative/zero become 1).
@@ -427,7 +540,7 @@ pub async fn query_component_changes_handler(
         .admin
         .db
         .factory_metadata()
-        .query_change_log(&component_sn, page, page_size)
+        .query_change_log(&sn, page, page_size)
         .await
         .map_err(|e| {
             error!("Database error on factory change log query: {}", e);
@@ -444,24 +557,43 @@ pub async fn query_component_changes_handler(
     }))
 }
 
+/// Coerce a raw JSONB `file_attachments` value into the array the API view
+/// exposes: Array passes through, Null → empty, scalar → wrapped in a
+/// single-element array (matches the "metadata not arrived" / passthrough
+/// surface contract, design §4.2.2 C). Shared by both row→view mappers.
+fn normalise_file_attachments(v: Option<JsonValue>) -> Vec<JsonValue> {
+    v.and_then(|v| match v {
+        JsonValue::Array(arr) => Some(arr),
+        JsonValue::Null => None,
+        _ => Some(vec![v]),
+    })
+    .unwrap_or_default()
+}
+
 /// Map a left-join row to its API view. `meta_type` (metadata table) wins over
 /// `assoc_type` (association table); both absent → `None`. `file_attachments`
 /// falls back to `[]` when the JSON value is null or not an array (matches the
 /// "metadata not arrived" surface contract in design §4.2.2 C).
 fn map_row_to_component_view(row: FactoryDeviceViewRow) -> FactoryComponentView {
     let component_type = row.meta_type.or(row.assoc_type);
-    let file_attachments = row
-        .file_attachments
-        .and_then(|v| match v {
-            JsonValue::Array(arr) => Some(arr),
-            JsonValue::Null => None,
-            _ => Some(vec![v]),
-        })
-        .unwrap_or_default();
+    let file_attachments = normalise_file_attachments(row.file_attachments);
 
     FactoryComponentView {
         component_sn: row.component_sn,
         component_type,
+        metadata: row.metadata,
+        file_attachments,
+        updated_at: row.updated_at,
+    }
+}
+
+/// Map a device-level metadata row to its API view. Same `file_attachments`
+/// normalisation as `map_row_to_component_view` (Array passthrough, Null →
+/// empty, scalar → wrapped); device-level has no componentType/componentSn.
+fn map_row_to_device_metadata_view(row: FactoryDeviceMetadataRow) -> FactoryDeviceMetadataView {
+    let file_attachments = normalise_file_attachments(row.file_attachments);
+
+    FactoryDeviceMetadataView {
         metadata: row.metadata,
         file_attachments,
         updated_at: row.updated_at,
@@ -519,13 +651,30 @@ pub async fn factory_metadata_get_handler(
             ApiError::internal("Database operation failed")
         })?;
 
+    // Second repo call for the device-level content (design §5.1: keep
+    // `get_device_view` single-responsibility). Fetched outside the
+    // `Option::map` closure below because it is async; the closure only assembles.
+    let device_metadata_row = state
+        .db
+        .factory_metadata()
+        .get_device_metadata(&device_id)
+        .await
+        .map_err(|e| {
+            error!(
+                "Database error on factory-metadata device metadata read: {}",
+                e
+            );
+            ApiError::internal("Database operation failed")
+        })?;
+    let device_metadata = device_metadata_row.map(map_row_to_device_metadata_view);
+
     // None → data: null (device treats this as "no factory metadata yet").
     let data: Option<JsonValue> = view.map(|rows| {
         let components: Vec<FactoryComponentView> =
             rows.into_iter().map(map_row_to_component_view).collect();
         let view = FactoryDeviceView {
             device_sn: device_id.clone(),
-            device_metadata: None,
+            device_metadata,
             components,
         };
         // `FactoryDeviceView` is Serialize; convert to a raw JSON value for the

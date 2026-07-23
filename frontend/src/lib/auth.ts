@@ -1,3 +1,5 @@
+import { listProducts } from '@/lib/api-generated/sdk.gen'
+
 let authCheckPromise: Promise<boolean> | null = null
 let authConfigPromise: Promise<AuthConfig> | null = null
 let cachedAuthConfig: AuthConfig | null = null
@@ -58,16 +60,20 @@ export async function checkAuth(): Promise<boolean> {
   if (!config.enabled) return true
 
   if (!authCheckPromise) {
-    authCheckPromise = fetch('/api/admin/product?page=1&page_size=1', {
-      credentials: 'include',
+    // Probe through the generated SDK client so a stale access token is
+    // transparently refreshed by the 401 auto-refresh interceptor before the
+    // probe is judged. `throwOnError: false` keeps a 401 as an `{ error }` shape
+    // (after the interceptor's refresh+replay) rather than throwing.
+    authCheckPromise = listProducts({
+      query: { page: 1, page_size: 1 },
     })
       .then((response) => {
-        if (response.status === 401) {
-          return false
-        }
+        if ('error' in response) {
+          if (response.response.status === 401) {
+            return false
+          }
 
-        if (!response.ok) {
-          throw new Error(`auth probe failed with status ${response.status}`)
+          throw new Error(`Auth probe failed with HTTP ${response.response.status}`)
         }
 
         return true

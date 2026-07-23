@@ -185,7 +185,7 @@ pub struct OtaVersionQuery {
     pub page_size: i64,
 }
 
-/// Query parameters for `GET /api/admin/factory/components/{componentSn}/changes`
+/// Query parameters for `GET /api/admin/factory/sn/{sn}/changes`
 /// (design §4.2.2 D). The repo has no shared `PaginationQuery`; each paginated
 /// endpoint carries its own query struct following the existing convention
 /// (`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.

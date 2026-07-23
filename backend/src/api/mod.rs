@@ -75,10 +75,19 @@ pub fn create_router(
 
     let health_route = Router::new().route("/health", get(handlers::health_check));
 
-    let webhook_routes = Router::new()
+    // Browser-facing auth endpoints. NOT behind internal_ip_middleware — these
+    // are reached from the admin web console over the public network (a user on
+    // a non-private IP must still be able to start OAuth, refresh an access
+    // token, and log out). Only the rmqtt-broker webhook routes below are
+    // internal-IP-gated.
+    let auth_routes = Router::new()
         .route("/auth/config", get(auth_handlers::get_auth_config))
         .route("/auth/oauth/start", get(auth_handlers::oauth_start))
         .route("/auth/oauth/callback", get(auth_handlers::oauth_callback))
+        .route("/auth/refresh", post(auth_handlers::refresh_token))
+        .route("/auth/logout", post(auth_handlers::logout));
+
+    let webhook_routes = Router::new()
         .route("/access/auth", post(auth_handlers::auth))
         .route("/access/acl", post(auth_handlers::acl))
         .route(
@@ -218,7 +227,7 @@ pub fn create_router(
             get(factory_handlers::get_factory_device_view_handler),
         )
         .route(
-            "/admin/factory/components/{component_sn}/changes",
+            "/admin/factory/sn/{sn}/changes",
             get(factory_handlers::query_component_changes_handler),
         );
 
@@ -249,6 +258,10 @@ pub fn create_router(
             put(factory_handlers::upsert_component_handler),
         )
         .route(
+            "/factory/devices/{device_sn}",
+            put(factory_handlers::upsert_device_metadata_handler),
+        )
+        .route(
             "/factory/devices/{device_sn}/components",
             put(factory_handlers::replace_associations_handler),
         )
@@ -257,7 +270,10 @@ pub fn create_router(
             factory_middleware::factory_auth_middleware,
         ));
 
-    let api_routes = device_routes.merge(admin_routes).merge(factory_routes);
+    let api_routes = device_routes
+        .merge(admin_routes)
+        .merge(factory_routes)
+        .merge(auth_routes);
 
     let otel_enabled = config.otel.trace.is_some() || config.otel.log.is_some();
 

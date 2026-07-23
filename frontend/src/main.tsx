@@ -7,18 +7,16 @@
 import './styles.css'
 import { StrictMode } from 'react'
 import { createRouter, RouterProvider } from '@tanstack/react-router'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import ReactDOM from 'react-dom/client'
 import { routeTree } from './routes/-route-tree'
+import { installAutoRefreshInterceptor } from './lib/refresh'
+import { queryClient } from './lib/query-client'
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      retry: false,
-    },
-  },
-})
+// Register the 401-driven access-token refresh on the API client before any
+// request is made. Herald 0.3.3 access tokens expire every 15 min; without this
+// the user is logged out at the first stale-token response.
+installAutoRefreshInterceptor()
 
 export const router = createRouter({
   routeTree,

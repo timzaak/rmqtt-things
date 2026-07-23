@@ -61,10 +61,37 @@ pub struct OAuthCallbackQuery {
     state: String,
 }
 
+/// Token-family response from Herald. Used for both the OAuth token exchange
+/// (`POST /api/oauth/{realm}/token`, snake_case per RFC 6749) and the browser
+/// refresh (`POST /api/auth/browser-token/refresh`, camelCase since `3d0d6ff7`)
+/// — the two endpoints return the same five fields under different JSON casing,
+/// so each field aliases its camelCase spelling to accept either form.
+///
+/// Herald 0.3.3 returns a short-lived access token (default 900s) plus a
+/// long-lived refresh token (default 30d, config 1–90d).
+/// `expires_in`/`refresh_expires_in` fit in i64 (max 7_776_000 < i64::MAX).
 #[derive(Deserialize)]
 struct TokenResponse {
+    #[serde(alias = "accessToken")]
     access_token: String,
+    #[serde(alias = "refreshToken")]
+    refresh_token: String,
+    #[allow(dead_code)]
+    #[serde(alias = "tokenType")]
+    token_type: String,
+    #[serde(alias = "expiresIn")]
     expires_in: i64,
+    #[serde(alias = "refreshExpiresIn")]
+    refresh_expires_in: i64,
+}
+
+/// Response body of our `/api/auth/refresh` endpoint. The web console schedules
+/// its next proactive refresh from `expires_in` (well before the 15-minute
+/// access-token boundary so we never race the token expiry).
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshResponse {
+    pub expires_in: i64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -176,6 +203,19 @@ pub async fn oauth_callback(
         ))
         .map_err(|_| ApiError::internal("invalid auth cookie"))?,
     );
+    // Refresh token rides in its own HttpOnly cookie; its Max-Age is the
+    // browser token family's absolute lifetime (default 30d). The access token
+    // in X-Auth expires much sooner (900s), so the web console must call
+    // /api/auth/refresh before X-Auth lapses to avoid a 15-min forced re-login.
+    response_headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&build_cookie(
+            "X-Auth-Refresh",
+            &token.refresh_token,
+            token.refresh_expires_in,
+        ))
+        .map_err(|_| ApiError::internal("invalid refresh cookie"))?,
+    );
     response_headers.append(
         header::SET_COOKIE,
         HeaderValue::from_str(&clear_cookie("RMQTT_OAUTH"))
@@ -183,6 +223,108 @@ pub async fn oauth_callback(
     );
 
     Ok((StatusCode::FOUND, response_headers))
+}
+
+/// Refresh the browser access token using the `X-Auth-Refresh` cookie.
+///
+/// Herald 0.3.3 issues short-lived (900s) access tokens alongside a long-lived
+/// refresh token. Both tokens rotate on every refresh, and **reusing a rotated
+/// refresh token revokes the whole token family** — so the web console must
+/// proactively call this endpoint before `X-Auth` lapses (single in-flight
+/// refresh), never retry concurrently after a 401.
+#[utoipa::path(
+    post,
+    path = "/api/auth/refresh",
+    tag = "system",
+    responses(
+        (status = 200, description = "Rotated access token; cookies refreshed", body = RefreshResponse),
+        (status = 401, description = "Refresh token missing or rejected by Herald")
+    )
+)]
+pub async fn refresh_token(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApiError> {
+    let Some(herald) = state.admin.config.herald.as_ref() else {
+        return Err(ApiError::not_found("Herald auth is not configured"));
+    };
+    let refresh_cookie =
+        get_cookie(&headers, "X-Auth-Refresh").ok_or_else(ApiError::unauthorized)?;
+
+    let tokens =
+        refresh_oauth_token(herald.base_url.trim_end_matches('/'), &refresh_cookie).await?;
+
+    let mut response_headers = HeaderMap::new();
+    response_headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&build_cookie(
+            "X-Auth",
+            &tokens.access_token,
+            tokens.expires_in,
+        ))
+        .map_err(|_| ApiError::internal("invalid auth cookie"))?,
+    );
+    response_headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&build_cookie(
+            "X-Auth-Refresh",
+            &tokens.refresh_token,
+            tokens.refresh_expires_in,
+        ))
+        .map_err(|_| ApiError::internal("invalid refresh cookie"))?,
+    );
+
+    Ok((
+        StatusCode::OK,
+        response_headers,
+        Json(RefreshResponse {
+            expires_in: tokens.expires_in,
+        }),
+    ))
+}
+
+/// Log out: revoke the Herald token family, then clear both auth cookies.
+///
+/// Revocation is best-effort — if Herald is unreachable we still clear the
+/// cookies so the user's session ends locally; the orphaned family dies on its
+/// own when the refresh absolute TTL expires.
+#[utoipa::path(
+    post,
+    path = "/api/auth/logout",
+    tag = "system",
+    responses((status = 200, description = "Logged out; cookies cleared"))
+)]
+pub async fn logout(
+    State(state): State<Arc<ApiState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, ApiError> {
+    let Some(herald) = state.admin.config.herald.as_ref() else {
+        return Err(ApiError::not_found("Herald auth is not configured"));
+    };
+    if let Some(access_token) = get_cookie(&headers, "X-Auth") {
+        // Herald's /api/auth/logout is Bearer-protected; a 4xx/5xx means the
+        // token was already gone or the service is down. Either way we still
+        // drop the cookies below so the client session ends locally.
+        let _ = herald_logout(herald.base_url.trim_end_matches('/'), &access_token).await;
+    }
+
+    let mut response_headers = HeaderMap::new();
+    response_headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&clear_cookie("X-Auth"))
+            .map_err(|_| ApiError::internal("invalid auth cookie"))?,
+    );
+    response_headers.append(
+        header::SET_COOKIE,
+        HeaderValue::from_str(&clear_cookie("X-Auth-Refresh"))
+            .map_err(|_| ApiError::internal("invalid refresh cookie"))?,
+    );
+
+    Ok((
+        StatusCode::OK,
+        response_headers,
+        Json(serde_json::json!({"message": "ok"})),
+    ))
 }
 
 fn random_token(len: usize) -> String {
@@ -257,6 +399,47 @@ async fn exchange_oauth_code(
         .json::<TokenResponse>()
         .await
         .map_err(|_| ApiError::service_unavailable("auth service unavailable"))
+}
+
+async fn refresh_oauth_token(
+    herald_base_url: &str,
+    refresh_token: &str,
+) -> Result<TokenResponse, ApiError> {
+    let url = format!("{herald_base_url}/api/auth/browser-token/refresh");
+    let response = reqwest::Client::new()
+        .post(url)
+        .json(&serde_json::json!({ "refreshToken": refresh_token }))
+        .send()
+        .await
+        .map_err(|_| ApiError::service_unavailable("auth service unavailable"))?;
+
+    // Herald maps invalid/reused refresh tokens to 401; both mean the session
+    // is gone and the client must re-authenticate.
+    if !response.status().is_success() {
+        return Err(ApiError::unauthorized());
+    }
+
+    response
+        .json::<TokenResponse>()
+        .await
+        .map_err(|_| ApiError::service_unavailable("auth service unavailable"))
+}
+
+/// Best-effort family revocation via Herald's Bearer-protected logout endpoint.
+/// Any error (network failure, 4xx for already-revoked tokens) is swallowed by
+/// the caller so cookies still get cleared locally.
+async fn herald_logout(herald_base_url: &str, access_token: &str) -> Result<(), ApiError> {
+    let url = format!("{herald_base_url}/api/auth/logout");
+    reqwest::Client::new()
+        .post(url)
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {access_token}"),
+        )
+        .send()
+        .await
+        .map_err(|_| ApiError::service_unavailable("auth service unavailable"))?;
+    Ok(())
 }
 
 fn resolve_app_origin_and_return_to(

@@ -606,7 +606,7 @@ async fn scenario_factory_upsert_component_then_overwrite_writes_change_log(
     );
     assert_eq!(rows.len(), 1);
     let log = &rows[0];
-    assert_eq!(log.component_sn, component_sn);
+    assert_eq!(log.sn, component_sn);
     assert_eq!(log.actor, "factory", "R5: actor must be 'factory'");
     // before snapshot carries the first-report metadata (v=1).
     let before = log
@@ -827,7 +827,7 @@ async fn scenario_factory_association_arrives_before_metadata_left_join_returns_
     assert_eq!(view["deviceSn"], device_sn);
     assert!(
         view["deviceMetadata"].is_null(),
-        "deviceMetadata is reserved null this round"
+        "deviceMetadata is null because no device-level metadata has been reported for this device yet (BE-D02 reads real device-level metadata; none seeded here)"
     );
     let components = view["components"]
         .as_array()
@@ -1010,7 +1010,7 @@ async fn scenario_factory_device_get_publishes_reply_with_merged_view(
     assert_eq!(data["deviceSn"], device_sn);
     assert!(
         data["deviceMetadata"].is_null(),
-        "deviceMetadata is reserved null this round"
+        "deviceMetadata is null because no device-level metadata has been reported for this device yet (BE-D02 reads real device-level metadata; only association + component metadata seeded here)"
     );
     let components = data["components"]
         .as_array()
@@ -1088,4 +1088,473 @@ async fn scenario_factory_device_acl_allows_factory_metadata_topic_only_for_self
         "deny",
         "cross-device factory-metadata topic must be denied"
     );
+}
+
+// ===========================================================================
+// Scenario 9 — device-level metadata upsert: Created then overwrite writes a
+// change_log row (before=null on first, before=first-snapshot on overwrite,
+// actor="factory"). Symmetric to scenario 3 but on the device-level write path.
+//
+// User Story: US-PA-045 (device-level metadata closed loop, design §6.1).
+// Covers: design §4.2.1 PUT /api/factory/devices/{deviceSn}, §5.1
+//         `upsert_device_metadata`, §4.2.2 device-level snapshots (NO
+//         componentType — the key difference from component-level snapshots),
+//         §6.1 scenario `device_metadata_upsert_creates_and_overwrites`.
+//
+// Uses `FactoryAuthTestContext`. Asserts the device-level write path produces
+// 204 on both the Created and Overwritten reports, writes no change_log row on
+// the first Created report, and writes exactly one change_log row on the
+// overwrite whose before/after snapshots match the device-level shape
+// (metadata/fileAttachments/updatedAt, NO componentType field).
+// ===========================================================================
+#[test_context(FactoryAuthTestContext)]
+#[tokio::test]
+async fn scenario_factory_device_metadata_upsert_creates_and_overwrites(
+    ctx: &mut FactoryAuthTestContext,
+) {
+    let device_sn = "dev_meta_upsert";
+    let path = format!("/api/factory/devices/{device_sn}");
+
+    // First report: metadata.serial = S1 → 204, no change_log row yet (Created).
+    let first_body = json!({
+        "metadata": { "serial": "S1" },
+        "fileAttachments": [
+            { "fileKey": "factory-attachments/dev/s1.bin", "fileName": "s1.bin" }
+        ]
+    });
+    let (status_first, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &path,
+        &first_body,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status_first, StatusCode::NO_CONTENT);
+
+    // Just-before-overwrite assertion: still zero change_log rows (Created).
+    let (_, total_before) = ctx
+        .admin_state
+        .db
+        .factory_metadata()
+        .query_change_log(device_sn, 1, 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        total_before, 0,
+        "first device-level report is a Created; no change_log row yet (R5)"
+    );
+
+    // Second report (overwrite): metadata.serial = S2 → 204, change_log gets a row.
+    let second_body = json!({
+        "metadata": { "serial": "S2" },
+        "fileAttachments": [
+            { "fileKey": "factory-attachments/dev/s2.bin", "fileName": "s2.bin" }
+        ]
+    });
+    let (status_second, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &path,
+        &second_body,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status_second, StatusCode::NO_CONTENT);
+
+    // Query change_log (time-descending): exactly one row, sn = device_sn,
+    // actor = "factory", before = the S1 snapshot, after = the S2 snapshot.
+    // Device-level snapshots have NO componentType (design §4.2.2 / §5.1 —
+    // devices have no component type), the key difference from scenario 3.
+    let (rows, total_after) = ctx
+        .admin_state
+        .db
+        .factory_metadata()
+        .query_change_log(device_sn, 1, 10)
+        .await
+        .unwrap();
+    assert_eq!(
+        total_after, 1,
+        "overwrite must write exactly one change_log row"
+    );
+    assert_eq!(rows.len(), 1);
+    let log = &rows[0];
+    assert_eq!(log.sn, device_sn);
+    assert_eq!(log.actor, "factory", "R5: actor must be 'factory'");
+
+    // before snapshot carries the first-report device metadata (serial=S1).
+    let before = log
+        .before
+        .as_ref()
+        .expect("overwrite before-snapshot must be present");
+    assert_eq!(
+        before["metadata"]["serial"], "S1",
+        "before snapshot must be the serial=S1 state"
+    );
+    // after snapshot carries the new device metadata (serial=S2).
+    assert_eq!(
+        log.after["metadata"]["serial"], "S2",
+        "after snapshot must be the serial=S2 state"
+    );
+
+    // Device-level snapshots have NO componentType (the key difference from
+    // component-level snapshots — design §4.2.2 / §5.1). Asserting absence
+    // guards against accidentally reusing the component-level snapshot shape.
+    assert!(
+        before.get("componentType").is_none(),
+        "device-level before snapshot must NOT carry componentType (design §4.2.2)"
+    );
+    assert!(
+        log.after.get("componentType").is_none(),
+        "device-level after snapshot must NOT carry componentType (design §4.2.2)"
+    );
+}
+
+// ===========================================================================
+// Scenario 10 — device-level metadata appears in the admin merged view.
+//
+// User Story: US-PA-047 (admin reads device-level factory metadata, design §6.1).
+// Covers: design §4.2.1 GET /api/admin/factory/devices/{deviceSn} response,
+//         §5.1 `FactoryDeviceMetadataView`, §6.1 scenario
+//         `device_metadata_appears_in_admin_view`.
+//
+// Uses `FactoryAuthTestContext`. Complementary to scenario 5: scenario 5 seeds
+// only an association (no device-level metadata) → `deviceMetadata` is null;
+// this scenario seeds real device-level metadata → `deviceMetadata` must be a
+// non-null object with `metadata`, `fileAttachments` (array, contains the
+// reported item), and `updatedAt` (RFC3339 string, non-null).
+// ===========================================================================
+#[test_context(FactoryAuthTestContext)]
+#[tokio::test]
+async fn scenario_factory_device_metadata_appears_in_admin_view(ctx: &mut FactoryAuthTestContext) {
+    let device_sn = "dev_meta_admin_view";
+
+    // Seed device-level metadata (with a file attachment) via the factory
+    // writer path.
+    let put_body = json!({
+        "metadata": { "firmware": "1.0.0" },
+        "fileAttachments": [
+            { "fileKey": "factory-attachments/dev/fw.bin", "fileName": "fw.bin" }
+        ]
+    });
+    let (status_put, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &format!("/api/factory/devices/{device_sn}"),
+        &put_body,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status_put, StatusCode::NO_CONTENT);
+
+    // Admin merged view must surface the real device-level metadata.
+    let (status_get, body_get) = request(
+        &ctx.service,
+        Method::GET,
+        &format!("/api/admin/factory/devices/{device_sn}"),
+    )
+    .await;
+    assert_eq!(
+        status_get,
+        StatusCode::OK,
+        "device with device-level metadata must return 200, not 404"
+    );
+
+    let view: JsonValue = serde_json::from_str(&body_get).expect("view must be valid JSON");
+    assert_eq!(view["deviceSn"], device_sn);
+
+    // deviceMetadata is a NON-null object (complementary to scenario 5's null
+    // state — design §4.2.1 / §5.1 FactoryDeviceMetadataView).
+    assert!(
+        view["deviceMetadata"].is_object(),
+        "deviceMetadata must be a non-null object when device-level metadata has been reported"
+    );
+    let device_metadata = &view["deviceMetadata"];
+
+    // metadata carries the reported structured object.
+    assert!(
+        device_metadata["metadata"].is_object(),
+        "deviceMetadata.metadata must be an object"
+    );
+    assert_eq!(
+        device_metadata["metadata"]["firmware"], "1.0.0",
+        "deviceMetadata.metadata must reflect the reported firmware"
+    );
+
+    // fileAttachments is an array containing the reported item.
+    let file_attachments = device_metadata["fileAttachments"]
+        .as_array()
+        .expect("deviceMetadata.fileAttachments must be an array");
+    assert_eq!(
+        file_attachments.len(),
+        1,
+        "deviceMetadata.fileAttachments must contain the one reported item"
+    );
+    assert_eq!(
+        file_attachments[0]["fileKey"], "factory-attachments/dev/fw.bin",
+        "deviceMetadata.fileAttachments[0].fileKey must match the reported item"
+    );
+
+    // updatedAt is a non-null RFC3339 string once metadata has arrived.
+    assert!(
+        device_metadata["updatedAt"].is_string(),
+        "deviceMetadata.updatedAt must be a non-null RFC3339 string once metadata has been reported"
+    );
+}
+
+// ===========================================================================
+// Scenario 11 — device pull webhook reply carries real device-level metadata.
+//
+// User Story: US-DV-011 (device reads own device-level factory metadata via the
+// pull topic, design §6.1).
+// Covers: design §4.2.1 POST /api/thing/factory-metadata/get, §5.1 webhook
+//         handler (reads `get_device_metadata`), §5.3 publish_response to
+//         {topic}_reply, §6.1 scenario
+//         `device_metadata_in_device_webhook`.
+//
+// Uses the mockito-backed `FactoryWebhookContext`. Complementary to scenario 7:
+// scenario 7 seeds only association + component metadata (no device-level
+// metadata) → `data.deviceMetadata` is null; this scenario seeds real
+// device-level metadata via the factory writer path → the webhook reply's
+// `data.deviceMetadata` must be a non-null object with metadata/fileAttachments/
+// updatedAt.
+// ===========================================================================
+#[test_context(FactoryWebhookContext)]
+#[tokio::test]
+async fn scenario_factory_device_metadata_in_device_webhook(ctx: &mut FactoryWebhookContext) {
+    let product_id = "prod_factory_dev_meta";
+    let device_sn = "dev_factory_dev_meta";
+
+    // --- Pre-seed: device-level metadata via the factory writer path. ---
+    let meta_body = json!({
+        "metadata": { "qcReport": "PASS" },
+        "fileAttachments": [
+            { "fileKey": "factory-attachments/dev/qc.bin", "fileName": "qc.bin" }
+        ]
+    });
+    let (status_meta, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &format!("/api/factory/devices/{device_sn}"),
+        &meta_body,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status_meta, StatusCode::NO_CONTENT);
+
+    // --- Trigger the device-pull webhook. ---
+    let topic = factory_metadata_get_topic(product_id, device_sn);
+    let request_id = "factory-dev-meta-req-001";
+    let payload = json!({ "id": request_id, "ack": 0, "params": {} });
+    let msg = mqtt_publish_message(device_sn, &topic, &payload);
+
+    let (status_hook, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/thing/factory-metadata/get",
+        &msg,
+    )
+    .await;
+    assert_eq!(
+        status_hook,
+        StatusCode::NO_CONTENT,
+        "device-pull webhook must return 204"
+    );
+
+    // --- Inspect the captured publish body. ---
+    let published = ctx
+        .take_published_body()
+        .await
+        .expect("webhook must publish a reply via /mqtt/publish");
+
+    // Topic must end with `_reply`.
+    let published_topic = published
+        .get("topic")
+        .and_then(|v| v.as_str())
+        .expect("publish body must carry a topic");
+    assert_eq!(
+        published_topic,
+        format!("{topic}_reply"),
+        "publish_response must target {{topic}}_reply"
+    );
+
+    // The `payload` is a STRINGIFIED MqttResponse; re-parse it.
+    let payload_str = published
+        .get("payload")
+        .and_then(|v| v.as_str())
+        .expect("publish payload must be a string");
+    let response: JsonValue = serde_json::from_str(payload_str)
+        .expect("publish payload string must parse as MqttResponse JSON");
+    assert_eq!(
+        response["id"], request_id,
+        "reply must echo the original request id"
+    );
+    assert_eq!(response["code"], 200, "reply code must be 200");
+
+    let data = &response["data"];
+    assert!(
+        data.is_object(),
+        "data must be the merged-view object (device has device-level metadata, so not null)"
+    );
+    assert_eq!(data["deviceSn"], device_sn);
+
+    // deviceMetadata is a NON-null object (complementary to scenario 7's null
+    // state — design §4.2.1 / §5.1 webhook handler reads get_device_metadata).
+    assert!(
+        data["deviceMetadata"].is_object(),
+        "data.deviceMetadata must be a non-null object when device-level metadata has been reported"
+    );
+    let device_metadata = &data["deviceMetadata"];
+    assert!(
+        device_metadata["metadata"].is_object(),
+        "data.deviceMetadata.metadata must be an object"
+    );
+    assert_eq!(
+        device_metadata["metadata"]["qcReport"], "PASS",
+        "data.deviceMetadata.metadata must reflect the reported qcReport"
+    );
+    let file_attachments = device_metadata["fileAttachments"]
+        .as_array()
+        .expect("data.deviceMetadata.fileAttachments must be an array");
+    assert_eq!(
+        file_attachments.len(),
+        1,
+        "data.deviceMetadata.fileAttachments must contain the one reported item"
+    );
+    assert_eq!(
+        file_attachments[0]["fileKey"], "factory-attachments/dev/qc.bin",
+        "data.deviceMetadata.fileAttachments[0].fileKey must match the reported item"
+    );
+    assert!(
+        device_metadata["updatedAt"].is_string(),
+        "data.deviceMetadata.updatedAt must be a non-null RFC3339 string once metadata has been reported"
+    );
+}
+
+// ===========================================================================
+// Scenario 12 — neutralized change-log query path works for BOTH component SN
+// and device SN (design §6.3 regression point for the component_sn → sn
+// generalization).
+//
+// User Story: design §6.3 sn-neutralization regression (no new US id; covers
+// the BE-D01 path-neutralization contract).
+// Covers: design §4.2.1 GET /api/admin/factory/sn/{sn}/changes (neutralized
+//         path — was /components/{componentSn}/changes), §4.1 sn generalization
+//         (one table, both SN kinds), §6.3 regression point.
+//
+// Uses `FactoryAuthTestContext`. Writes both a component-level metadata
+// overwrite (→ component change_log) and a device-level metadata overwrite
+// (→ device change_log) via HTTP, then queries BOTH through the SAME neutral
+// `/api/admin/factory/sn/{sn}/changes` endpoint and asserts each returns its
+// own log rows with `sn` matching the request SN. This guards against any
+// regression to the old `/components/{componentSn}/changes` path or a split
+// query layer.
+// ===========================================================================
+#[test_context(FactoryAuthTestContext)]
+#[tokio::test]
+async fn scenario_factory_change_log_query_by_sn_works_for_both(ctx: &mut FactoryAuthTestContext) {
+    let component_sn = "sn_logquery_comp";
+    let device_sn = "sn_logquery_dev";
+
+    // --- Seed a component-level change_log row (PUT twice → overwrite). ---
+    let comp_path = format!("/api/factory/components/{component_sn}");
+    let comp_first = json!({ "componentType": "camera", "metadata": { "v": 1 } });
+    let (status, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &comp_path,
+        &comp_first,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let comp_second = json!({ "componentType": "camera", "metadata": { "v": 2 } });
+    let (status, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &comp_path,
+        &comp_second,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // --- Seed a device-level change_log row (PUT twice → overwrite). ---
+    let dev_path = format!("/api/factory/devices/{device_sn}");
+    let dev_first = json!({ "metadata": { "serial": "S1" } });
+    let (status, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &dev_path,
+        &dev_first,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let dev_second = json!({ "metadata": { "serial": "S2" } });
+    let (status, _) = request_json_with_headers(
+        &ctx.service,
+        Method::PUT,
+        &dev_path,
+        &dev_second,
+        FACTORY_BEARER_HEADERS,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // --- Query the component change_log via the NEUTRAL sn path (HTTP). ---
+    let (status_comp, body_comp) = request(
+        &ctx.service,
+        Method::GET,
+        &format!("/api/admin/factory/sn/{component_sn}/changes"),
+    )
+    .await;
+    assert_eq!(
+        status_comp,
+        StatusCode::OK,
+        "neutral /sn/{{sn}}/changes must accept a component SN"
+    );
+    let comp_resp: JsonValue =
+        serde_json::from_str(&body_comp).expect("component change-log response must be valid JSON");
+    let comp_items = comp_resp["data"]
+        .as_array()
+        .expect("component change-log data must be an array");
+    assert!(
+        !comp_items.is_empty(),
+        "neutral sn query must return at least one row for the component SN"
+    );
+    for item in comp_items {
+        assert_eq!(
+            item["sn"], component_sn,
+            "every component change-log row must carry sn == the component SN (sn generalization, design §4.1)"
+        );
+    }
+
+    // --- Query the device change_log via the SAME NEUTRAL sn path (HTTP). ---
+    let (status_dev, body_dev) = request(
+        &ctx.service,
+        Method::GET,
+        &format!("/api/admin/factory/sn/{device_sn}/changes"),
+    )
+    .await;
+    assert_eq!(
+        status_dev,
+        StatusCode::OK,
+        "neutral /sn/{{sn}}/changes must accept a device SN"
+    );
+    let dev_resp: JsonValue =
+        serde_json::from_str(&body_dev).expect("device change-log response must be valid JSON");
+    let dev_items = dev_resp["data"]
+        .as_array()
+        .expect("device change-log data must be an array");
+    assert!(
+        !dev_items.is_empty(),
+        "neutral sn query must return at least one row for the device SN"
+    );
+    for item in dev_items {
+        assert_eq!(
+            item["sn"], device_sn,
+            "every device change-log row must carry sn == the device SN (sn generalization, design §4.1)"
+        );
+    }
 }

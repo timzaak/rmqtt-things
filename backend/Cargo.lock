@@ -1227,9 +1227,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
 name = "herald-sdk"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b76736aea6e5b0d3707a32d07ab7added06eda157407968307743c3edf26dd8"
+checksum = "30abcb2d1015b2d276947e97c26a06a766173e00962c5989a745b3c9af51a825"
 dependencies = [
  "dashmap",
  "futures",
