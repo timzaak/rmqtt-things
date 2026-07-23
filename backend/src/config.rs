@@ -20,6 +20,8 @@ pub struct Config {
     pub herald: Option<HeraldConfig>,
     #[serde(default)]
     pub alarm: AlarmConfig,
+    #[serde(default)]
+    pub factory: FactoryConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -273,4 +275,15 @@ impl Default for AlarmConfig {
             webhook_retry_interval_seconds: default_webhook_retry_interval_seconds(),
         }
     }
+}
+
+/// Production-line (factory) API key configuration (support-multiple-device
+/// feature, design §4.5). Keys are compared in constant time by
+/// `factory_auth_middleware`. Empty list (the default when `[factory]` is
+/// absent) means the middleware rejects every request with 401; rotation
+/// requires a restart.
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct FactoryConfig {
+    #[serde(default)]
+    pub api_keys: Vec<String>,
 }

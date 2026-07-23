@@ -75,7 +75,13 @@ impl AsyncTestContext for TestContext {
             task_set: Arc::new(tokio::sync::Mutex::new(tokio::task::JoinSet::new())),
         });
 
-        let router = create_router(config, app_state.clone(), admin_state.clone(), None);
+        let router = create_router(
+            config,
+            app_state.clone(),
+            admin_state.clone(),
+            None,
+            empty_factory_auth_state(),
+        );
 
         TestContext {
             _app_state: app_state,
@@ -130,6 +136,15 @@ pub async fn drop_test_schema(pool: &PgPool, schema_name: &str) {
 
 pub fn test_s3_endpoint() -> String {
     std::env::var("TEST_S3_ENDPOINT").unwrap_or_else(|_| "http://127.0.0.1:14566".to_string())
+}
+
+/// Build a `FactoryAuthState` with an empty API-key list. Used by tests that
+/// don't exercise the factory write path; an empty list means every factory
+/// request is 401 (design §5.4). Tests that need a valid factory API key
+/// should build their own `FactoryAuthState` with the key(s) inlined.
+pub fn empty_factory_auth_state() -> Arc<crate::api::factory_middleware::FactoryAuthState> {
+    let keys: Arc<[Box<str>]> = Vec::<Box<str>>::new().into();
+    Arc::new(crate::api::factory_middleware::FactoryAuthState { api_keys: keys })
 }
 
 fn database_url_with_schema(database_url: &str, schema_name: &str) -> String {

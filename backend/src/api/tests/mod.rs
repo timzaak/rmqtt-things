@@ -5,6 +5,8 @@ mod alarm_record_api_scenarios;
 mod alarm_rule_crud_scenarios;
 mod cert_scenarios;
 mod device_auto_provisioning_scenarios;
+mod factory_metadata_scenarios;
+mod file_download_url_scenarios;
 mod herald_auth_scenarios;
 mod mqtt_device_flow_scenarios;
 mod mqtt_integration;

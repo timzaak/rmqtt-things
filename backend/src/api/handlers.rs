@@ -285,7 +285,12 @@ impl S3Client {
             None,
         )?;
 
-        let bucket = Bucket::new(&s3_config.bucket, region, credentials)?;
+        // Use path-style addressing so presigned URLs against IPv4 endpoints
+        // (e.g. LocalStack http://127.0.0.1:14566) are built as
+        // http://<endpoint>/<bucket>/... instead of the virtual-host-style
+        // http://<bucket>.<endpoint>/... which Url::parse rejects with
+        // "invalid IPv4 address".
+        let bucket = Bucket::new(&s3_config.bucket, region, credentials)?.with_path_style();
 
         Ok(S3Client {
             bucket: *bucket,

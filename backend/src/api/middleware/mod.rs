@@ -70,7 +70,14 @@ pub fn extract_permission(path: &str, method: &Method) -> Option<Rule> {
         || path.starts_with("/admin/event")
         || path.starts_with("/admin/alarm-rule")
         || path.starts_with("/admin/alarm")
+        || path.starts_with("/admin/factory")
     {
+        // `/admin/factory/*` (design §4.5) maps to the `device` resource so
+        // Herald `device:read`/`device:write` governs the factory admin read
+        // endpoints. Without this, `extract_permission` returns `None` and
+        // `herald_auth_middleware` forbids every `/admin/factory/*` request in
+        // Herald-configured deployments (single-tenant deployments don't mount
+        // the middleware, so they're unaffected).
         "device"
     } else if path.starts_with("/admin/ca") || path.starts_with("/admin/ota") {
         "cert"
@@ -222,6 +229,19 @@ mod tests {
             ),
             ("/api/admin/alarm", Method::GET, "device", "read"),
             ("/api/admin/alarm/1/ack", Method::PATCH, "device", "write"),
+            // Factory admin read endpoints map to device resource (design §4.5).
+            (
+                "/api/admin/factory/devices/sn-1",
+                Method::GET,
+                "device",
+                "read",
+            ),
+            (
+                "/api/admin/factory/components/sn-1/changes",
+                Method::GET,
+                "device",
+                "read",
+            ),
         ];
 
         for (path, method, resource, action) in cases {

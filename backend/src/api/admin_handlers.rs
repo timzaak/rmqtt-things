@@ -18,6 +18,98 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
+// GET /api/admin/file/download-url - Get a presigned S3 download URL for a file
+// attachment (design §4.2.2 F / §5.5). The frontend uses this to render
+// `FileAttachment.fileKey` values as clickable direct links.
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
+#[into_params(parameter_in = Query)]
+pub struct FileDownloadUrlQuery {
+    /// S3 object key (same value as `FileAttachment.fileKey`). Non-empty, ≤ 1024 chars,
+    /// must not start with `/` and must not contain a `..` path segment.
+    #[serde(rename = "fileKey")]
+    pub file_key: String,
+}
+
+#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
+pub struct FileDownloadUrlResponse {
+    pub url: String,
+    #[serde(rename = "expiresInSeconds")]
+    pub expires_in_seconds: u64,
+}
+
+/// Validate an admin file download `file_key` against the path-traversal rules
+/// in design §4.5. Extracted as a pure function so the validation matrix
+/// (empty / overlong / `..` segment / absolute path / valid) is unit-testable
+/// without spinning up a full router.
+fn validate_file_key(file_key: &str) -> Result<(), ApiError> {
+    if file_key.is_empty()
+        || file_key.len() > 1024
+        || file_key.starts_with('/')
+        || file_key.split('/').any(|seg| seg == "..")
+    {
+        return Err(ApiError::bad_request("Invalid fileKey"));
+    }
+    Ok(())
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/admin/file/download-url",
+    tag = "admin",
+    params(FileDownloadUrlQuery),
+    responses(
+        (status = 200, description = "Presigned download URL", body = FileDownloadUrlResponse),
+        (status = 400, description = "Invalid fileKey"),
+        (status = 403, description = "Directory not allowed"),
+        (status = 503, description = "S3 client not configured")
+    )
+)]
+pub async fn admin_file_download_url_handler(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<FileDownloadUrlQuery>,
+) -> Result<Json<FileDownloadUrlResponse>, ApiError> {
+    // §4.5 path-traversal protection. `validate_identifier` cannot be reused
+    // because a file key legitimately contains `/` (directory segments).
+    validate_file_key(&query.file_key)?;
+
+    // No `/` ⇒ the whole key is the filename and directory is empty (same
+    // convention as `admin_file_upload_handler`, which passes empty
+    // product_id / device_id in the admin context).
+    let directory = query
+        .file_key
+        .rsplit_once('/')
+        .map(|(d, _)| d)
+        .unwrap_or("");
+
+    let s3_client = state
+        .admin
+        .s3_client
+        .as_ref()
+        .ok_or_else(|| ApiError::service_unavailable("S3 client not configured"))?;
+
+    // §4.5 directory whitelist — prevents reading outside the configured S3
+    // prefixes. Admin context has no product/device variables, matching
+    // `admin_file_upload_handler`.
+    if !is_file_upload_directory_allowed(&s3_client.config.directories, "", "", directory) {
+        return Err(ApiError::forbidden_with("Directory not allowed"));
+    }
+
+    let url = s3_client
+        .get_presigned_download_url(&query.file_key)
+        .await
+        .map_err(|e| {
+            error!("Failed to get presigned download url: {}", e);
+            ApiError::internal("Failed to get presigned download url")
+        })?;
+
+    // `S3Config.expired_seconds` is `u32`; the API contract exposes `u64`
+    // (design §4.2.2 F) so widen here.
+    Ok(Json(FileDownloadUrlResponse {
+        url,
+        expires_in_seconds: u64::from(s3_client.config.expired_seconds),
+    }))
+}
+
 // POST /api/admin/file/upload - Upload file
 #[utoipa::path(
     post,
@@ -1107,5 +1199,61 @@ pub async fn delete_ota_version(
         Ok(StatusCode::OK)
     } else {
         Err(ApiError::not_found("Version not found"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_file_key;
+    use crate::api::error::ApiError;
+    use axum::http::StatusCode;
+
+    // Asserts the validator rejects with a 400 BAD_REQUEST rather than another
+    // status — `admin_file_download_url_handler` relies on this mapping for the
+    // §4.2.2 F 400 response contract.
+    fn assert_bad_request(result: Result<(), ApiError>) {
+        match result {
+            Err(e) => assert_eq!(
+                e.status_code(),
+                StatusCode::BAD_REQUEST,
+                "expected 400 for invalid fileKey"
+            ),
+            Ok(_) => panic!("expected rejection, got Ok"),
+        }
+    }
+
+    #[test]
+    fn validate_file_key_rejects_empty() {
+        assert_bad_request(validate_file_key(""));
+    }
+
+    #[test]
+    fn validate_file_key_rejects_overlong() {
+        // Exactly 1025 chars — one past the limit.
+        let overlong = "a".repeat(1025);
+        assert_bad_request(validate_file_key(&overlong));
+    }
+
+    #[test]
+    fn validate_file_key_rejects_dotdot_segment() {
+        assert_bad_request(validate_file_key("foo/../bar"));
+        // Trailing `..` is also a path segment and must be rejected.
+        assert_bad_request(validate_file_key("foo/.."));
+    }
+
+    #[test]
+    fn validate_file_key_rejects_absolute_path() {
+        assert_bad_request(validate_file_key("/etc/passwd"));
+    }
+
+    #[test]
+    fn validate_file_key_accepts_valid_keys() {
+        // Plain filename, no directory.
+        assert!(validate_file_key("report.pdf").is_ok());
+        // Nested directories with a normal filename — a realistic attachment key.
+        assert!(validate_file_key("factory/attachments/report.pdf").is_ok());
+        // Exactly 1024 chars is the upper bound and must pass.
+        let max = "a".repeat(1024);
+        assert!(validate_file_key(&max).is_ok());
     }
 }

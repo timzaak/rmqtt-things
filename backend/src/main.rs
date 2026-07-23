@@ -141,10 +141,32 @@ async fn main() -> anyhow::Result<()> {
         task_set: Arc::clone(&task_set),
     });
 
+    // Construct FactoryAuthState from `[factory] api_keys`. An empty list (the
+    // default when `[factory]` is absent) means the middleware rejects every
+    // request with 401 — see design §5.4. Built here, not inside `create_router`,
+    // so the router stays free of config concerns (mirrors `HeraldAuthState`
+    // injection).
+    let factory_api_keys: Arc<[Box<str>]> = config
+        .factory
+        .api_keys
+        .iter()
+        .map(|s| s.as_str().into())
+        .collect::<Vec<Box<str>>>()
+        .into();
+    let factory_auth_state = Arc::new(api::factory_middleware::FactoryAuthState {
+        api_keys: factory_api_keys,
+    });
+
     let retry_interval = config.alarm.webhook_retry_interval_seconds;
     let max_retries = config.alarm.webhook_max_retries;
 
-    let router = create_router(config, app_state, admin_state, herald_client);
+    let router = create_router(
+        config,
+        app_state,
+        admin_state,
+        herald_client,
+        factory_auth_state,
+    );
 
     // Spawn the background webhook retry task
     {

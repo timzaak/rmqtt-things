@@ -605,6 +605,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "constant_time_eq"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a1ec0cfec728a79a5109075543131387f911cb4d07716436d7ae20533657a96"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2740,6 +2746,7 @@ dependencies = [
  "axum-extra",
  "base64",
  "clap",
+ "constant_time_eq",
  "dashmap",
  "herald-sdk",
  "hex",

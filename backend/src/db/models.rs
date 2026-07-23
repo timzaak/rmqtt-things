@@ -349,6 +349,63 @@ pub struct AlarmRecord {
     pub cleared_at: Option<OffsetDateTime>,
 }
 
+// --- Factory metadata models (support-multiple-device feature, design §5.1) ---
+// All four derive ToSchema so the BE-D03 merged-view DTO can reference them and
+// OpenAPI generation stays uniform. `factory_device_metadata` has no write entry
+// point this round but its model is needed for the device-level metadata field.
+
+/// Device-level factory metadata. Reserved this round (no write entry point):
+/// the table exists so the `FactoryDeviceView.deviceMetadata` response slot
+/// has a stable schema extension target.
+#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+#[allow(dead_code)]
+pub struct FactoryDeviceMetadata {
+    pub device_sn: String,
+    pub metadata: JsonValue,
+    pub file_attachments: JsonValue,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+/// Component-level factory metadata. `component_type` is free TEXT (default
+/// 'camera'); the DB column constrains the default, not the value set.
+#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+pub struct FactoryComponentMetadata {
+    pub component_sn: String,
+    pub component_type: String,
+    pub metadata: JsonValue,
+    pub file_attachments: JsonValue,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
+/// Device ↔ component association. `component_type` is a hint carried at
+/// association time; the metadata table's value takes precedence in views.
+#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+pub struct FactoryComponentAssociation {
+    pub device_sn: String,
+    pub component_sn: String,
+    pub component_type: Option<String>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_at: OffsetDateTime,
+}
+
+/// Component metadata overwrite log. `before` is NULL on the first report.
+#[derive(Debug, Clone, FromRow, Serialize, ToSchema)]
+pub struct FactoryMetadataChangeLog {
+    pub id: i64,
+    pub component_sn: String,
+    pub before: Option<JsonValue>,
+    pub after: JsonValue,
+    pub actor: String,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_at: OffsetDateTime,
+}
+
 #[cfg(test)]
 mod tests {
     use serde::Serialize;

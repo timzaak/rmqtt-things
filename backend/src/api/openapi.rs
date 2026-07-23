@@ -1,6 +1,6 @@
 use crate::api::{
-    admin_handlers, alarm_handlers, auth_handlers, ca_handlers, handlers, ota_handlers,
-    product_handlers,
+    admin_handlers, alarm_handlers, auth_handlers, ca_handlers, factory_handlers, handlers,
+    ota_handlers, product_handlers,
 };
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityRequirement, SecurityScheme};
 use utoipa::{Modify, OpenApi};
@@ -58,6 +58,7 @@ use utoipa::{Modify, OpenApi};
         admin_handlers::update_ota_version,
         admin_handlers::delete_ota_version,
         admin_handlers::admin_file_upload_handler,
+        admin_handlers::admin_file_download_url_handler,
         alarm_handlers::list_alarm_rules,
         alarm_handlers::create_alarm_rule,
         alarm_handlers::get_alarm_rule,
@@ -67,6 +68,12 @@ use utoipa::{Modify, OpenApi};
         alarm_handlers::list_alarms,
         alarm_handlers::ack_alarm,
         alarm_handlers::clear_alarm,
+        factory_handlers::factory_file_upload_handler,
+        factory_handlers::upsert_component_handler,
+        factory_handlers::replace_associations_handler,
+        factory_handlers::get_factory_device_view_handler,
+        factory_handlers::query_component_changes_handler,
+        factory_handlers::factory_metadata_get_handler,
     ),
     components(
         schemas(
@@ -77,6 +84,8 @@ use utoipa::{Modify, OpenApi};
             crate::api::admin_models::CreateOtaVersionRequest,
             crate::api::admin_models::CreatePropertyCommandRequest,
             crate::api::admin_handlers::DeletePropertyCommandsQuery,
+            crate::api::admin_handlers::FileDownloadUrlQuery,
+            crate::api::admin_handlers::FileDownloadUrlResponse,
             crate::api::admin_models::DeviceStatusHistoryListResponse,
             crate::api::admin_models::DeviceStatusListResponse,
             crate::api::admin_models::EventHistoryListResponse,
@@ -160,6 +169,17 @@ use utoipa::{Modify, OpenApi};
             crate::api::alarm_models::ApiAlarmRecord,
             crate::api::alarm_models::AlarmRecordResponse,
             crate::api::admin_models::PaginatedResponse<crate::api::alarm_models::ApiAlarmRecord>,
+            crate::api::factory_handlers::UpsertComponentRequest,
+            crate::api::factory_handlers::UpsertAssociationsRequest,
+            crate::api::factory_handlers::ComponentAssociationItem,
+            crate::api::factory_handlers::FileAttachment,
+            crate::api::factory_handlers::FactoryDeviceView,
+            crate::api::factory_handlers::FactoryComponentView,
+            crate::api::admin_models::FactoryChangeLogQuery,
+            crate::api::admin_models::PaginatedResponse<crate::db::models::FactoryMetadataChangeLog>,
+            crate::db::models::FactoryComponentMetadata,
+            crate::db::models::FactoryComponentAssociation,
+            crate::db::models::FactoryMetadataChangeLog,
         )
     ),
     tags(
@@ -167,6 +187,7 @@ use utoipa::{Modify, OpenApi};
         (name = "thing", description = "RMQTT thing callbacks"),
         (name = "device", description = "Device lifecycle callbacks"),
         (name = "admin", description = "Administrative APIs"),
+        (name = "factory", description = "Production-line (factory) write APIs"),
         (name = "system", description = "System APIs")
     )
 )]

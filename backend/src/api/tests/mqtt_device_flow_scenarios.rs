@@ -593,7 +593,13 @@ impl AsyncTestContext for MergeOrderTestContext {
             task_set: Arc::new(tokio::sync::Mutex::new(tokio::task::JoinSet::new())),
         });
 
-        let router = create_router(config, app_state.clone(), admin_state.clone(), None);
+        let router = create_router(
+            config,
+            app_state.clone(),
+            admin_state.clone(),
+            None,
+            crate::api::tests::simple_tests::empty_factory_auth_state(),
+        );
 
         MergeOrderTestContext {
             service: router,

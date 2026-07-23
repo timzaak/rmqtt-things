@@ -20,6 +20,16 @@ impl ApiError {
         Self::new(StatusCode::BAD_REQUEST, message)
     }
 
+    /// Status code carried by this error. Exposed so unit tests can assert the
+    /// HTTP contract (e.g. that `validate_file_key` rejects with 400) without
+    /// constructing a full `Response`. Kept public for future handler-side
+    /// introspection; `#[allow(dead_code)]` silences the prod-only-unused
+    /// warning until a non-test caller appears.
+    #[allow(dead_code)]
+    pub fn status_code(&self) -> StatusCode {
+        self.status
+    }
+
     pub fn not_found(message: impl Into<String>) -> Self {
         Self::new(StatusCode::NOT_FOUND, message)
     }
@@ -30,6 +40,13 @@ impl ApiError {
 
     pub fn unauthorized() -> Self {
         Self::new(StatusCode::UNAUTHORIZED, "unauthorized")
+    }
+
+    /// Like `unauthorized()` but with a custom message. Symmetric with
+    /// `forbidden_with`; used by `factory_auth_middleware` (design §5.2) to
+    /// surface "Invalid factory API key" instead of the generic "unauthorized".
+    pub fn unauthorized_with(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, message)
     }
 
     pub fn forbidden() -> Self {

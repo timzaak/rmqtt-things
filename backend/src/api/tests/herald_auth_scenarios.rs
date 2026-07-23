@@ -96,6 +96,7 @@ impl AsyncTestContext for HeraldAuthTestContext {
             app_state.clone(),
             admin_state.clone(),
             Some(herald_client),
+            crate::api::tests::simple_tests::empty_factory_auth_state(),
         );
 
         // Obtain a valid session token by logging in to Herald

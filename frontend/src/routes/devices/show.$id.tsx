@@ -13,6 +13,7 @@ import { useEventHistory } from '@/hooks/useEvents'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { PageHeader } from '@/components/ui/page-header'
 import { PropertyShadowSection } from '@/components/property-shadow/PropertyShadowSection'
+import { FactoryMetadataSection } from '@/components/factory-metadata/FactoryMetadataSection'
 import { formatDatetime } from '@/lib/utils'
 
 export const devicesShowRoute = createRoute({
@@ -151,6 +152,7 @@ function DeviceDetailContent({
 
       <LatestPropertiesSection productId={productId} deviceId={id} />
       <PropertyShadowSection productId={productId} deviceId={id} />
+      <FactoryMetadataSection deviceSn={id} />
       <PropertyHistorySection productId={productId} deviceId={id} />
       <EventHistorySection productId={productId} deviceId={id} />
       <CommandHistorySection productId={productId} deviceId={id} />

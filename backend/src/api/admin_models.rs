@@ -185,6 +185,21 @@ pub struct OtaVersionQuery {
     pub page_size: i64,
 }
 
+/// Query parameters for `GET /api/admin/factory/components/{componentSn}/changes`
+/// (design §4.2.2 D). The repo has no shared `PaginationQuery`; each paginated
+/// endpoint carries its own query struct following the existing convention
+/// (`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct FactoryChangeLogQuery {
+    /// 页码，默认为1
+    #[serde(default = "default_page")]
+    pub page: i64,
+    /// 每页大小，默认为10
+    #[serde(default = "default_page_size")]
+    pub page_size: i64,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateOtaVersionRequest {
     pub product_id: String,

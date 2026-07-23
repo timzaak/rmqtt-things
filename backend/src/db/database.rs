@@ -3,6 +3,7 @@ use crate::config::AlarmConfig;
 use crate::db::alarm::AlarmRepo;
 use crate::db::cert_issue::CertIssueRepo;
 use crate::db::device::DeviceRepo;
+use crate::db::factory_metadata::FactoryMetadataRepo;
 use crate::db::models::*;
 use crate::db::ota::OtaRepo;
 use crate::db::product::ProductRepo;
@@ -58,6 +59,10 @@ impl DatabaseService {
 
     pub fn device(&self) -> DeviceRepo {
         DeviceRepo::new(self.pool.clone())
+    }
+
+    pub fn factory_metadata(&self) -> FactoryMetadataRepo {
+        FactoryMetadataRepo::new(self.pool.clone())
     }
 
     fn add_device_status_filter<'a>(

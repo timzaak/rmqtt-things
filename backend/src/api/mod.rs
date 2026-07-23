@@ -26,6 +26,8 @@ pub mod alarm_models;
 pub mod auth_handlers;
 pub mod ca_handlers;
 pub mod error;
+pub mod factory_handlers;
+pub mod factory_middleware;
 pub mod handlers;
 pub mod middleware;
 pub mod openapi;
@@ -37,6 +39,7 @@ mod tests;
 pub mod utils;
 pub mod web_models;
 
+use crate::api::factory_middleware::FactoryAuthState;
 use crate::api::handlers::S3Client;
 use crate::api::middleware::{HeraldAuthState, herald_auth_middleware, internal_ip_middleware};
 use crate::api::openapi::ApiDoc;
@@ -63,6 +66,7 @@ pub fn create_router(
     app_state: Arc<handlers::AppState>,
     admin_state: Arc<AdminAppState>,
     herald_client: Option<Arc<herald_sdk::Client>>,
+    factory_auth_state: Arc<FactoryAuthState>,
 ) -> Router {
     let state = Arc::new(ApiState {
         app: app_state,
@@ -88,6 +92,10 @@ pub fn create_router(
         )
         .route("/thing/event/post", post(handlers::event_post))
         .route("/thing/file/upload", post(handlers::file_upload_handler))
+        .route(
+            "/thing/factory-metadata/get",
+            post(factory_handlers::factory_metadata_get_handler),
+        )
         .route("/ota/version", post(ota_handlers::ota_version_post))
         .route("/device/connect", post(handlers::device_connect))
         .route("/device/disconnect", post(handlers::device_disconnect))
@@ -171,6 +179,16 @@ pub fn create_router(
             "/admin/file/upload",
             post(admin_handlers::admin_file_upload_handler),
         )
+        // GET /admin/file/download-url — presigned S3 download URL for file
+        // attachments (design §4.2.2 F / §5.5). Shares the existing
+        // `admin_routes` group and Herald middleware; `extract_permission`
+        // already maps `/admin/file/*` to the `product` resource, so Herald
+        // `product:read` governs this GET (single-tenant deployments pass
+        // through). No path params, so no axum 0.8 `{name}` syntax needed.
+        .route(
+            "/admin/file/download-url",
+            get(admin_handlers::admin_file_download_url_handler),
+        )
         .route(
             "/admin/alarm-rule",
             get(alarm_handlers::list_alarm_rules).post(alarm_handlers::create_alarm_rule),
@@ -190,6 +208,18 @@ pub fn create_router(
         .route(
             "/admin/alarm/{id}/clear",
             patch(alarm_handlers::clear_alarm),
+        )
+        // Factory admin read routes (design §4.2.2 C/D + §5.4). These share the
+        // existing admin_routes group — Herald `device:read` applies once
+        // `extract_permission` maps `/admin/factory/*` to the `device` resource
+        // (middleware/mod.rs). Single-tenant (no Herald) deployments pass through.
+        .route(
+            "/admin/factory/devices/{device_sn}",
+            get(factory_handlers::get_factory_device_view_handler),
+        )
+        .route(
+            "/admin/factory/components/{component_sn}/changes",
+            get(factory_handlers::query_component_changes_handler),
         );
 
     let admin_routes = match (config.herald.as_ref(), herald_client) {
@@ -205,7 +235,29 @@ pub fn create_router(
         (_, _) => admin_routes,
     };
 
-    let api_routes = device_routes.merge(admin_routes);
+    // Independent factory routes behind `factory_auth_middleware` (design §5.4).
+    // Shares `Arc<ApiState>` state type with the other route groups (axum 0.8
+    // `Router::merge` requires a single shared state type). Path params use the
+    // 0.8 `{name}` syntax — `:name` would be treated as a literal segment.
+    let factory_routes = Router::new()
+        .route(
+            "/factory/file/upload",
+            post(factory_handlers::factory_file_upload_handler),
+        )
+        .route(
+            "/factory/components/{component_sn}",
+            put(factory_handlers::upsert_component_handler),
+        )
+        .route(
+            "/factory/devices/{device_sn}/components",
+            put(factory_handlers::replace_associations_handler),
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            factory_auth_state,
+            factory_middleware::factory_auth_middleware,
+        ));
+
+    let api_routes = device_routes.merge(admin_routes).merge(factory_routes);
 
     let otel_enabled = config.otel.trace.is_some() || config.otel.log.is_some();
 

@@ -1,8 +1,14 @@
-import { describe, test, expect, vi } from 'vitest'
+import { describe, test, it, expect, vi } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
-import type { DeviceStatusWithSource, ShadowView } from '@/lib/api-generated/types.gen'
+import type {
+  DeviceStatusWithSource,
+  ShadowView,
+  FactoryDeviceView,
+  FactoryComponentView,
+  FactoryMetadataChangeLog,
+} from '@/lib/api-generated/types.gen'
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
@@ -67,6 +73,13 @@ vi.mock('@/hooks/useEvents', () => ({
   useEventHistory: (...args: unknown[]) => mockUseEventHistory(...args),
 }))
 
+const mockUseFactoryMetadata = vi.fn()
+const mockUseComponentChangeLog = vi.fn()
+vi.mock('@/hooks/useFactoryMetadata', () => ({
+  useFactoryMetadata: (...args: unknown[]) => mockUseFactoryMetadata(...args),
+  useComponentChangeLog: (...args: unknown[]) => mockUseComponentChangeLog(...args),
+}))
+
 // Import the module to trigger createRoute and capture the component
 import '../show.$id'
 
@@ -110,6 +123,12 @@ function setupMocks(deviceData = mockDevice) {
     isLoading: false,
   })
   mockUseSetDesired.mockReturnValue({ mutate: vi.fn(), isPending: false, error: null })
+  // Factory metadata: loading complete, no data. Cases needing data mock per-test.
+  mockUseFactoryMetadata.mockReturnValue({ data: undefined, isLoading: false, isError: false })
+  mockUseComponentChangeLog.mockReturnValue({
+    data: { data: [], pagination: undefined },
+    isLoading: false,
+  })
 }
 
 describe('DevicesShowPage', () => {
@@ -301,6 +320,66 @@ function makePendingShadow(): ShadowView {
     delta: { colorTemp: 4000 },
     desired_updated_time: '2025-01-01T09:00:00Z',
     reported_updated_time: '2025-01-01T10:00:00Z',
+  }
+}
+
+// --- Factory metadata section fixtures ---
+
+/**
+ * Build a factory device view with no device-level metadata and no components
+ * by default. Callers override `components` to populate the left-join table.
+ */
+function makeFactoryDeviceView(overrides: Partial<FactoryDeviceView> = {}): FactoryDeviceView {
+  return {
+    deviceSn: 'test-device-001',
+    deviceMetadata: null,
+    components: [],
+    ...overrides,
+  }
+}
+
+/**
+ * Build a single component view with sensible defaults (a camera with a
+ * certificate file attachment). Override any field per-test to exercise the
+ * left-join partial-data fallbacks (`metadata: null`, `fileAttachments: []`,
+ * `updatedAt: null`).
+ */
+function makeFactoryComponentView(
+  overrides: Partial<FactoryComponentView> = {}
+): FactoryComponentView {
+  return {
+    componentSn: 'comp-camera-001',
+    componentType: 'camera',
+    metadata: { firmware: '1.2.3' },
+    fileAttachments: [
+      {
+        fileKey: 'certs/cert.pem',
+        fileName: 'cert.pem',
+        contentType: 'application/x-pem-file',
+        sizeBytes: 2048,
+      },
+    ],
+    updatedAt: '2026-07-18T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/**
+ * Build a single change-log entry. The backend returns SNAKE_CASE keys
+ * (`component_sn`, `created_at`); `before: null` represents the initial
+ * report (rendered as "Initial report" in the drawer).
+ */
+function makeChangeLogEntry(
+  overrides: Partial<FactoryMetadataChangeLog> = {}
+): FactoryMetadataChangeLog {
+  return {
+    id: 1,
+    component_sn: 'comp-camera-001',
+    before: null,
+    after: { firmware: '1.2.3' },
+    actor: 'factory',
+    created_at: '2026-07-18T10:00:00Z',
+    ...overrides,
   }
 }
 
@@ -618,5 +697,188 @@ describe('Property Shadow section', () => {
 
     // One-shot command ignored => falls back to "Pending convergence".
     expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Pending convergence')
+  })
+})
+
+describe('Factory metadata section', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('renders section container', () => {
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('factory-metadata-section')).toBeInTheDocument()
+  })
+
+  test('shows device-level metadata not available placeholder', () => {
+    setupMocks()
+    // deviceMetadata is reserved/always null this round; the section surfaces
+    // an explicit "not available" hint rather than rendering nothing.
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({ deviceMetadata: null }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByText(/Device-level metadata:/i)).toHaveTextContent(
+      'Device-level metadata: not available'
+    )
+  })
+
+  test('renders one row per associated component', () => {
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        components: [
+          makeFactoryComponentView({ componentSn: 'comp-camera-001' }),
+          makeFactoryComponentView({
+            componentSn: 'comp-sensor-002',
+            componentType: 'sensor',
+          }),
+        ],
+      }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    for (const sn of ['comp-camera-001', 'comp-sensor-002']) {
+      expect(screen.getByTestId(`factory-component-row-${sn}`)).toBeInTheDocument()
+      expect(screen.getByTestId(`factory-component-changes-btn-${sn}`)).toBeInTheDocument()
+    }
+  })
+
+  const nullFieldCases: Array<{
+    label: string
+    override: Partial<FactoryComponentView>
+    expected: string
+  }> = [
+    {
+      label: 'metadata',
+      override: { metadata: null },
+      expected: 'Metadata not arrived',
+    },
+    {
+      label: 'fileAttachments',
+      override: { fileAttachments: [] },
+      expected: '-',
+    },
+    {
+      label: 'updatedAt',
+      override: { updatedAt: null },
+      expected: '-',
+    },
+  ]
+
+  it.each(nullFieldCases)('renders null-field fallback for $label', ({ override, expected }) => {
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        components: [makeFactoryComponentView(override)],
+      }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('factory-component-row-comp-camera-001')).toBeInTheDocument()
+    // The fallback text must appear somewhere inside the section.
+    expect(screen.getByTestId('factory-metadata-section').textContent).toContain(expected)
+  })
+
+  test('opens change log drawer when View change log button is clicked', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        components: [makeFactoryComponentView({ componentSn: 'comp-camera-001' })],
+      }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.queryByTestId('component-change-log-drawer')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('factory-component-changes-btn-comp-camera-001'))
+
+    expect(await screen.findByTestId('component-change-log-drawer')).toBeInTheDocument()
+  })
+
+  test('renders Initial report when change log entry before is null', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        components: [makeFactoryComponentView({ componentSn: 'comp-camera-001' })],
+      }),
+      isLoading: false,
+      isError: false,
+    })
+    // First entry has no predecessor: `before: null` renders as "Initial report".
+    mockUseComponentChangeLog.mockReturnValue({
+      data: { data: [makeChangeLogEntry({ before: null })], pagination: undefined },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    await user.click(screen.getByTestId('factory-component-changes-btn-comp-camera-001'))
+
+    expect(await screen.findByText('Initial report')).toBeInTheDocument()
+  })
+
+  test('shows error message when hook returns isError (non-404)', async () => {
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('boom'),
+    })
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('factory-metadata-error')).toBeInTheDocument()
+    // Non-404 errors surface via a sonner toast (mirrors shadow error path).
+    const { toast } = await import('sonner')
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        'Failed to load factory metadata',
+        expect.objectContaining({ description: 'boom' })
+      )
+    })
+  })
+
+  test('shows empty state card when hook returns 404 error', async () => {
+    setupMocks()
+    // react-query exposes the thrown backend 404 body as `error`. The factory
+    // section matches it as a normal empty state and does NOT toast.
+    mockUseFactoryMetadata.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: { error: 'Device has no factory metadata' },
+    })
+
+    // toast.error is a shared module-level mock (see src/test/setup.ts); clear
+    // prior tests' calls so we observe only what happens in this test.
+    const { toast } = await import('sonner')
+    vi.mocked(toast.error).mockClear()
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('factory-metadata-empty')).toHaveTextContent(
+      'This device has no factory metadata'
+    )
+    // No error card and no toast on the 404 branch.
+    expect(screen.queryByTestId('factory-metadata-error')).not.toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })

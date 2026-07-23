@@ -55,3 +55,17 @@ domain = "*.fornetcode.com"
 # api_key = "your-api-key"
 # realm_id = "rmqtt"
 # client_id = "admin-web-console"
+
+# Factory (production-line) API keys for the /api/factory/* write path.
+# Static config; keys are compared in constant time. Rotation requires a
+# restart. When the [factory] section is omitted or api_keys is empty the
+# factory routes reject every request with 401.
+#
+# File attachments uploaded via POST /api/factory/file/upload reuse the
+# `[s3].directories` allow-list, but factory uploads carry NO product/device
+# context — the `${productId}` / `${deviceId}` placeholders are silently
+# substituted with empty strings. Configure factory-friendly rules with
+# literal paths or static prefixes (e.g. "factory-attachments/*"); device-scoped
+# rules like "${productId}/${deviceId}/*" will NOT match for factory uploads.
+# [factory]
+# api_keys = ["factory-api-key-please-change"]

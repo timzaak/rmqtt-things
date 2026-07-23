@@ -129,7 +129,13 @@ impl AsyncTestContext for MqttTestContext {
         });
 
         // Start real axum server
-        let router = create_router(config, app_state.clone(), admin_state.clone(), None);
+        let router = create_router(
+            config,
+            app_state.clone(),
+            admin_state.clone(),
+            None,
+            crate::api::tests::simple_tests::empty_factory_auth_state(),
+        );
         let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
         // Retry binding to the backend port with backoff, since serial_test may

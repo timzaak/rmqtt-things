@@ -54,3 +54,8 @@ base_url = "http://127.0.0.1:13000"
 api_key = "rmqtt-things-test-api-key"
 realm_id = "rmqtt"
 client_id = "admin-web-console"
+
+# Factory (production-line) API keys for the /api/factory/* write path.
+# Must match the fallback in demo/e2e/helpers/factory-api.ts.
+[factory]
+api_keys = ["factory-api-key-please-change"]
