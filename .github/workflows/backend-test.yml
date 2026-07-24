@@ -2,8 +2,8 @@ name: Backend Tests
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 17 * * *"  # UTC 17:00 = 北京时间 01:00
+  # schedule:
+  #   - cron: "0 17 * * *"  # UTC 17:00 = 北京时间 01:00
 
 env:
   CARGO_TERM_COLOR: never
