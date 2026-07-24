@@ -95,6 +95,16 @@ void generate_password(const char *device_id, const char *suffix,
 | Cloud → Device | `{pid}/{did}/thing/file/upload_reply` | Return upload credentials |
 | Device → Cloud | `{pid}/{did}/ota/version` | Report firmware version |
 | Cloud → Device | `{pid}/{did}/ota/upgrade` | Push OTA upgrade |
+| Device → Cloud | `{pid}/{did}/thing/factory-metadata/get` | Pull own factory metadata |
+| Cloud → Device | `{pid}/{did}/thing/factory-metadata/get_reply` | Return factory metadata |
+
+### Factory Metadata Pull
+
+After a device comes online it can actively pull its own factory metadata (device-level whole-unit metadata and component metadata) to apply factory configuration (e.g. calibration parameters) without hardcoding or local recomputation.
+
+Publish to `{pid}/{did}/thing/factory-metadata/get`; the backend publishes the merged factory-metadata view to `{pid}/{did}/thing/factory-metadata/get_reply`. When the device has no factory metadata at all, `data` is `null`.
+
+Factory metadata is reported by the production-line system via an independent HTTP API (isolated from admin/device auth); device-level and component-level data are landed independently and assembled asynchronously. When some components have not arrived yet, the currently existing parts are returned; the device must tolerate missing data or retry later. See [API reference · Factory Metadata Query](api-reference-en.md#factory-metadata-query) and PRD [`docs/prd/core/support-multiple-device.md`](../prd/core/support-multiple-device.md).
 
 ## Authentication and Authorization
 

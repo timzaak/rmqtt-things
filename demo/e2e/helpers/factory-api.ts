@@ -10,9 +10,12 @@
  * 配置项中（空配置拒绝所有请求，返回 401）。
  *
  * 设计选择：
- * - 与 `helpers/api.ts`（管理端 cookie 鉴权 GET）解耦：factory 写请求走独立的
- *   `request` 参数（不携带 admin cookie），由调用方在 `data-testid`/UI 流程外
- *   通过 Playwright `request` fixture 直接发起。
+ * - 与 `helpers/api.ts`（管理端 cookie 鉴权 GET）解耦：factory 写请求只依赖
+ *   `Authorization: Bearer <key>` 鉴权，与 admin cookie 在后端是两套完全独立
+ *   的中间件（`factory_routes` 仅挂 `factory_auth_middleware`，不挂 herald；
+ *   见 `backend/src/api/mod.rs`）。Playwright `request` fixture 在
+ *   `fixtures/demo-auth.fixtures.ts` 中复用 `page.request`，会顺带浏览器上下文
+ *   的 admin `X-Auth` cookie，但后端 factory 中间件不消费 cookie，故无副作用。
  * - helper **不**调用 `logger.finalize()`；日志由统一 fixture 的 `demoLogger`
  *   接入（参见 `fixtures/demo-auth.fixtures.ts` 的 demoLogger fixture）。
  * - 不在此处断言响应状态：返回原始 `APIResponse`，由测试侧根据场景（204 / 400 /
@@ -66,7 +69,8 @@ export interface UpsertComponentBody {
  * `factory_metadata_change_log`（R5）。后端响应为 **204 No Content**（无 body）；
  * 调用方应直接断言 `response.status() === 204`。
  *
- * @param request Playwright `APIRequestContext`（factory 写路径不应携带 admin cookie）。
+ * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin
+ *   cookie 在后端是两套独立中间件；request 顺带 cookie 无副作用（见文件头设计选择）。
  * @param componentSn 子组件 SN（与设备 SN 同字符集，后端用 `validate_identifier` 校验）。
  * @param body 三字段均可选的 upsert 体。
  * @returns 原始 `APIResponse`，由调用方断言状态码。
@@ -98,7 +102,8 @@ export interface ComponentAssociationItem {
  * `replace_associations_full_replace_is_idempotent`）。该端点 **不**写 change log
  * （R5 将日志范围限定在子组件元数据覆盖上）。后端响应为 **204 No Content**。
  *
- * @param request Playwright `APIRequestContext`（factory 写路径不应携带 admin cookie）。
+ * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin
+ *   cookie 在后端是两套独立中间件；request 顺带 cookie 无副作用（见文件头设计选择）。
  * @param deviceSn 设备 SN（与 MQTT client_id 同命名空间）。
  * @param components 子组件列表（full-replace）。
  * @returns 原始 `APIResponse`，由调用方断言状态码。
@@ -111,5 +116,55 @@ export async function replaceAssociations(
   return request.put(`/api/factory/devices/${deviceSn}/components`, {
     headers: factoryAuthHeaders(),
     data: { components },
+  })
+}
+
+/**
+ * `upsertDeviceMetadata` body（设计 §4.2.2 + §5.1，对称 `UpsertComponentBody`）。
+ *
+ * **关键差异：无 `componentType`**——设备级元数据是整机维度，没有子组件类型
+ * 概念（设计 §5.1 DTO 注释「与 FactoryComponentView 对称，无
+ * componentType/componentSn」）。两字段均可选：后端在缺省时分别回落为 `{}` 与
+ * `[]`（与 `upsertComponent` 的缺省行为一致）。
+ */
+export interface UpsertDeviceMetadataBody {
+  /** 结构化元数据（整机维度，如序列号、批次）。缺省 `{}`。 */
+  metadata?: Record<string, unknown>
+  /** 文件附件引用。每个 `fileKey` 必须先经 `POST /api/factory/file/upload` 取得。 */
+  fileAttachments?: Array<{
+    fileKey: string
+    fileName: string
+    contentType?: string
+    sizeBytes?: number
+  }>
+}
+
+/**
+ * PUT `/api/factory/devices/{deviceSn}` — upsert 设备级（整机）元数据。
+ *
+ * 设计 §4.2.2 + §5.1 + BE-D02：repo 层在 upsert 发生覆盖时于同一事务内写一条
+ * `factory_metadata_change_log`（`sn = deviceSn`，actor `'factory'`，after 快照
+ * 结构为 `{ metadata, file_attachments, updated_at }`，**无 `component_type`**，
+ * 与子组件级关键差异）。后端响应为 **204 No Content**（无 body）；调用方应直接
+ * 断言 `response.status() === 204`。
+ *
+ * 与 `upsertComponent` 对称：返回原始 `APIResponse`，由测试侧断言状态码以保留
+ * 失败归因精确性（设备级 HTTP 失败归因 backend BE-D02，见 factory-metadata-demo
+ * 文件头注释）。
+ *
+ * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin
+ *   cookie 在后端是两套独立中间件；request 顺带 cookie 无副作用（见文件头设计选择）。
+ * @param deviceSn 设备 SN（与 MQTT client_id 同命名空间，后端用 `validate_identifier` 校验）。
+ * @param body 两字段均可选的 upsert 体。
+ * @returns 原始 `APIResponse`，由调用方断言状态码。
+ */
+export async function upsertDeviceMetadata(
+  request: APIRequestContext,
+  deviceSn: string,
+  body: UpsertDeviceMetadataBody,
+): Promise<APIResponse> {
+  return request.put(`/api/factory/devices/${deviceSn}`, {
+    headers: factoryAuthHeaders(),
+    data: body,
   })
 }

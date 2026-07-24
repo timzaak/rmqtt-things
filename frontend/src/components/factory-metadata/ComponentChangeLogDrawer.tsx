@@ -6,7 +6,7 @@ import { extractErrorMessage, formatDatetime } from '@/lib/utils'
 import type { FactoryMetadataChangeLog } from '@/lib/api-generated/types.gen'
 
 interface ComponentChangeLogDrawerProps {
-  componentSn: string | null
+  sn: string | null
   onClose: () => void
 }
 
@@ -36,9 +36,9 @@ function toRow(entry: FactoryMetadataChangeLog): ChangeLogRow {
  *
  * `before` is null on the initial report — rendered as "Initial report".
  */
-export function ComponentChangeLogDrawer({ componentSn, onClose }: ComponentChangeLogDrawerProps) {
+export function ComponentChangeLogDrawer({ sn, onClose }: ComponentChangeLogDrawerProps) {
   const [page, setPage] = useState(1)
-  const { data, isLoading, isError, error } = useComponentChangeLog(componentSn ?? '', page)
+  const { data, isLoading, isError, error } = useComponentChangeLog(sn ?? '', page)
 
   // Page resets to 1 on component change via the parent's `key={componentSn}`
   // (remount), so no reset effect is needed here.
@@ -53,7 +53,7 @@ export function ComponentChangeLogDrawer({ componentSn, onClose }: ComponentChan
     }
   }, [isError, error])
 
-  const isOpen = componentSn !== null
+  const isOpen = sn !== null
 
   const rows = (data?.data ?? []).map(toRow)
   const pagination = data?.pagination
@@ -120,7 +120,7 @@ export function ComponentChangeLogDrawer({ componentSn, onClose }: ComponentChan
               Component Change Log
             </h3>
             <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-              <code style={{ fontFamily: "'JetBrains Mono', monospace" }}>{componentSn}</code>
+              <code style={{ fontFamily: "'JetBrains Mono', monospace" }}>{sn}</code>
             </p>
           </div>
           <button

@@ -95,6 +95,16 @@ void generate_password(const char *device_id, const char *suffix,
 | 云端→设备 | `{pid}/{did}/thing/file/upload_reply` | 返回上传凭证 |
 | 设备→云端 | `{pid}/{did}/ota/version` | 上报固件版本 |
 | 云端→设备 | `{pid}/{did}/ota/upgrade` | 推送 OTA 升级 |
+| 设备→云端 | `{pid}/{did}/thing/factory-metadata/get` | 拉取自身出厂元数据 |
+| 云端→设备 | `{pid}/{did}/thing/factory-metadata/get_reply` | 返回出厂元数据 |
+
+### 出厂元数据拉取
+
+设备上线后可主动拉取自身出厂元数据（含设备级整机元数据与子组件元数据），用于生效出厂配置（如标定参数），无需硬编码或本地重算。
+
+发布到 `{pid}/{did}/thing/factory-metadata/get`，后端把合并后的出厂元数据视图发布到 `{pid}/{did}/thing/factory-metadata/get_reply`。设备无任何出厂元数据时 `data` 为 `null`。
+
+出厂元数据由产线系统通过独立 HTTP API 上报（与管理端/设备认证隔离），设备级与子组件级独立落地、异步组装。部分子组件未到达时返回当前存在部分，设备需自行容忍缺失或稍后重读。详见 [API 参考 · 出厂元数据查询](api-reference.md#出厂元数据查询) 与 PRD [`docs/prd/core/support-multiple-device.md`](../prd/core/support-multiple-device.md)。
 
 ## 认证与权限
 

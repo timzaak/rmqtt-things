@@ -144,33 +144,32 @@ beforeLoad: async () => {
 
 `checkAuth()` first queries `/api/auth/config` to see if Herald is enabled. If not, it passes through immediately. If Herald is enabled, it sends a probe request to `/api/admin/product?page=1&page_size=1` and checks the response status to determine whether the session is valid.
 
-When unauthenticated, the browser redirects directly to Herald's login page. The backend `GET /api/auth/config` returns the complete login URL:
+When unauthenticated, the frontend redirects to the backend OAuth start route to complete Herald login. The backend `GET /api/auth/config` returns the login entry point:
 
 ```json
-{"enabled": true, "login_url": "http://herald.example.com/default/auth/login"}
+{"enabled": true, "login_url": "/api/auth/oauth/start", "herald_login_url": "http://herald:13000/rmqtt/auth/login"}
 ```
 
-The URL is assembled by the backend from `herald.base_url` and `herald.realm_id` in the format `{base_url}/{realm_id}/auth/login`. The frontend does no URL construction.
+`login_url` is rmqtt-things' own OAuth start route, not a Herald page URL. The browser navigates to `/api/auth/oauth/start?redirect=<current page>`; the backend generates PKCE + state, writes a short-lived `RMQTT_OAUTH` cookie, then 302-redirects to Herald's authorize page (`herald_login_url`, format `{base_url}/{realm_id}/auth/login`).
 
-### Authentication Mechanism
+### Authentication Mechanism (OAuth code flow + dual cookies)
 
-When Herald and rmqtt-things are deployed on the same host (or same root domain), browser cookies are shared across ports/subdomains. After the user logs in at Herald, the `X-Auth` cookie set by Herald is automatically included in requests to rmqtt-things. The user simply returns to the rmqtt-things page after logging in -- no callback intermediary is needed.
+The entire token exchange is done by the backend; Herald does not set cookies on the browser directly. Flow:
 
-### Session Expiry
+1. The user logs in on Herald's authorize page; Herald calls back to the backend `GET /api/auth/oauth/callback` with `code` + `state`.
+2. The backend validates `state`, then uses `code` + PKCE to call Herald `POST /api/oauth/{realm}/token` and obtains the token family (since Herald 0.3.3, returned as a JSON body: `accessToken` / `refreshToken` / `tokenType:"Bearer"` / `expiresIn`≈900 / `refreshExpiresIn`≈30d).
+3. The backend sets two `HttpOnly; SameSite=Lax; Path=/` cookies on the response:
+   - `X-Auth` = access token (short-lived, ≈900s)
+   - `X-Auth-Refresh` = refresh token (long-lived, ≈30d)
+4. The browser then automatically sends the `X-Auth` cookie with subsequent rmqtt-things admin API requests. The backend `herald_auth_middleware` extracts `X-Auth` and calls Herald `check_permission` to authorize (with a ≈5-minute cache).
 
-The API client (`api-client.ts`) has a 401 interceptor:
+If the access token later expires, the frontend interceptor refreshes it automatically (see below). Herald and rmqtt-things do not need to share a root domain — the cookies are set by rmqtt-things itself, same-origin.
 
-```typescript
-apiClient.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response?.status === 401) handle401()
-        return Promise.reject(error)
-    }
-)
-```
+### Token Refresh and Session Expiry
 
-`handle401()` resets the auth state cache and redirects to the Herald login page. An `isRedirecting` flag prevents multiple concurrent 401 responses from triggering duplicate redirects.
+The frontend `refresh.ts` installs a response interceptor: on a 401 it calls `POST /api/auth/refresh` once (the backend reads the `X-Auth-Refresh` cookie, exchanges it with Herald for new tokens, and re-issues `X-Auth` + `X-Auth-Refresh`), then replays the original request on success. Refresh is serialized (only one in flight at a time) to avoid concurrent-401 storms. `/api/auth/refresh`, `/api/auth/logout`, and `/api/auth/oauth/*` do not trigger the refresh interceptor.
+
+When refresh also fails (refresh token expired), `handle401()` redirects back to `/api/auth/oauth/start` to re-login. `POST /api/auth/logout` revokes the tokens and clears both cookies.
 
 ## Deployment
 

@@ -154,6 +154,16 @@ Base URL: `http://localhost:8080/api`
 
 响应：纯文本 `"allow"` 或 `"deny"`
 
+### POST /api/thing/factory-metadata/get
+
+设备运行时拉取自身出厂元数据（设备级 + 子组件级合并视图）。RMQTT 把设备发布的 `{productId}/{deviceId}/thing/factory-metadata/get` 主题消息转发到此回调。详见[设备出厂元数据](device-guide.md#出厂元数据拉取)。
+
+**认证**：仅内网 IP 白名单校验（设备 HMAC 认证由 RMQTT broker 完成）。
+
+请求体为标准 RMQTT webhook 消息信封。后端把合并后的 `FactoryDeviceView`（结构与下方管理端 `GET /api/admin/factory/devices/{deviceSn}` 一致）通过 MQTT 响应发布到 `{topic}_reply`；设备无任何出厂元数据时 `data` 为 `null`。
+
+响应：`204 No Content`（数据通过 `_reply` 主题异步返回设备）
+
 ## Admin 管理接口
 
 管理后台用的 API。支持分页查询。
@@ -560,6 +570,66 @@ curl -X POST http://localhost:8080/api/admin/file/upload \
 }
 ```
 
+### 出厂元数据查询
+
+管理员查询产线上报的设备出厂元数据。写入入口见下方[产线写入接口](#产线写入接口)。详见 PRD [`docs/prd/core/support-multiple-device.md`](../prd/core/support-multiple-device.md)。
+
+#### GET /api/admin/factory/devices/{deviceSn}
+
+查询某设备的出厂元数据合并视图（设备级 + 子组件级 left join 当前存在部分）。设备无任何出厂元数据时返回 `404`。
+
+```bash
+curl -b "X-Auth=<token>" http://localhost:8080/api/admin/factory/devices/my-device-sn
+```
+
+```json
+{
+  "deviceSn": "my-device-sn",
+  "deviceMetadata": {
+    "metadata": {"serial": "SN-A", "batch": "2026Q3"},
+    "fileAttachments": [{"fileKey": "...", "fileName": "report.pdf"}],
+    "updatedAt": "2026-07-24T00:00:00Z"
+  },
+  "components": [
+    {
+      "componentSn": "cam-001",
+      "componentType": "camera",
+      "metadata": {"calibration": 2},
+      "fileAttachments": [],
+      "updatedAt": "2026-07-24T00:00:00Z"
+    }
+  ]
+}
+```
+
+`deviceMetadata` 为整机级元数据（`null` 表示产线尚未上报设备级元数据），`components` 为子组件清单。二者独立落地、异步组装，部分未到达时返回当前存在部分，不报错。
+
+#### GET /api/admin/factory/sn/{sn}/changes
+
+查询某 SN 的出厂元数据变更日志（时间倒序，分页）。`sn` 既可以是设备 SN（设备级覆盖日志）也可以是子组件 SN（子组件级覆盖日志）。支持分页参数 `page` / `page_size`。
+
+```bash
+curl -b "X-Auth=<token>" "http://localhost:8080/api/admin/factory/sn/cam-001/changes?page=1&page_size=20"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": 12,
+      "sn": "cam-001",
+      "before": {"metadata": {"calibration": 1}, "file_attachments": [], "updated_at": "..."},
+      "after": {"metadata": {"calibration": 2}, "file_attachments": [], "updated_at": "..."},
+      "actor": "factory",
+      "created_at": "2026-07-24T00:00:00Z"
+    }
+  ],
+  "pagination": {"page": 1, "page_size": 20, "total": 1}
+}
+```
+
+`before` 为覆盖前快照（首次上报那行 `before` 为 `null`，因为 Created 不写日志），`after` 为覆盖后快照。子组件级快照含 `component_type` 字段；**设备级快照无 `component_type`**（整机没有组件类型概念），断言走 `after.metadata.xxx` 路径。
+
 ### 健康检查
 
 #### GET /api/health
@@ -571,3 +641,66 @@ curl http://localhost:8080/api/health
 ```json
 {"status":"health","timestamp":"2025-01-01T00:00:00Z"}
 ```
+
+## 产线写入接口
+
+产线（工厂）系统上报设备出厂元数据的独立 API。与 Admin 认证（Herald cookie）、设备认证（HMAC 证书）完全隔离：**必须携带 `Authorization: Bearer <key>`**，key 须出现在后端 `[factory] api_keys` 配置项中（空配置拒绝所有请求，返回 `401`）。读取见上方[出厂元数据查询](#出厂元数据查询)。
+
+```bash
+curl -X PUT http://localhost:8080/api/factory/components/cam-001 \
+  -H "Authorization: Bearer ${FACTORY_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"calibration": 2}}'
+```
+
+### PUT /api/factory/components/{componentSn}
+
+upsert 子组件出厂元数据（结构化字段 + 文件附件）。同 SN 重复上报幂等覆盖，覆盖时写一条变更日志。
+
+请求体（全部可选，缺省值：`componentType`=`"camera"`、`metadata`=`{}`、`fileAttachments`=`[]`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| componentType | string? | 组件类型提示，缺省 `"camera"` |
+| metadata | object? | 结构化元数据（标定值等） |
+| fileAttachments | array? | 文件附件，`fileKey` 须先经 `POST /api/factory/file/upload` 取得 |
+
+响应：`204 No Content`
+
+### PUT /api/factory/devices/{deviceSn}
+
+upsert 设备级（整机）出厂元数据。与子组件级对称，但**无 `componentType` 字段**（整机没有组件类型概念）。覆盖时写一条变更日志（`sn = deviceSn`，`after` 快照无 `component_type`）。
+
+请求体（全部可选，缺省 `metadata`=`{}`、`fileAttachments`=`[]`）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| metadata | object? | 整机级结构化元数据（序列号标签、批次等） |
+| fileAttachments | array? | 文件附件（出厂检验报告等） |
+
+响应：`204 No Content`
+
+### PUT /api/factory/devices/{deviceSn}/components
+
+全量替换设备的子组件关联（full-replace 语义：未出现在列表里的关联会被删除）。与子组件元数据异步到达、乱序不阻塞。该端点**不写变更日志**（变更日志范围限定在元数据覆盖）。
+
+请求体：
+
+```json
+{
+  "components": [
+    {"componentSn": "cam-001", "componentType": "camera"},
+    {"componentSn": "sensor-002"}
+  ]
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| components | array | 子组件列表（full-replace），`componentSn` 必填，`componentType` 可选提示 |
+
+响应：`204 No Content`
+
+### POST /api/factory/file/upload
+
+产线侧文件上传（S3 预签名 POST），取得的 `fileKey` 用于上述 `fileAttachments`。与管理端文件上传能力一致，但走产线 Bearer 认证；`directory` 必须在配置的允许目录列表内，且 factory 目录规则只能用字面前缀（`${productId}`/`${deviceId}` 模板占位符在产线路径下会被置空）。

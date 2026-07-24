@@ -154,6 +154,16 @@ Rule: devices may only operate on topics prefixed with `{username}/{clientId}/`,
 
 Response: plain text `"allow"` or `"deny"`
 
+### POST /api/thing/factory-metadata/get
+
+Device runtime pull of its own factory metadata (device-level + component-level merged view). RMQTT forwards messages published by the device on the `{productId}/{deviceId}/thing/factory-metadata/get` topic to this callback. See [Device factory metadata](device-guide-en.md#factory-metadata-pull).
+
+**Auth**: internal IP allow-list only (device HMAC auth is done by the RMQTT broker).
+
+The request body is the standard RMQTT webhook message envelope. The backend publishes the merged `FactoryDeviceView` (same shape as the admin `GET /api/admin/factory/devices/{deviceSn}` below) to `{topic}_reply` via MQTT; `data` is `null` when the device has no factory metadata at all.
+
+Response: `204 No Content` (data is returned to the device asynchronously via the `_reply` topic)
+
 ## Admin Management Endpoints
 
 APIs for the management backend. Supports paginated queries.
@@ -560,6 +570,66 @@ Response:
 }
 ```
 
+### Factory Metadata Query
+
+Admin queries of production-line-reported device factory metadata. Write endpoints are below under [Factory Write Endpoints](#factory-write-endpoints). See PRD [`docs/prd/core/support-multiple-device.md`](../prd/core/support-multiple-device.md).
+
+#### GET /api/admin/factory/devices/{deviceSn}
+
+Query the merged factory-metadata view of a device (device-level + component-level left join of the parts that currently exist). Returns `404` when the device has no factory metadata at all.
+
+```bash
+curl -b "X-Auth=<token>" http://localhost:8080/api/admin/factory/devices/my-device-sn
+```
+
+```json
+{
+  "deviceSn": "my-device-sn",
+  "deviceMetadata": {
+    "metadata": {"serial": "SN-A", "batch": "2026Q3"},
+    "fileAttachments": [{"fileKey": "...", "fileName": "report.pdf"}],
+    "updatedAt": "2026-07-24T00:00:00Z"
+  },
+  "components": [
+    {
+      "componentSn": "cam-001",
+      "componentType": "camera",
+      "metadata": {"calibration": 2},
+      "fileAttachments": [],
+      "updatedAt": "2026-07-24T00:00:00Z"
+    }
+  ]
+}
+```
+
+`deviceMetadata` is the device-level (whole-unit) metadata (`null` means the production line has not yet reported device-level metadata); `components` is the component list. They are landed independently and assembled asynchronously; when parts have not arrived yet, the currently existing parts are returned without error.
+
+#### GET /api/admin/factory/sn/{sn}/changes
+
+Query the factory-metadata change log of an SN (time-descending, paginated). `sn` may be either a device SN (device-level overwrite log) or a component SN (component-level overwrite log). Supports `page` / `page_size` pagination params.
+
+```bash
+curl -b "X-Auth=<token>" "http://localhost:8080/api/admin/factory/sn/cam-001/changes?page=1&page_size=20"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": 12,
+      "sn": "cam-001",
+      "before": {"metadata": {"calibration": 1}, "file_attachments": [], "updated_at": "..."},
+      "after": {"metadata": {"calibration": 2}, "file_attachments": [], "updated_at": "..."},
+      "actor": "factory",
+      "created_at": "2026-07-24T00:00:00Z"
+    }
+  ],
+  "pagination": {"page": 1, "page_size": 20, "total": 1}
+}
+```
+
+`before` is the pre-overwrite snapshot (the first-report row has `before` = `null` because Created does not write a log); `after` is the post-overwrite snapshot. Component-level snapshots include a `component_type` field; **device-level snapshots have no `component_type`** (a whole unit has no component-type concept) — assert via the `after.metadata.xxx` path.
+
 ### Health Check
 
 #### GET /api/health
@@ -571,3 +641,66 @@ curl http://localhost:8080/api/health
 ```json
 {"status":"health","timestamp":"2025-01-01T00:00:00Z"}
 ```
+
+## Factory Write Endpoints
+
+Independent API for the production-line (factory) system to report device factory metadata. Fully isolated from Admin auth (Herald cookie) and device auth (HMAC cert): **must carry `Authorization: Bearer <key>`**, where the key must appear in the backend `[factory] api_keys` config (an empty config rejects every request with `401`). Reads are above under [Factory Metadata Query](#factory-metadata-query).
+
+```bash
+curl -X PUT http://localhost:8080/api/factory/components/cam-001 \
+  -H "Authorization: Bearer ${FACTORY_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"calibration": 2}}'
+```
+
+### PUT /api/factory/components/{componentSn}
+
+Upsert component-level factory metadata (structured fields + file attachments). Same-SN repeated reports overwrite idempotently and write a change log entry on overwrite.
+
+Request body (all optional; defaults: `componentType`=`"camera"`, `metadata`=`{}`, `fileAttachments`=`[]`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| componentType | string? | Component type hint, default `"camera"` |
+| metadata | object? | Structured metadata (calibration values, etc.) |
+| fileAttachments | array? | File attachments; `fileKey` must first be obtained via `POST /api/factory/file/upload` |
+
+Response: `204 No Content`
+
+### PUT /api/factory/devices/{deviceSn}
+
+Upsert device-level (whole-unit) factory metadata. Symmetric to the component level, but **has no `componentType` field** (a whole unit has no component-type concept). Writes a change log entry on overwrite (`sn = deviceSn`; the `after` snapshot has no `component_type`).
+
+Request body (all optional; defaults `metadata`=`{}`, `fileAttachments`=`[]`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| metadata | object? | Device-level structured metadata (serial label, batch, etc.) |
+| fileAttachments | array? | File attachments (factory inspection reports, etc.) |
+
+Response: `204 No Content`
+
+### PUT /api/factory/devices/{deviceSn}/components
+
+Full-replace a device's component associations (full-replace semantics: associations not in the list are deleted). Arrives asynchronously with component metadata and is not blocked by ordering. This endpoint **does not write a change log** (the change log is scoped to metadata overwrites).
+
+Request body:
+
+```json
+{
+  "components": [
+    {"componentSn": "cam-001", "componentType": "camera"},
+    {"componentSn": "sensor-002"}
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| components | array | Component list (full-replace); `componentSn` required, `componentType` optional hint |
+
+Response: `204 No Content`
+
+### POST /api/factory/file/upload
+
+Production-line file upload (S3 presigned POST); the resulting `fileKey` is used in the `fileAttachments` above. Same as the admin file-upload capability but behind the factory Bearer auth; `directory` must be in the configured allow-list, and factory directory rules can only use literal prefixes (the `${productId}`/`${deviceId}` template placeholders are emptied under the factory path).

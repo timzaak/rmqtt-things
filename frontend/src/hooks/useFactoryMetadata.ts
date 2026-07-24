@@ -21,13 +21,13 @@ export const useFactoryMetadata = (deviceSn: string) => {
   })
 }
 
-export const useComponentChangeLog = (componentSn: string, page: number) => {
+export const useComponentChangeLog = (sn: string, page: number) => {
   return useQuery({
-    queryKey: ['component-change-log', componentSn, page],
-    enabled: !!componentSn,
+    queryKey: ['component-change-log', sn, page],
+    enabled: !!sn,
     queryFn: async () => {
       const res = await queryComponentChangesHandler({
-        path: { sn: componentSn },
+        path: { sn },
         query: { page, page_size: 10 },
         throwOnError: true,
       })

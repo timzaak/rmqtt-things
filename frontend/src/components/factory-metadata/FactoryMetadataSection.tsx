@@ -143,7 +143,8 @@ interface FactoryMetadataSectionProps {
 
 export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps) {
   const { data, isLoading, isError, error } = useFactoryMetadata(deviceSn)
-  const [selectedComponentSn, setSelectedComponentSn] = useState<string | null>(null)
+  const [selectedSn, setSelectedSn] = useState<string | null>(null)
+  const [deviceLogOpen, setDeviceLogOpen] = useState(false)
 
   // Surface non-404 errors via toast (consistent with PropertyShadowSection's
   // error styling). The 404 "no metadata" branch is a normal empty state and
@@ -160,6 +161,13 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
   const showGenericErrorCard = isError && !isNotFoundError(error)
 
   const rows = data ? data.components.map(toRow) : []
+
+  // A single drawer instance serves both component-level and device-level
+  // change logs. `drawerSn` collapses the two independent triggers into one
+  // nullable SN: a selected component SN wins, otherwise fall back to the
+  // device SN when the device-level entry is open. The parent's `key={drawerSn}`
+  // remounts the drawer on any SN switch so its internal page resets cleanly.
+  const drawerSn = selectedSn ?? (deviceLogOpen ? deviceSn : null)
 
   const columns: Column<FactoryComponentRow>[] = [
     {
@@ -210,7 +218,7 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
       accessor: (row) => (
         <button
           data-testid={`factory-component-changes-btn-${row.componentSn}`}
-          onClick={() => setSelectedComponentSn(row.componentSn)}
+          onClick={() => setSelectedSn(row.componentSn)}
           className="text-[12px] font-medium hover:underline transition-opacity hover:opacity-80"
           style={{ color: 'var(--color-accent)' }}
         >
@@ -236,9 +244,37 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
           background: 'var(--color-surface-1)',
           border: '1px solid var(--color-border)',
         }}
+        data-testid="factory-device-metadata-block"
       >
-        Device-level metadata:{' '}
-        {data?.deviceMetadata ? formatValue(data.deviceMetadata) : 'not available'}
+        {`Device-level metadata:${data?.deviceMetadata ? '' : ' not available'}`}
+        {data?.deviceMetadata && (
+          <>
+            <pre
+              className="mt-2 overflow-auto text-[11px]"
+              style={{ fontFamily: "'JetBrains Mono', monospace" }}
+            >
+              {formatValue(data.deviceMetadata.metadata)}
+            </pre>
+            <FileAttachmentLinks
+              attachments={
+                (data.deviceMetadata.fileAttachments ?? []) as unknown as FileAttachment[]
+              }
+            />
+            {data.deviceMetadata.updatedAt && (
+              <span style={{ display: 'block', marginTop: '4px' }}>
+                Updated {formatDatetime(data.deviceMetadata.updatedAt)}
+              </span>
+            )}
+            <button
+              data-testid="factory-device-changes-btn"
+              onClick={() => setDeviceLogOpen(true)}
+              className="mt-2 text-[12px] font-medium hover:underline transition-opacity hover:opacity-80"
+              style={{ color: 'var(--color-accent)' }}
+            >
+              View change log
+            </button>
+          </>
+        )}
       </p>
 
       {showNotFoundCard ? (
@@ -254,9 +290,12 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
       )}
 
       <ComponentChangeLogDrawer
-        key={selectedComponentSn ?? 'closed'}
-        componentSn={selectedComponentSn}
-        onClose={() => setSelectedComponentSn(null)}
+        key={drawerSn ?? 'closed'}
+        sn={drawerSn}
+        onClose={() => {
+          setSelectedSn(null)
+          setDeviceLogOpen(false)
+        }}
       />
     </section>
   )

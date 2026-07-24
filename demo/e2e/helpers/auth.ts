@@ -40,13 +40,30 @@ export async function fetchAuthConfig(): Promise<AuthConfig> {
 }
 
 /**
- * 通过 Herald API 直接登录，提取 X-Auth token 并注入浏览器
+ * Herald SSO 登录返回结构（BrowserTokenResponse JSON body）
+ *
+ * 自 Herald 0.3.3 起，`POST /api/auth/rmqtt/login` 不再设置 `X-Auth` Set-Cookie，
+ * 改为返回 JSON body。与后端 `backend/src/api/tests/herald_auth_scenarios.rs::login_to_herald`
+ * 及 `auth_handlers.rs::oauth_callback` 的 token 来源保持一致。
  */
-async function loginViaHeraldApi(
-  page: Page,
+interface HeraldBrowserTokenResponse {
+  accessToken: string
+  refreshToken: string
+  tokenType?: string
+  expiresIn?: number
+  refreshExpiresIn?: number
+}
+
+/**
+ * 通过 Herald API 登录，从 JSON body 提取 access/refresh token
+ *
+ * 对齐后端 `login_to_herald`：从 `BrowserTokenResponse` body 取 `accessToken`/`refreshToken`，
+ * 而非旧的 `Set-Cookie: X-Auth`（Herald 0.3.3 已废弃）。
+ */
+async function loginToHerald(
   heraldUrl: string,
   options: { logger?: UnifiedLogger } = {}
-): Promise<void> {
+): Promise<HeraldBrowserTokenResponse> {
   const { logger } = options
   const loginUrl = `${heraldUrl}/api/auth/rmqtt/login`
 
@@ -68,21 +85,41 @@ async function loginViaHeraldApi(
     throw new Error(`Herald login failed (${resp.status}): ${body}`)
   }
 
-  // 从 Set-Cookie 提取 X-Auth token
-  const setCookieHeaders = resp.headers.getSetCookie()
-  const xAuthCookie = setCookieHeaders.find((h) => h.startsWith('X-Auth='))
-  if (!xAuthCookie) {
-    throw new Error('Herald login response missing X-Auth cookie')
+  const body = (await resp.json().catch(() => null)) as HeraldBrowserTokenResponse | null
+  if (!body?.accessToken) {
+    throw new Error('Herald login response missing accessToken in JSON body')
   }
+  if (!body.refreshToken) {
+    throw new Error('Herald login response missing refreshToken in JSON body')
+  }
+  return body
+}
 
-  const token = xAuthCookie.replace('X-Auth=', '').split(';')[0]
-
-  // 注入浏览器 cookie — domain 从 BASE_URL 提取以兼容 localhost 和 127.0.0.1
+/**
+ * 把 Herald token 族注入浏览器上下文为 `X-Auth` + `X-Auth-Refresh` cookie
+ *
+ * 对齐后端 `oauth_callback` 的双 cookie 行为：access token 短时（≈900s），refresh token
+ * 长时保活（≈30d），避免长 e2e 运行中 access token 过期后无法续期。
+ */
+async function injectAuthCookies(
+  page: Page,
+  tokens: HeraldBrowserTokenResponse
+): Promise<void> {
   const domain = new URL(BASE_URL).hostname
   await page.context().addCookies([
-    { name: 'X-Auth', value: token, domain, path: '/' },
+    { name: 'X-Auth', value: tokens.accessToken, domain, path: '/' },
+    { name: 'X-Auth-Refresh', value: tokens.refreshToken, domain, path: '/' },
   ])
+}
 
+async function loginViaHeraldApi(
+  page: Page,
+  heraldUrl: string,
+  options: { logger?: UnifiedLogger } = {}
+): Promise<void> {
+  const { logger } = options
+  const tokens = await loginToHerald(heraldUrl, { logger })
+  await injectAuthCookies(page, tokens)
   logger?.testCode.log(`[Auth] Herald SSO 登录成功，token 已注入`) ?? console.warn(`[Auth] Herald SSO 登录成功，token 已注入`)
 }
 
@@ -105,36 +142,10 @@ export async function ensureAuthCookie(
 
   // Derive Herald API base URL from herald_login_url (e.g. http://host:13000/default/auth/login -> http://host:13000)
   const heraldBaseUrl = config.herald_login_url.replace(/\/[^/]*\/auth\/login$/, '')
-  const loginUrl = `${heraldBaseUrl}/api/auth/rmqtt/login`
-  logger?.testCode.log(`[Auth] 注入认证 cookie: ${loginUrl}`) ?? console.warn(`[Auth] 注入认证 cookie: ${loginUrl}`)
+  logger?.testCode.log(`[Auth] 注入认证 cookie via Herald: ${heraldBaseUrl}`) ?? console.warn(`[Auth] 注入认证 cookie via Herald: ${heraldBaseUrl}`)
 
-  const resp = await fetch(loginUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: DEMO_ADMIN.email,
-      password: DEMO_ADMIN.password,
-      clientId: 'admin-web-console',
-    }),
-    signal: AbortSignal.timeout(10000),
-  })
-
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '')
-    throw new Error(`Herald login failed (${resp.status}): ${body}`)
-  }
-
-  const setCookieHeaders = resp.headers.getSetCookie()
-  const xAuthCookie = setCookieHeaders.find((h) => h.startsWith('X-Auth='))
-  if (!xAuthCookie) {
-    throw new Error('Herald login response missing X-Auth cookie')
-  }
-
-  const token = xAuthCookie.replace('X-Auth=', '').split(';')[0]
-  const domain = new URL(BASE_URL).hostname
-  await page.context().addCookies([
-    { name: 'X-Auth', value: token, domain, path: '/' },
-  ])
+  const tokens = await loginToHerald(heraldBaseUrl, { logger })
+  await injectAuthCookies(page, tokens)
 
   logger?.testCode.log('[Auth] 认证 cookie 已注入') ?? console.warn('[Auth] 认证 cookie 已注入')
 }

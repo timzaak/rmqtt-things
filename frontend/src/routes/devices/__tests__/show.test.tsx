@@ -6,6 +6,7 @@ import type {
   DeviceStatusWithSource,
   ShadowView,
   FactoryDeviceView,
+  FactoryDeviceMetadataView,
   FactoryComponentView,
   FactoryMetadataChangeLog,
 } from '@/lib/api-generated/types.gen'
@@ -380,6 +381,30 @@ function makeFactoryDeviceView(overrides: Partial<FactoryDeviceView> = {}): Fact
     deviceSn: 'test-device-001',
     deviceMetadata: null,
     components: [],
+    ...overrides,
+  }
+}
+
+/**
+ * Build device-level factory metadata with sensible defaults (a serial entry
+ * plus a QC report attachment). Override any field per-test to exercise the
+ * device-level data-driven block (`metadata: null`, `fileAttachments: []`,
+ * `updatedAt: null`).
+ */
+function makeFactoryDeviceMetadataView(
+  overrides: Partial<FactoryDeviceMetadataView> = {}
+): FactoryDeviceMetadataView {
+  return {
+    metadata: { serial: 'SN-DEV-001' },
+    fileAttachments: [
+      {
+        fileKey: 'reports/qc.pdf',
+        fileName: 'qc.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: 12345,
+      },
+    ],
+    updatedAt: '2026-07-23T08:00:00Z',
     ...overrides,
   }
 }
@@ -795,6 +820,103 @@ describe('Factory metadata section', () => {
     expect(screen.getByText(/Device-level metadata:/i)).toHaveTextContent(
       'Device-level metadata: not available'
     )
+  })
+
+  test('renders device-level metadata content when deviceMetadata is present', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        deviceMetadata: makeFactoryDeviceMetadataView(),
+      }),
+      isLoading: false,
+      isError: false,
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Factory Metadata')
+
+    // Narrow to the device-level block (avoids catching the section container,
+    // which also includes component-level rows / fallbacks).
+    const block = screen.getByTestId('factory-device-metadata-block')
+    expect(block.textContent).toContain('SN-DEV-001')
+    expect(block.textContent).not.toContain('not available')
+    expect(block.textContent).toContain('qc.pdf')
+  })
+
+  test('opens change log drawer for device-level metadata and queries with deviceSn', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        deviceMetadata: makeFactoryDeviceMetadataView(),
+      }),
+      isLoading: false,
+      isError: false,
+    })
+    // The drawer uses useComponentChangeLog(sn, page); mock the hook so that
+    // when it is called with the device SN it returns a recognisable entry.
+    mockUseComponentChangeLog.mockImplementation((sn: string) => ({
+      data: {
+        data:
+          sn === 'test-device-001'
+            ? [makeChangeLogEntry({ sn: 'test-device-001', after: { serial: 'SN-DEV-001' } })]
+            : [],
+        pagination: undefined,
+      },
+      isLoading: false,
+    }))
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Factory Metadata')
+
+    await user.click(screen.getByTestId('factory-device-changes-btn'))
+
+    const drawer = await screen.findByTestId('component-change-log-drawer')
+    // The device-level entry must drive the drawer with the device SN, not a
+    // component SN (the two triggers share one drawer via `drawerSn`).
+    expect(drawer).toHaveTextContent('test-device-001')
+    expect(mockUseComponentChangeLog).toHaveBeenCalledWith('test-device-001', 1)
+  })
+
+  test('keeps component-level change log button independent of device-level drawer', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseFactoryMetadata.mockReturnValue({
+      data: makeFactoryDeviceView({
+        deviceMetadata: makeFactoryDeviceMetadataView(),
+        components: [makeFactoryComponentView({ componentSn: 'comp-camera-001' })],
+      }),
+      isLoading: false,
+      isError: false,
+    })
+    // Return a recognisable entry per SN so each drawer instance is identifiable.
+    mockUseComponentChangeLog.mockImplementation((sn: string) => ({
+      data: {
+        data: [makeChangeLogEntry({ sn, after: { [sn]: true } })],
+        pagination: undefined,
+      },
+      isLoading: false,
+    }))
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Factory Metadata')
+
+    // Component-level entry: drawer queries with the component SN.
+    await user.click(screen.getByTestId('factory-component-changes-btn-comp-camera-001'))
+    let drawer = await screen.findByTestId('component-change-log-drawer')
+    expect(drawer).toHaveTextContent('comp-camera-001')
+
+    // Close the drawer (resets both selectedSn and deviceLogOpen via onClose).
+    await user.click(screen.getByTestId('component-change-log-close'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('component-change-log-drawer')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTestId('factory-device-changes-btn'))
+    drawer = await screen.findByTestId('component-change-log-drawer')
+    expect(drawer).toHaveTextContent('test-device-001')
+    expect(mockUseComponentChangeLog).toHaveBeenLastCalledWith('test-device-001', 1)
   })
 
   test('renders one row per associated component', async () => {

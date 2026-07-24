@@ -144,33 +144,32 @@ beforeLoad: async () => {
 
 `checkAuth()` 先查 `/api/auth/config` 看有没有开 Herald。没开就直接通过。开了就发一个探测请求到 `/api/admin/product?page=1&page_size=1`，根据返回状态判断 session 是否有效。
 
-未登录时，浏览器直接跳转到 Herald 的登录页。后端 `GET /api/auth/config` 返回完整的登录 URL：
+未登录时，前端跳转到后端 OAuth 起点完成 Herald 登录。后端 `GET /api/auth/config` 返回登录入口：
 
 ```json
-{"enabled": true, "login_url": "http://herald.example.com/default/auth/login"}
+{"enabled": true, "login_url": "/api/auth/oauth/start", "herald_login_url": "http://herald:13000/rmqtt/auth/login"}
 ```
 
-URL 由后端根据 `herald.base_url` 和 `herald.realm_id` 拼接，格式为 `{base_url}/{realm_id}/auth/login`。前端不做任何 URL 拼接。
+`login_url` 是 rmqtt-things 自己的 OAuth 起点路由，不是 Herald 的页面 URL。浏览器导航到 `/api/auth/oauth/start?redirect=<当前页>` 后，后端生成 PKCE + state、写入短期 `RMQTT_OAUTH` cookie，再 302 跳转到 Herald 的授权页（`herald_login_url`，格式 `{base_url}/{realm_id}/auth/login`）。
 
-### 认证机制
+### 认证机制（OAuth code flow + 双 cookie）
 
-Herald 和 rmqtt-things 部署在同一主机（或同根域）时，浏览器 Cookie 跨端口/子域共享。用户在 Herald 登录后，Herald 设置的 `X-Auth` Cookie 会被浏览器自动带给 rmqtt-things 的请求。用户登录后手动返回 rmqtt-things 页面即可，不需要回调中转。
+整个 token 交换由后端完成，Herald 不直接给浏览器设 cookie。流程：
 
-### 会话失效
+1. 用户在 Herald 授权页登录，Herald 带 `code` + `state` 回调到后端 `GET /api/auth/oauth/callback`。
+2. 后端校验 `state`，用 `code` + PKCE 向 Herald `POST /api/oauth/{realm}/token` 换取 token 族（Herald 0.3.3 起返回 JSON body：`accessToken` / `refreshToken` / `tokenType:"Bearer"` / `expiresIn`≈900 / `refreshExpiresIn`≈30d）。
+3. 后端在响应里设置两个 `HttpOnly; SameSite=Lax; Path=/` cookie：
+   - `X-Auth` = access token（短时，≈900s）
+   - `X-Auth-Refresh` = refresh token（长时，≈30d）
+4. 浏览器随后请求 rmqtt-things 管理端 API 时自动带上 `X-Auth` cookie。后端 `herald_auth_middleware` 提取 `X-Auth`，调 Herald `check_permission` 校验权限（有 ≈5 分钟缓存）。
 
-API 客户端（`api-client.ts`）有 401 拦截器：
+后续请求如果 access token 过期，前端拦截器会自动刷新（见下）。Herald 与 rmqtt-things 不要求同根域——cookie 由 rmqtt-things 自己在同源下设置。
 
-```typescript
-apiClient.interceptors.response.use(
-    response => response,
-    error => {
-        if (error.response?.status === 401) handle401()
-        return Promise.reject(error)
-    }
-)
-```
+### Token 刷新与会话失效
 
-`handle401()` 重置认证状态缓存，跳转到 Herald 登录页。用 `isRedirecting` 标记防止多个并发 401 触发多次跳转。
+前端 `refresh.ts` 装了响应拦截器：收到 401 时，调一次 `POST /api/auth/refresh`（后端读 `X-Auth-Refresh` cookie，向 Herald 换新 token，重新下发 `X-Auth` + `X-Auth-Refresh`），成功后重放原请求。刷新串行化（同一时刻只发一次），避免并发 401 风暴。`/api/auth/refresh`、`/api/auth/logout`、`/api/auth/oauth/*` 不触发刷新拦截。
+
+刷新失败（refresh token 也过期）时，`handle401()` 跳转回 `/api/auth/oauth/start` 重新登录。`POST /api/auth/logout` 会吊销 token 并清掉两个 cookie。
 
 ## 部署
 

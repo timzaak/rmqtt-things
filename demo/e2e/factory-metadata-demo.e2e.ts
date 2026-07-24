@@ -10,6 +10,8 @@
  * - Scenario A -> US-PA-046 场景 1 (关联/元数据异步到达组装) + US-PA-047 场景 1/2 (完整 + 部分到达)
  * - Scenario B -> US-PA-045 场景 3 (同 SN 重复上报幂等覆盖写一条 change log)
  * - Scenario C -> US-PA-046 场景 2 (一设备多子组件) + US-PA-047 (未上报 404 边界)
+ * - Scenario D -> US-PA-045 设备级复用 (产线 PUT 设备级 + admin GET 读出 deviceMetadata
+ *   + 覆写写设备级 change log) + US-PA-047 设备级元数据查询 (设计 §6.2/§5.1)
  *
  * 验收面：仅 HTTP API（factory PUT Bearer + admin GET cookie），**不**进入设备详情
  * UI 正文断言（FE-A01 已在前端阶段独立验收 UI）。
@@ -20,6 +22,8 @@
  * 失败归因（参见 DE-D01 item）：
  * - Scenario A/C 失败优先归因后端 left-join / 404 边界（BE-D01/D03）；
  * - Scenario B 失败优先归因后端 change_log 写入或幂等覆盖（BE-D01/D02）；
+ * - Scenario D 设备级 HTTP 失败（PUT 非 204 / GET deviceMetadata 仍 null / 设备级
+ *   change log 未写）优先归因后端 BE-D02（设备级 upsert/读出/快照）；
  * - 纯测试侧问题（imports / helper 签名 / selector 字面量）由 demo-dev 自治修复。
  *
  * 前置条件：后端 API 运行在 BASE_URL (默认 http://localhost:8080)。
@@ -30,7 +34,7 @@
 
 import { test, expect } from './fixtures/demo-auth.fixtures'
 import { getJson } from './helpers/api'
-import { upsertComponent, replaceAssociations } from './helpers/factory-api'
+import { upsertComponent, upsertDeviceMetadata, replaceAssociations } from './helpers/factory-api'
 import { verifyTestEnvironment } from './helpers/environment-setup'
 
 /**
@@ -41,7 +45,26 @@ import { verifyTestEnvironment } from './helpers/environment-setup'
 const POLL_TIMEOUT = 15_000
 
 /**
- * admin 设备合并视图（设计 §4.2.2 C）。
+ * 设备级元数据视图（设计 §5.1）。
+ *
+ * 字段命名对齐 `backend/src/api/factory_handlers.rs::FactoryDeviceMetadataView`
+ * （BE-D02 落地后的真实结构）：camelCase `fileAttachments`/`updatedAt`，与
+ * `FactoryComponentView` 字段命名规则一致。`metadata`/`updatedAt` 在尚未写入时
+ * 为 `null`；`fileAttachments` 回落为 `[]`。
+ *
+ * **关键差异**：与子组件级不同，设备级**无 `componentType`**（整机维度无子组件
+ * 类型概念，设计 §5.1 DTO 注释「与 FactoryComponentView 对称，无
+ * componentType/componentSn」）。
+ */
+interface FactoryDeviceMetadataView {
+  metadata: Record<string, unknown> | null
+  fileAttachments: unknown[]
+  /** RFC3339 字符串；设备级元数据尚未上报时为 null。 */
+  updatedAt: string | null
+}
+
+/**
+ * admin 设备合并视图（设计 §4.2.2 C + §5.1）。
  *
  * 字段命名对齐 `backend/src/api/factory_handlers.rs::FactoryDeviceView`：
  * `device_metadata` 字段在 Rust 端用 `#[serde(rename = "deviceMetadata")]`，
@@ -49,8 +72,11 @@ const POLL_TIMEOUT = 15_000
  */
 interface FactoryDeviceView {
   deviceSn: string
-  /** 设备级元数据（本轮保留，始终为 null —— 见 FactoryDeviceView 文档）。 */
-  deviceMetadata: Record<string, unknown> | null
+  /**
+   * 设备级元数据（BE-D02 后从真实的 `factory_device_metadata` 表读出）。
+   * 设备级元数据尚未上报时为 `null`；不改变设备视图的 404 判定（设计 §6.3）。
+   */
+  deviceMetadata: FactoryDeviceMetadataView | null
   components: FactoryComponentView[]
 }
 
@@ -88,7 +114,12 @@ interface FactoryComponentView {
  */
 interface FactoryChangeLogRow {
   id: number
-  component_sn: string
+  /**
+   * 变更日志归属的 SN（BE-D01 起字段名 `component_sn → sn`，设计 §5.1 model）。
+   * 该字段中立化承载子组件 SN 与设备 SN：子组件级场景下为子组件 SN，设备级
+   * 场景下为设备 SN（BE-D02 设备级 upsert 同样写 `sn = device_sn`）。
+   */
+  sn: string
   /** 上一次的子组件元数据行快照（snake_case 嵌套对象）；首次上报为 null。 */
   before: {
     component_type: string
@@ -225,7 +256,7 @@ test.describe('Factory Metadata (US-PA-045/046/047)', () => {
       async () => {
         const body = await getJson<PaginatedChangeLog>(
           request,
-          `/api/admin/factory/components/${camSn}/changes?page=1&page_size=20`,
+          `/api/admin/factory/sn/${camSn}/changes?page=1&page_size=20`,
         )
         return {
           // shape 守卫：响应结构必须为 { data, pagination }，pagination 必须含
@@ -251,12 +282,12 @@ test.describe('Factory Metadata (US-PA-045/046/047)', () => {
     // actor 固定为 "factory"（factory_middleware 的 FactoryCaller label）。
     const logBody = await getJson<PaginatedChangeLog>(
       request,
-      `/api/admin/factory/components/${camSn}/changes?page=1&page_size=20`,
+      `/api/admin/factory/sn/${camSn}/changes?page=1&page_size=20`,
     )
     expect(logBody.data.length).toBeGreaterThanOrEqual(1)
 
     const row = logBody.data[0]
-    expect(row.component_sn).toBe(camSn)
+    expect(row.sn).toBe(camSn)
     expect(row.actor).toBe('factory')
     // before/after 是子组件元数据行的快照（snake_case 嵌套对象），断言走
     // .metadata.calibration 路径而非顶层 calibration。
@@ -327,5 +358,79 @@ test.describe('Factory Metadata (US-PA-045/046/047)', () => {
       `/api/admin/factory/devices/${emptyDeviceSn}`,
     )
     expect(emptyResp.status()).toBe(404)
+  })
+
+  // ---------------------------------------------------------------------------
+  // Scenario D — 设备级（整机）元数据写入/读出/覆写变更日志闭环
+  //   US-PA-045 场景 3 对称扩展（设备级同 SN 覆盖写一条 change log）
+  //   US-PA-047 设备级元数据查询（admin GET deviceMetadata 非空读出）
+  //   设计 §6.2 设备级端到端场景（产线 PUT 设备级 → admin GET 读出 deviceMetadata
+  //   → 覆写 → 设备级 change log），§5.1 设备级快照无 component_type 关键差异。
+  // ---------------------------------------------------------------------------
+  test('[Scenario D] US-PA-045 device-level metadata upsert then admin GET reads deviceMetadata + overwrite writes change log', async ({
+    request,
+    demoLogger: _demoLogger,
+  }) => {
+    const deviceSn = `e2e-factory-devmeta-${Date.now()}`
+
+    // Step 1: 首次设备级上报（Created，before=null，**不**写 change log）。
+    // 无 componentType —— 设备级 DTO 与子组件级的关键差异（设计 §5.1）。
+    const firstResp = await upsertDeviceMetadata(request, deviceSn, {
+      metadata: { serial: 'SN-A' },
+    })
+    expect(firstResp.status()).toBe(204)
+
+    // Step 2: admin GET 读出 deviceMetadata —— 持久业务状态断言（非 toast）。
+    // 设备级元数据无关联子组件，但不应改变 404 判定：仍应返回 200 + `components: []`
+    // + 非空 `deviceMetadata`（设计 §6.3：设备级元数据上报后设备视图即可读出）。
+    await expect.poll(
+      async () => {
+        const body = await getJson<FactoryDeviceView>(
+          request,
+          `/api/admin/factory/devices/${deviceSn}`,
+        )
+        return {
+          deviceSn: body.deviceSn,
+          serial: (
+            body.deviceMetadata?.metadata as { serial?: unknown } | null
+          )?.serial,
+          hasDeviceMetadata: body.deviceMetadata !== null,
+          componentsCount: body.components.length,
+        }
+      },
+      { timeout: POLL_TIMEOUT },
+    ).toEqual({
+      deviceSn,
+      serial: 'SN-A',
+      hasDeviceMetadata: true,
+      componentsCount: 0,
+    })
+
+    // Step 3: 同设备 SN 覆写（Updated，before=首次值快照，写一条 change log）。
+    const overwriteResp = await upsertDeviceMetadata(request, deviceSn, {
+      metadata: { serial: 'SN-B' },
+    })
+    expect(overwriteResp.status()).toBe(204)
+
+    // Step 4: 设备级 change log（路径 `/api/admin/factory/sn/{sn}/changes`，
+    // BE-D01 中立化路径同样承载设备 SN）。断言关键差异：设备级快照
+    // `{ metadata, file_attachments, updated_at }` **无 component_type**，
+    // 走 `after.metadata.serial` 路径而非 `after.component_type`。
+    const logBody = await getJson<PaginatedChangeLog>(
+      request,
+      `/api/admin/factory/sn/${deviceSn}/changes?page=1&page_size=20`,
+    )
+    expect(logBody.data.length).toBeGreaterThanOrEqual(1)
+
+    const row = logBody.data[0]
+    expect(row.sn).toBe(deviceSn)
+    expect(row.actor).toBe('factory')
+    // before 为首次值快照（设备级结构，无 component_type），走 .metadata.serial。
+    expect((row.before?.metadata as { serial?: unknown } | null)?.serial).toBe(
+      'SN-A',
+    )
+    expect((row.after.metadata as { serial?: unknown } | null)?.serial).toBe(
+      'SN-B',
+    )
   })
 })
