@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getPropertyLatest,
   getPropertyHistory,
-  getPropertyCommands,
   createPropertyCommand,
   deletePropertyCommands,
   getPropertyShadow,
@@ -11,7 +10,6 @@ import {
 import type {
   SimplePaginatedResponsePropertyLatest as PropertyLatestPage,
   SimplePaginatedResponsePropertyHistory as PropertyHistoryPage,
-  PaginatedResponsePropertyCommand as PropertyCommandPage,
   CreatePropertyCommandRequest,
   ShadowView,
   SetDesiredRequest,
@@ -67,33 +65,6 @@ export function usePropertyHistory(params: PropertyHistoryParams) {
   })
 }
 
-interface PropertyCommandsParams {
-  product_id: string
-  device_id?: string | null
-  status?: null | import('@/lib/api-generated/types.gen').CommandStatus
-  page?: number
-  page_size?: number
-}
-
-export function usePropertyCommands(params: PropertyCommandsParams) {
-  return useQuery({
-    queryKey: ['property-commands', params],
-    queryFn: async () => {
-      const res = await getPropertyCommands({
-        query: {
-          product_id: params.product_id,
-          device_id: params.device_id ?? undefined,
-          status: params.status ?? undefined,
-          page: params.page ?? 1,
-          page_size: params.page_size ?? 10,
-        },
-        throwOnError: true,
-      })
-      return res.data as unknown as PropertyCommandPage
-    },
-  })
-}
-
 export function useCreatePropertyCommand() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -103,6 +74,7 @@ export function useCreatePropertyCommand() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['property-commands'] })
+      queryClient.invalidateQueries({ queryKey: ['device-operations'] })
     },
   })
 }
@@ -119,6 +91,7 @@ export function useDeletePropertyCommands() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['property-commands'] })
+      queryClient.invalidateQueries({ queryKey: ['device-operations'] })
     },
   })
 }
@@ -155,6 +128,7 @@ export const useSetDesired = () => {
       queryClient.invalidateQueries({ queryKey: ['property-shadow'] })
       queryClient.invalidateQueries({ queryKey: ['property-commands'] })
       queryClient.invalidateQueries({ queryKey: ['property-latest'] })
+      queryClient.invalidateQueries({ queryKey: ['device-operations'] })
     },
   })
 }

@@ -12,6 +12,26 @@
  * 根据项目实际情况修改每个选择器。
  */
 
+/**
+ * 将属性 key 转为 kebab-case，用于构造动态 data-testid。
+ *
+ * 与前端 `StateConfigurationSection.tsx` 的 toKebabKey 对齐（DE-D01 校准：
+ * frontend/src/components/device-detail/StateConfigurationSection.tsx:36-42）：
+ * camelCase 边界插连字符、连续大写末尾插连字符、非字母数字折叠为单连字符、
+ * 去首尾连字符、小写。例：`colorTemp` -> `color-temp`。
+ *
+ * 供 `SELECTORS.stateConfiguration.targetApplyButton(key)` 等动态选择器复用，
+ * 测试文件不得再内联各自的转换实现。
+ */
+export function toKebabKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
 export const SELECTORS = {
   /** 登录页选择器 */
   login: {
@@ -162,11 +182,15 @@ export const SELECTORS = {
   },
 
   /**
-   * Property Shadow 面板选择器 (US-PA-042/043/044)
+   * @deprecated（DE-D01 校准，待 DE-D02 适配完成后删除）
    *
-   * 对应组件 frontend/src/components/property-shadow/PropertyShadowSection.tsx。
-   * 仅收集静态 data-testid；动态 testid `shadow-status-${kebabKey}` 由测试文件
-   * 内联 helper 构造（key 随测试数据变化，无法表达为常量）。
+   * Property Shadow 面板选择器 (US-PA-042/043/044)。
+   *
+   * 已失效：前端 `PropertyShadowSection.tsx` 已随 device-detail-experience
+   * 七区改造删除，`shadow-section` / `shadow-delta-table` / `shadow-set-button` /
+   * `shadow-desired-editor` 在 frontend/src 内 rg 均无匹配（DE-D01 校准证据）。
+   * 功能由 `stateConfiguration` 组（StateConfigurationSection.tsx）接替。
+   * 暂保留仅供 DE-D02 适配期编译过渡，新测试不得使用。
    */
   shadow: {
     section: '[data-testid="shadow-section"]',
@@ -178,17 +202,19 @@ export const SELECTORS = {
   },
 
   /**
-   * Action Invocation 面板选择器 (US-TME-002 / US-TME-003)
+   * @deprecated（DE-D01 校准，待 DE-D02 适配完成后删除）
    *
-   * 对应组件：
-   * - frontend/src/components/device-detail/ActionInvocationsSection.tsx
-   *   （`invokeButton` / `invocationTable`）
-   * - frontend/src/components/device-detail/ActionInvokeDialog.tsx
-   *   （`invokeDialog` / `serviceTypeInput` / `paramsInput` / `submitButton` /
-   *   `cancelButton`）
+   * Action Invocation 面板选择器（US-TME-002 / US-TME-003）。
    *
-   * 选择器校准证据（DE-D02）：设计 §4.4.3 七个 data-testid 全部存在于
-   * 前端实现（见 item Validation 的 rg 输出）。
+   * 面板级 testid 已失效：前端 `ActionInvocationsSection.tsx` 已删除，
+   * `invokeButton`（action-invoke-button）与 `invocationTable`
+   * （action-invocation-table）在 frontend/src 内 rg 均无匹配；入口与历史表由
+   * `operations` 组（`runActionButton` / `table`）接替。
+   *
+   * 对话框 testid 仍有效（ActionInvokeDialog.tsx 保留，DE-D01 校准证据：
+   * `action-invoke-dialog` :57 / `service-type-input` :81 / `params-input` :114），
+   * 但与 `operations.actionDialog` 等重复，新测试请使用 `operations` 组。
+   * 暂保留仅供 DE-D02 适配期编译过渡。
    */
   actions: {
     invokeButton: '[data-testid="action-invoke-button"]',
@@ -201,20 +227,99 @@ export const SELECTORS = {
   },
 
   /**
-   * 设备详情页 Tab 切换选择器 (DE-D04)
+   * State & Configuration 分区选择器（US-PA-050/051，DE-D01 新增）
    *
-   * 设备详情页 (`frontend/src/routes/devices/show.$id.tsx` TABS) 默认 tab 为
-   * `overview`，Shadow / Commands / Actions / ... 各分区仅在对应 activeTab 时
-   * 渲染。Tab 按钮使用语义化 role=tab，标签文案稳定（不随测试数据变化），故
-   * 以 getByRole('tab', { name }) 表达；此处集中常量避免测试文件各自硬编码。
+   * 对应组件 frontend/src/components/device-detail/StateConfigurationSection.tsx。
+   * 校准证据（DE-D01）：`target-update-button`（:204）、
+   * `state-configuration-table`（:222）、`target-apply-button-${kebabKey}`
+   * （:180，key 经组件内 toKebabKey :36-42 转换，与上方导出 helper 同规则）、
+   * `target-update-dialog` / `target-json-input`（:292/:306）均存在于前端实现。
+   * 对话框内 submit/cancel 复用通用 testid（:352/:333），使用时须限定在
+   * updateDialog 作用域内。同步状态文案（:99-107）：In sync / Out of sync /
+   * Target not set。
+   */
+  stateConfiguration: {
+    table: '[data-testid="state-configuration-table"]',
+    targetUpdateButton: '[data-testid="target-update-button"]',
+    /** 动态构造：单属性 Apply 按钮，key 由 toKebabKey 转换（与前端规则一致） */
+    targetApplyButton: (key: string) =>
+      `[data-testid="target-apply-button-${toKebabKey(key)}"]`,
+    updateDialog: '[data-testid="target-update-dialog"]',
+    targetJsonInput: '[data-testid="target-json-input"]',
+    /** 限定在 updateDialog 内使用 */
+    dialogSubmitButton: '[data-testid="submit-button"]',
+    /** 限定在 updateDialog 内使用 */
+    dialogCancelButton: '[data-testid="cancel-button"]',
+  },
+
+  /**
+   * Operations 分区选择器（US-PA-051，DE-D01 新增）
+   *
+   * 对应组件（校准证据 DE-D01，均存在于前端实现）：
+   * - frontend/src/components/device-detail/DeviceOperationsSection.tsx
+   *   （typeFilter :106 / statusFilter :123 / runActionButton :140 /
+   *   moreActionsButton :149 / directPropertyWriteButton :170 / table :205 /
+   *   error :194）
+   * - frontend/src/components/device-detail/ActionInvokeDialog.tsx
+   *   （actionDialog :57 / actionServiceTypeInput :81 / actionParamsInput :114）
+   * - frontend/src/components/device-detail/DirectPropertyWriteDialog.tsx
+   *   （directWriteDialog :64 / directWriteJsonInput :78 /
+   *   targetConflictWarning :101；固定警告文案 :8-9）
+   *
+   * 类型筛选 option value 为后端枚举（设计 §5.1）：targetSync /
+   * directPropertyWrite / actionInvocation；Type 列文案 Target sync /
+   * Direct write / Action（DeviceOperationsSection.tsx:15-25）。
+   * 对话框 submit/cancel 复用通用 testid，须限定在对应 dialog 作用域内。
+   */
+  operations: {
+    table: '[data-testid="device-operations-table"]',
+    error: '[data-testid="device-operations-error"]',
+    typeFilter: '[data-testid="operation-type-filter"]',
+    statusFilter: '[data-testid="operation-status-filter"]',
+    runActionButton: '[data-testid="run-action-button"]',
+    moreActionsButton: '[data-testid="more-actions-button"]',
+    directPropertyWriteButton: '[data-testid="direct-property-write-button"]',
+    actionDialog: '[data-testid="action-invoke-dialog"]',
+    actionServiceTypeInput: '[data-testid="service-type-input"]',
+    actionParamsInput: '[data-testid="params-input"]',
+    directWriteDialog: '[data-testid="direct-property-write-dialog"]',
+    directWriteJsonInput: '[data-testid="command-json-input"]',
+    targetConflictWarning: '[data-testid="target-conflict-warning"]',
+    /** 限定在对应 dialog 内使用 */
+    dialogSubmitButton: '[data-testid="submit-button"]',
+    /** 限定在对应 dialog 内使用 */
+    dialogCancelButton: '[data-testid="cancel-button"]',
+  },
+
+  /**
+   * 设备详情页 Tab 切换选择器（device-detail-experience 七区结构，DE-D01 重写）
+   *
+   * 七区信息架构（设计 §4.4.2，frontend/src/routes/devices/show.$id.tsx TABS
+   * :22-34）：Overview / State & Configuration / Operations / Reported Data /
+   * Events / Connectivity / Metadata，Tab 为 role=tab 的 button。仅
+   * State & Configuration、Operations、Reported Data 提供 data-testid
+   * （设计 §4.4.5），优先以 testid 定位（page.locator）；其余四个无 testid，
+   * 以 getByRole('tab', { name }) 按稳定文案定位。
+   *
+   * 校准证据（DE-D01）：旧 Shadow / Commands / Actions Tab 已随
+   * PropertyShadowSection / PropertyCommandsSection / ActionInvocationsSection
+   * 一并删除（frontend/src 内 rg 无匹配），对应旧 key 同步移除。
    */
   deviceTabs: {
-    /** getByRole('tab', { name }) — Shadow tab（渲染 PropertyShadowSection） */
-    shadowTab: 'Shadow',
-    /** getByRole('tab', { name }) — Actions tab（渲染 ActionInvocationsSection） */
-    actionsTab: 'Actions',
-    /** getByRole('tab', { name }) — Commands tab（渲染 PropertyCommandsSection） */
-    commandsTab: 'Commands',
+    /** getByRole('tab', { name }) — Overview（默认激活，无 testid） */
+    overviewTab: 'Overview',
+    /** page.locator(...) — State & Configuration tab */
+    stateConfigurationTab: '[data-testid="device-tab-state-configuration"]',
+    /** page.locator(...) — Operations tab */
+    operationsTab: '[data-testid="device-tab-operations"]',
+    /** page.locator(...) — Reported Data tab */
+    reportedDataTab: '[data-testid="device-tab-reported-data"]',
+    /** getByRole('tab', { name }) — Events（无 testid） */
+    eventsTab: 'Events',
+    /** getByRole('tab', { name }) — Connectivity（无 testid） */
+    connectivityTab: 'Connectivity',
+    /** getByRole('tab', { name }) — Metadata（无 testid） */
+    metadataTab: 'Metadata',
   },
 }
 

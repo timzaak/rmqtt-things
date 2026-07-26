@@ -7,9 +7,10 @@ import { installAutoRefreshInterceptor, refreshAccessToken } from '@/lib/refresh
 // Mock the auth helpers so a failed refresh doesn't try to navigate; capture
 // the redirect call instead.
 const handle401Mock = vi.hoisted(() => vi.fn())
+const resetAuthCheckMock = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/auth', () => ({
   handle401: handle401Mock,
-  resetAuthCheck: vi.fn(),
+  resetAuthCheck: resetAuthCheckMock,
   getLoginUrl: () => '/api/auth/oauth/start',
   buildLoginRedirectUrl: () => '/api/auth/oauth/start',
 }))
@@ -49,6 +50,7 @@ describe('auto-refresh interceptor', () => {
     client.setConfig({ baseUrl: BASE })
     installAutoRefreshInterceptor()
     handle401Mock.mockClear()
+    resetAuthCheckMock.mockClear()
   })
 
   afterEach(() => {
@@ -111,6 +113,7 @@ describe('auto-refresh interceptor', () => {
     expect(ok).toBe(false)
     // The failed refresh should hand off to the login redirect, not retry.
     expect(handle401Mock).toHaveBeenCalledTimes(1)
+    expect(resetAuthCheckMock).not.toHaveBeenCalled()
   })
 
   test('a 401 on /api/auth/refresh itself does not recursively refresh', async () => {

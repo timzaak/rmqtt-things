@@ -728,6 +728,92 @@
         ]
       }
     },
+    "/api/admin/device/operation": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_device_operations",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation_type",
+            "in": "query",
+            "description": "操作类型：targetSync / directPropertyWrite / actionInvocation，可选",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DeviceOperationType"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device operations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier, enum or pagination"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
     "/api/admin/device/status": {
       "get": {
         "tags": [
@@ -1596,6 +1682,15 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/CommandStatus"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "description": "命令来源：0=OneShot（一次性写入）, 1=DesiredDelta（Target 同步）；缺省返回全部",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandSource"
             }
           },
           {
@@ -3843,6 +3938,110 @@
           }
         }
       },
+      "DeviceOperationQuery": {
+        "type": "object",
+        "description": "统一设备操作查询入参（设计 §4.2.3）。分页沿用既有默认值\n（`page` 默认 1、`page_size` 默认 10）。",
+        "required": [
+          "product_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "设备ID，可选"
+          },
+          "operation_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeviceOperationType",
+                "description": "操作类型：targetSync / directPropertyWrite / actionInvocation，可选"
+              }
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandStatus",
+                "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted"
+              }
+            ]
+          }
+        }
+      },
+      "DeviceOperationType": {
+        "type": "string",
+        "description": "统一操作类型（设计 §5.1）。camelCase 字面值与 SQL 投影常量一致：\n`targetSync`（property_command.source=1）/ `directPropertyWrite`（source=0）/\n`actionInvocation`（action_invocation）。",
+        "enum": [
+          "targetSync",
+          "directPropertyWrite",
+          "actionInvocation"
+        ]
+      },
+      "DeviceOperationView": {
+        "type": "object",
+        "description": "统一设备操作视图（设计 §4.2.3 响应表 / §5.1）。`operation_id` 为稳定组合\nID（`property:{id}` / `action:{id}`），`name` 对属性命令固定为\n`Set properties` / `Sync target`，对动作取 `service_type`。",
+        "required": [
+          "operationId",
+          "operationType",
+          "name",
+          "payload",
+          "status",
+          "createdTime",
+          "updatedTime"
+        ],
+        "properties": {
+          "createdTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间"
+          },
+          "name": {
+            "type": "string",
+            "description": "`Set properties` / `Sync target` / action 的 serviceType"
+          },
+          "operationId": {
+            "type": "string",
+            "description": "稳定组合 ID：`property:{id}` 或 `action:{id}`"
+          },
+          "operationType": {
+            "$ref": "#/components/schemas/DeviceOperationType"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/Value",
+            "description": "属性 command 或动作 params"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "updatedTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最近状态变更时间"
+          }
+        }
+      },
       "DeviceStatusHistory": {
         "type": "object",
         "required": [
@@ -5480,6 +5679,17 @@
           "product_id": {
             "type": "string",
             "description": "产品ID"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandSource",
+                "description": "命令来源：0=OneShot（一次性写入）, 1=DesiredDelta（Target 同步）；缺省返回全部"
+              }
+            ]
           },
           "status": {
             "oneOf": [

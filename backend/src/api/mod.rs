@@ -147,6 +147,12 @@ pub fn create_router(
             "/admin/device/status",
             get(admin_handlers::get_device_status),
         )
+        // 统一设备操作只读查询。`extract_permission` 的 `/admin/device` 前缀
+        // 已映射 `device` 资源，GET 自动得到 `device:read`。
+        .route(
+            "/admin/device/operation",
+            get(admin_handlers::get_device_operations),
+        )
         .route(
             "/admin/device/status/history",
             get(admin_handlers::get_device_status_history),

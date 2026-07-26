@@ -1,7 +1,7 @@
 use crate::db::models::{
-    ActionInvocation, CertIssue, CommandStatus, DeviceConnectionStatus, DeviceStatusHistory,
-    DeviceStatusWithSource, EventHistory, EventValidTemplate, EventValidTemplateStatus,
-    PropertyCommand, PropertyHistory, PropertyLatest, RegistrationSource,
+    ActionInvocation, CertIssue, CommandSource, CommandStatus, DeviceConnectionStatus,
+    DeviceStatusHistory, DeviceStatusWithSource, EventHistory, EventValidTemplate,
+    EventValidTemplateStatus, PropertyCommand, PropertyHistory, PropertyLatest, RegistrationSource,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -34,6 +34,8 @@ pub struct PropertyCommandQuery {
     pub device_id: Option<String>,
     /// 命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted
     pub status: Option<CommandStatus>,
+    /// 命令来源：0=OneShot（一次性写入）, 1=DesiredDelta（Target 同步）；缺省返回全部
+    pub source: Option<CommandSource>,
     /// 页码，默认为1
     #[serde(default = "default_page")]
     pub page: i64,
@@ -72,6 +74,64 @@ fn default_page() -> i64 {
 fn default_page_size() -> i64 {
     10
 }
+
+// ---- Unified device operation read model ----
+
+/// 统一操作类型。camelCase 字面值与 SQL 投影常量一致：
+/// `targetSync`（property_command.source=1）/ `directPropertyWrite`（source=0）/
+/// `actionInvocation`（action_invocation）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum DeviceOperationType {
+    TargetSync,
+    DirectPropertyWrite,
+    ActionInvocation,
+}
+
+/// 统一设备操作查询入参。
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct DeviceOperationQuery {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID，可选
+    pub device_id: Option<String>,
+    /// 操作类型：targetSync / directPropertyWrite / actionInvocation，可选
+    pub operation_type: Option<DeviceOperationType>,
+    /// 命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted
+    pub status: Option<CommandStatus>,
+    /// 页码，默认为1
+    #[serde(default = "default_page")]
+    pub page: i64,
+    /// 每页大小，默认为10
+    #[serde(default = "default_page_size")]
+    pub page_size: i64,
+}
+
+/// 统一设备操作视图。`operation_id` 为稳定组合 ID（`property:{id}` /
+/// `action:{id}`），`name` 对属性命令固定为 `Set properties` / `Sync target`，
+/// 对动作取 `service_type`（前端摘要规则依赖这些字面值）。
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceOperationView {
+    /// 稳定组合 ID：`property:{id}` 或 `action:{id}`
+    pub operation_id: String,
+    pub operation_type: DeviceOperationType,
+    /// `Set properties` / `Sync target` / action 的 serviceType
+    pub name: String,
+    /// 属性 command 或动作 params
+    pub payload: JsonValue,
+    pub status: CommandStatus,
+    /// 创建时间
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_time: OffsetDateTime,
+    /// 最近状态变更时间
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_time: OffsetDateTime,
+}
+
+/// 统一操作分页响应别名。
+pub type DeviceOperationListResponse = PaginatedResponse<DeviceOperationView>;
 
 // 创建命令请求结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

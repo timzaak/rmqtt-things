@@ -225,12 +225,13 @@ Parameters:
 |-----------|------|----------|-------------|
 | product_id | string | Yes | Product ID |
 | device_id | string | No | Device ID |
-| status | int16 | No | 0=pending, 1=sent, 2=success, 3=failed, 4=deleted |
+| status | string | No | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| source | string | No | Command origin: `OneShot` (direct write) / `DesiredDelta` (Target sync); omitted returns all, filtering applies before pagination |
 | page | int64 | No | Page number |
 | page_size | int64 | No | Items per page |
 
 ```bash
-curl "http://localhost:8080/api/admin/property/command?product_id=demo&status=0"
+curl "http://localhost:8080/api/admin/property/command?product_id=demo&status=Pending&source=OneShot"
 ```
 
 #### POST /api/admin/property/command
@@ -397,6 +398,45 @@ curl -X DELETE "http://localhost:8080/api/admin/service/command?ids=1,2,3"
 Response: `204 No Content`
 
 > For the device-side protocol, `set_reply` round-trip and offline queuing of action invocations, see the Action / service invocation section of the [Thing Model Protocol Spec](thing-model-spec-en.md).
+
+### Unified operation history
+
+The unified operation history aggregates the three kinds of platform operations — Target sync (`targetSync`), direct property write (`directPropertyWrite`), and action invocation (`actionInvocation`) — into a single read-only view used by the device detail page. It is read-side aggregation only: the three write paths keep their original entry points, state machines and persistence semantics, and there is no unified cancel/retry. For the product semantics see the [Device Detail Experience PRD](../prd/core/device-detail-experience.md).
+
+#### GET /api/admin/device/operation
+
+Query the unified operation history, ordered by last status-change time descending; sorting, filtering and pagination all happen on the backend.
+
+```bash
+curl "http://localhost:8080/api/admin/device/operation?product_id=demo&device_id=device1&operation_type=targetSync&status=Success&page=1&page_size=10"
+```
+
+Query parameters:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| product_id | string | Yes | Product ID |
+| device_id | string | No | Omit to query all devices under the product |
+| operation_type | string | No | `targetSync` / `directPropertyWrite` / `actionInvocation`; omitted returns all types |
+| status | string | No | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| page | int | No | Default 1 |
+| page_size | int | No | Default 10 |
+
+Response: `200 OK`; `data` is an array of operation views and `pagination` contains `page` / `page_size` / `total`.
+
+Operation view fields (camelCase):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| operationId | string | Stable composite ID: `property:{id}` for property operations, `action:{id}` for action invocations |
+| operationType | string | `targetSync` / `directPropertyWrite` / `actionInvocation` |
+| name | string | `Set properties` for direct writes, `Sync target` for Target sync, the serviceType for action invocations |
+| payload | object | Property command or action params |
+| status | string | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| createdTime | string | Creation time (RFC3339) |
+| updatedTime | string | Last status-change time (RFC3339) |
+
+> `status` reflects the delivery/execution result, not whether the property has synced to the Target; property sync state is determined by the delta view of `GET /api/admin/property/shadow`.
 
 ### Events
 

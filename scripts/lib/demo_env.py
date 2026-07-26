@@ -248,12 +248,19 @@ SET name = EXCLUDED.name,
     status = EXCLUDED.status,
     updated_at = NOW();
 
-INSERT INTO device_status (product_id, device_id, status, ip_address, last_online_at, updated_at)
-VALUES ('demo_product', 'demo-device', 1, '127.0.0.1', NOW(), NOW())
+INSERT INTO devices (product_id, device_id, registration_source)
+VALUES ('demo_product', 'demo-device', 1)
+ON CONFLICT (product_id, device_id) DO NOTHING;
+
+INSERT INTO device_status (
+    product_id, device_id, status, ip_address, last_online_at, last_offline_at, updated_at
+)
+VALUES ('demo_product', 'demo-device', 0, '127.0.0.1', NOW(), NOW(), NOW())
 ON CONFLICT (product_id, device_id) DO UPDATE
 SET status = EXCLUDED.status,
     ip_address = EXCLUDED.ip_address,
     last_online_at = EXCLUDED.last_online_at,
+    last_offline_at = EXCLUDED.last_offline_at,
     updated_at = NOW();
 
 INSERT INTO property_latest (product_id, device_id, properties, updated_time)
@@ -297,8 +304,8 @@ VALUES (
     0
 );
 
-INSERT INTO device_status_history (product_id, device_id, status, ip_address, connected_at, created_at)
-VALUES ('demo_product', 'demo-device', 1, '127.0.0.1', NOW(), NOW());
+INSERT INTO device_status_history (product_id, device_id, status, ip_address, disconnected_at, created_at)
+VALUES ('demo_product', 'demo-device', 0, '127.0.0.1', NOW(), NOW());
 
 INSERT INTO property_command (product_id, device_id, command, status, created_time, updated_time)
 VALUES ('demo_product', 'demo-device', '{"power":false,"brightness":80}'::jsonb, 0, NOW(), NOW());

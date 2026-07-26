@@ -345,7 +345,7 @@ async fn test_property_set_and_report(ctx: &mut TestContext) {
     let commands = ctx
         ._admin_state
         .db
-        .query_property_commands(&product_id, Some(&client_id), None, 1, 10)
+        .query_property_commands_by_source(&product_id, Some(&client_id), None, None, 1, 10)
         .await
         .unwrap()
         .0;
@@ -396,7 +396,7 @@ async fn test_property_set_and_report(ctx: &mut TestContext) {
     let commands = ctx
         ._admin_state
         .db
-        .query_property_commands(&product_id, Some(&client_id), None, 1, 10)
+        .query_property_commands_by_source(&product_id, Some(&client_id), None, None, 1, 10)
         .await
         .unwrap()
         .0;

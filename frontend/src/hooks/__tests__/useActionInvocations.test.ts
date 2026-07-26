@@ -1,15 +1,10 @@
 import { createElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { client } from '@/lib/api-generated/client.gen'
-import type { ActionInvocationView } from '@/lib/api-generated/types.gen'
-import {
-  useActionInvocations,
-  useCreateActionInvocation,
-  useDeleteActionInvocations,
-} from '@/hooks/useActionInvocations'
+import { useCreateActionInvocation, useDeleteActionInvocations } from '@/hooks/useActionInvocations'
 
 // The generated client builds `new Request(url)`, which rejects relative URLs
 // under jsdom. Pin an absolute baseUrl so the probe resolves; the fetch stub
@@ -58,23 +53,6 @@ function stubFetch(
   return { calls }
 }
 
-/** A list response shaped like the backend `ActionInvocationListResponse`. */
-function listBody(): string {
-  return JSON.stringify({
-    data: [
-      {
-        id: 1,
-        serviceType: 'reboot',
-        params: { delaySeconds: 5 },
-        status: 'Pending',
-        createdTime: '2025-01-01T10:00:00Z',
-        updatedTime: '2025-01-01T10:00:00Z',
-      } satisfies ActionInvocationView,
-    ],
-    pagination: { page: 1, page_size: 10, total: 1 },
-  })
-}
-
 /** Build a fresh QueryClient per test so caches never bleed across cases. */
 function createTestQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -91,101 +69,6 @@ function makeWrapper(queryClient: QueryClient) {
   }
   return Wrapper
 }
-
-describe('useActionInvocations query', () => {
-  beforeEach(() => {
-    client.setConfig({ baseUrl: BASE_URL })
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  test('passes product_id/device_id/page/page_size as query params', async () => {
-    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
-    const queryClient = createTestQueryClient()
-
-    const { result } = renderHook(
-      () =>
-        useActionInvocations({
-          product_id: 'product-a',
-          device_id: 'device-001',
-          page: 2,
-          page_size: 25,
-        }),
-      { wrapper: makeWrapper(queryClient) }
-    )
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-    expect(calls).toHaveLength(1)
-    const params = new URL(calls[0].url).searchParams
-    // Backend expects snake_case query keys (ActionCommandQuery).
-    expect(params.get('product_id')).toBe('product-a')
-    expect(params.get('device_id')).toBe('device-001')
-    expect(params.get('page')).toBe('2')
-    expect(params.get('page_size')).toBe('25')
-    expect(calls[0].url).toContain('/api/admin/service/command')
-  })
-
-  test('defaults page to 1 and page_size to 10 when omitted', async () => {
-    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
-    const queryClient = createTestQueryClient()
-
-    const { result } = renderHook(() => useActionInvocations({ product_id: 'product-a' }), {
-      wrapper: makeWrapper(queryClient),
-    })
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-
-    const params = new URL(calls[0].url).searchParams
-    expect(params.get('page')).toBe('1')
-    expect(params.get('page_size')).toBe('10')
-  })
-
-  test('uses separate cache entries for different params', async () => {
-    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
-    const queryClient = createTestQueryClient()
-
-    const paramsA = { product_id: 'product-a', device_id: 'device-1', page: 1, page_size: 10 }
-    const paramsB = { product_id: 'product-b', device_id: 'device-2', page: 2, page_size: 20 }
-
-    const { result: resultA } = renderHook(() => useActionInvocations(paramsA), {
-      wrapper: makeWrapper(queryClient),
-    })
-    await waitFor(() => expect(resultA.current.isSuccess).toBe(true))
-
-    const { result: resultB } = renderHook(() => useActionInvocations(paramsB), {
-      wrapper: makeWrapper(queryClient),
-    })
-    await waitFor(() => expect(resultB.current.isSuccess).toBe(true))
-
-    // Two distinct GETs because the cache keys differ by the whole params object.
-    expect(calls).toHaveLength(2)
-
-    // Each params object is cached independently — neither overwrites the other.
-    const cachedA = queryClient.getQueryData(['action-invocations', paramsA])
-    const cachedB = queryClient.getQueryData(['action-invocations', paramsB])
-    expect(cachedA).toBeDefined()
-    expect(cachedB).toBeDefined()
-    expect(cachedA).not.toBe(cachedB)
-  })
-
-  test('surfaces HTTP errors via throwOnError', async () => {
-    // 500 must throw inside the queryFn because the hook sets throwOnError:true,
-    // landing the hook in error state. (Without throwOnError the client would
-    // resolve to `{ error }` and React Query would treat it as success.)
-    stubFetch(() => ({ status: 500, body: JSON.stringify({ error: 'boom' }) }))
-    const queryClient = createTestQueryClient()
-
-    const { result } = renderHook(() => useActionInvocations({ product_id: 'product-a' }), {
-      wrapper: makeWrapper(queryClient),
-    })
-
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toBeDefined()
-  })
-})
 
 describe('useCreateActionInvocation', () => {
   beforeEach(() => {

@@ -1,10 +1,11 @@
 import { describe, test, it, expect, vi } from 'vitest'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
 import type {
   DeviceStatusWithSource,
   ShadowView,
+  DeviceOperationView,
   FactoryDeviceView,
   FactoryDeviceMetadataView,
   FactoryComponentView,
@@ -53,18 +54,14 @@ vi.mock('@/hooks/useDevices', () => ({
 
 const mockUsePropertyLatest = vi.fn()
 const mockUsePropertyHistory = vi.fn()
-const mockUsePropertyCommands = vi.fn()
 const mockUseCreatePropertyCommand = vi.fn()
-const mockUseDeletePropertyCommands = vi.fn()
 const mockUsePropertyShadow = vi.fn()
 const mockUseSetDesired = vi.fn()
 
 vi.mock('@/hooks/useProperties', () => ({
   usePropertyLatest: (...args: unknown[]) => mockUsePropertyLatest(...args),
   usePropertyHistory: (...args: unknown[]) => mockUsePropertyHistory(...args),
-  usePropertyCommands: (...args: unknown[]) => mockUsePropertyCommands(...args),
   useCreatePropertyCommand: () => mockUseCreatePropertyCommand(),
-  useDeletePropertyCommands: () => mockUseDeletePropertyCommands(),
   usePropertyShadow: (...args: unknown[]) => mockUsePropertyShadow(...args),
   useSetDesired: () => mockUseSetDesired(),
 }))
@@ -74,16 +71,19 @@ vi.mock('@/hooks/useEvents', () => ({
   useEventHistory: (...args: unknown[]) => mockUseEventHistory(...args),
 }))
 
-// Actions tab (thing-model-extension). The section mounts only when its tab is
-// active, but the hook module is imported at page-load time; mock it so no
-// network call is ever issued.
-const mockUseActionInvocations = vi.fn()
+// Run Action submission (DeviceOperationsSection -> ActionInvokeDialog). The
+// section mounts only when its tab is active, but the hook module is imported
+// at page-load time; mock it so no network call is ever issued.
 const mockUseCreateActionInvocation = vi.fn()
-const mockUseDeleteActionInvocations = vi.fn()
 vi.mock('@/hooks/useActionInvocations', () => ({
-  useActionInvocations: (...args: unknown[]) => mockUseActionInvocations(...args),
   useCreateActionInvocation: () => mockUseCreateActionInvocation(),
-  useDeleteActionInvocations: () => mockUseDeleteActionInvocations(),
+}))
+
+// Unified operations query: used by DeviceOverviewSection (mounted by default)
+// and DeviceOperationsSection.
+const mockUseDeviceOperations = vi.fn()
+vi.mock('@/hooks/useDeviceOperations', () => ({
+  useDeviceOperations: (...args: unknown[]) => mockUseDeviceOperations(...args),
 }))
 
 const mockUseFactoryMetadata = vi.fn()
@@ -121,23 +121,17 @@ function setupMocks(deviceData = mockDevice) {
     data: { data: [], pagination: undefined },
     isLoading: false,
   })
-  mockUsePropertyCommands.mockReturnValue({
-    data: { data: [], pagination: undefined },
-    isLoading: false,
-  })
   mockUseEventHistory.mockReturnValue({
     data: { data: [], pagination: undefined },
     isLoading: false,
   })
   mockUseCreatePropertyCommand.mockReturnValue({ mutate: vi.fn(), isPending: false })
-  mockUseDeletePropertyCommands.mockReturnValue({ mutate: vi.fn(), isPending: false })
-  // Actions tab defaults: empty list, idle mutations.
-  mockUseActionInvocations.mockReturnValue({
+  mockUseCreateActionInvocation.mockReturnValue({ mutate: vi.fn(), isPending: false })
+  mockUseDeviceOperations.mockReturnValue({
     data: { data: [], pagination: undefined },
     isLoading: false,
+    isError: false,
   })
-  mockUseCreateActionInvocation.mockReturnValue({ mutate: vi.fn(), isPending: false })
-  mockUseDeleteActionInvocations.mockReturnValue({ mutate: vi.fn(), isPending: false })
   mockUsePropertyShadow.mockReturnValue({
     data: { desired: {}, reported: {}, delta: {} },
     isLoading: false,
@@ -158,6 +152,51 @@ function setupMocks(deviceData = mockDevice) {
  */
 async function openTab(user: ReturnType<typeof userEvent.setup>, name: string) {
   await user.click(screen.getByRole('tab', { name }))
+}
+
+// --- Device detail fixtures ---
+
+/**
+ * Build a ShadowView. `desired` holds bare values, `reported` entries are
+ * wrapped as `{ value, time }`, and `delta` lists keys that have not
+ * converged (key -> bare desired value) — mirrors backend `compute_delta`.
+ */
+function makeShadow(overrides: Partial<ShadowView> = {}): ShadowView {
+  return {
+    desired: {},
+    reported: {},
+    delta: {},
+    ...overrides,
+  }
+}
+
+/** Desired/reported/delta for a brightness target that has not converged. */
+function makeOutOfSyncShadow(): ShadowView {
+  return makeShadow({
+    desired: { brightness: 80 },
+    reported: { brightness: { value: 50, time: '2025-01-01T10:00:00Z' } },
+    delta: { brightness: 80 },
+  })
+}
+
+/** Build one unified operations row with sensible defaults. */
+function makeOperation(overrides: Partial<DeviceOperationView> = {}): DeviceOperationView {
+  return {
+    operationId: 'property:1',
+    name: 'Sync target',
+    operationType: 'targetSync',
+    status: 'Success',
+    payload: { brightness: 80 },
+    createdTime: '2025-01-01T10:00:00Z',
+    updatedTime: '2025-01-01T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Params of the most recent useDeviceOperations call (any mounted section). */
+function lastOperationsParams(): Record<string, unknown> {
+  const calls = mockUseDeviceOperations.mock.calls
+  return calls[calls.length - 1][0] as Record<string, unknown>
 }
 
 describe('DevicesShowPage', () => {
@@ -192,152 +231,6 @@ describe('DevicesShowPage', () => {
     expect(screen.getByText('192.168.1.10')).toBeInTheDocument()
   })
 
-  test('renders Overview tab by default and keeps other sections unmounted', () => {
-    setupMocks()
-
-    renderWithProviders(<Page />)
-
-    // Overview is the default tab: device info + latest properties.
-    expect(screen.getByRole('heading', { name: 'Device Info' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Latest Properties' })).toBeInTheDocument()
-    // Other sections stay unmounted (and thus unfetched) until their tab opens.
-    expect(screen.queryByRole('heading', { name: 'Event History' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Connection History' })).not.toBeInTheDocument()
-    expect(screen.queryByTestId('shadow-section')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('factory-metadata-section')).not.toBeInTheDocument()
-  })
-
-  test('switches tabs and renders only the selected section', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-
-    await openTab(user, 'Shadow')
-    expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
-    // The overview content unmounts once another tab is active.
-    expect(screen.queryByRole('heading', { name: 'Device Info' })).not.toBeInTheDocument()
-
-    await openTab(user, 'Commands')
-    expect(screen.getByRole('heading', { name: 'Property Commands' })).toBeInTheDocument()
-
-    await openTab(user, 'Actions')
-    expect(screen.getByRole('heading', { name: 'Action Invocations' })).toBeInTheDocument()
-
-    await openTab(user, 'Property History')
-    expect(screen.getByRole('heading', { name: 'Property History' })).toBeInTheDocument()
-
-    await openTab(user, 'Events')
-    expect(screen.getByRole('heading', { name: 'Event History' })).toBeInTheDocument()
-
-    await openTab(user, 'Connection')
-    expect(screen.getByRole('heading', { name: 'Connection History' })).toBeInTheDocument()
-
-    await openTab(user, 'Factory Metadata')
-    expect(screen.getByTestId('factory-metadata-section')).toBeInTheDocument()
-  })
-
-  test('renders property history table with mock data', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    mockUsePropertyHistory.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 1,
-            properties: { temperature: 25.5 },
-            reported_time: '2025-01-01T10:00:00Z',
-            created_time: '2025-01-01T10:00:00Z',
-          },
-        ],
-        pagination: { page: 1, page_size: 10, total: 1 },
-      },
-      isLoading: false,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Property History')
-
-    expect(screen.getByText('1')).toBeInTheDocument()
-    // Check that property data is rendered (inside a <pre> block)
-    expect(screen.getByText(/temperature/)).toBeInTheDocument()
-  })
-
-  test('renders command history with Send Command button', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Commands')
-
-    expect(screen.getByRole('button', { name: /send command/i })).toBeInTheDocument()
-  })
-
-  test('opens command dialog when Send Command is clicked', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Commands')
-
-    await user.click(screen.getByRole('button', { name: /send command/i }))
-
-    // Dialog heading distinguishes from the button text
-    expect(screen.getByRole('heading', { name: /send command/i })).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('{"key": "value"}')).toBeInTheDocument()
-  })
-
-  test('submits command with valid JSON input', async () => {
-    const user = userEvent.setup()
-    const mockMutate = vi.fn()
-    setupMocks()
-    mockUseCreatePropertyCommand.mockReturnValue({ mutate: mockMutate, isPending: false })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Commands')
-
-    // Open dialog
-    await user.click(screen.getByRole('button', { name: /send command/i }))
-
-    // Use fireEvent.change to set JSON value (avoids userEvent special char interpretation)
-    const textarea = screen.getByPlaceholderText('{"key": "value"}')
-    fireEvent.change(textarea, { target: { value: '{"action": "reboot"}' } })
-
-    // Submit
-    await user.click(screen.getByRole('button', { name: /^send$/i }))
-
-    expect(mockMutate).toHaveBeenCalledWith(
-      {
-        product_id: 'product-a',
-        device_id: 'test-device-001',
-        command: { action: 'reboot' },
-      },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-      })
-    )
-  })
-
-  test('shows parse error for invalid JSON', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Commands')
-
-    // Open dialog
-    await user.click(screen.getByRole('button', { name: /send command/i }))
-
-    // Use fireEvent.change to set invalid JSON
-    const textarea = screen.getByPlaceholderText('{"key": "value"}')
-    fireEvent.change(textarea, { target: { value: 'not valid json' } })
-
-    // Submit
-    await user.click(screen.getByRole('button', { name: /^send$/i }))
-
-    expect(screen.getByText('Invalid JSON')).toBeInTheDocument()
-  })
-
   test('shows device not found when API returns empty', () => {
     mockUseDevices.mockReturnValue({
       data: { data: [], pagination: { page: 1, page_size: 1, total: 0 } },
@@ -361,36 +254,403 @@ describe('DevicesShowPage', () => {
   })
 })
 
-// --- Property Shadow section fixtures ---
+describe('tab navigation', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
 
-/**
- * Build a converged shadow view: desired present but delta empty.
- */
-function makeConvergedShadow(): ShadowView {
-  return {
-    desired: { brightness: 80 },
-    reported: { brightness: { value: 80, time: '2025-01-01T10:00:00Z' } },
-    delta: {},
-    desired_updated_time: '2025-01-01T09:00:00Z',
-    reported_updated_time: '2025-01-01T10:00:00Z',
-  }
-}
+  test('defaults to Overview and keeps the other six sections unmounted', () => {
+    setupMocks()
 
-/**
- * Build a pending shadow view: delta non-empty (desired not yet converged).
- */
-function makePendingShadow(): ShadowView {
-  return {
-    desired: { brightness: 80, colorTemp: 4000 },
-    reported: {
-      brightness: { value: 80, time: '2025-01-01T10:00:00Z' },
-      colorTemp: { value: 3000, time: '2025-01-01T10:00:00Z' },
+    renderWithProviders(<Page />)
+
+    // Overview is the default tab: device info + latest properties.
+    expect(screen.getByRole('heading', { name: 'Device Info' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Latest Properties' })).toBeInTheDocument()
+    // Other sections stay unmounted (and thus unfetched) until their tab opens.
+    expect(screen.queryByRole('heading', { name: 'State & Configuration' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('device-operations-table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Property History' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Event History' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Connection History' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('factory-metadata-section')).not.toBeInTheDocument()
+  })
+
+  test('exposes stable testids on the new tabs', () => {
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    expect(screen.getByTestId('device-tab-state-configuration')).toBeInTheDocument()
+    expect(screen.getByTestId('device-tab-operations')).toBeInTheDocument()
+    expect(screen.getByTestId('device-tab-reported-data')).toBeInTheDocument()
+  })
+
+  test('mounts the selected section and unmounts the previous one', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+
+    renderWithProviders(<Page />)
+
+    await openTab(user, 'State & Configuration')
+    expect(screen.getByRole('heading', { name: 'State & Configuration' })).toBeInTheDocument()
+    // The overview content unmounts once another tab is active.
+    expect(screen.queryByRole('heading', { name: 'Device Info' })).not.toBeInTheDocument()
+
+    await openTab(user, 'Operations')
+    expect(screen.getByTestId('device-operations-table')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'State & Configuration' })).not.toBeInTheDocument()
+
+    await openTab(user, 'Reported Data')
+    expect(screen.getByRole('heading', { name: 'Property History' })).toBeInTheDocument()
+    expect(screen.queryByTestId('device-operations-table')).not.toBeInTheDocument()
+
+    await openTab(user, 'Events')
+    expect(screen.getByRole('heading', { name: 'Event History' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Property History' })).not.toBeInTheDocument()
+
+    await openTab(user, 'Connectivity')
+    expect(screen.getByRole('heading', { name: 'Connection History' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Event History' })).not.toBeInTheDocument()
+
+    await openTab(user, 'Metadata')
+    expect(screen.getByTestId('factory-metadata-section')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Connection History' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Reported Data section', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('renders property history table with mock data', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyHistory.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: 1,
+            properties: { temperature: 25.5 },
+            reported_time: '2025-01-01T10:00:00Z',
+            created_time: '2025-01-01T10:00:00Z',
+          },
+        ],
+        pagination: { page: 1, page_size: 10, total: 1 },
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Reported Data')
+
+    expect(screen.getByText('1')).toBeInTheDocument()
+    // Check that property data is rendered (inside a <pre> block)
+    expect(screen.getByText(/temperature/)).toBeInTheDocument()
+  })
+})
+
+describe('State & Configuration section', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  // Sync mapping derived solely from the ShadowView.
+  const syncCases: Array<{
+    scenario: string
+    shadow: ShadowView
+    expectedLabel: string
+  }> = [
+    {
+      scenario: 'desired lacks the key',
+      shadow: makeShadow({
+        reported: { brightness: { value: 50, time: '2025-01-01T10:00:00Z' } },
+      }),
+      expectedLabel: 'Target not set',
     },
-    delta: { colorTemp: 4000 },
-    desired_updated_time: '2025-01-01T09:00:00Z',
-    reported_updated_time: '2025-01-01T10:00:00Z',
-  }
-}
+    {
+      scenario: 'desired has the key and delta does not',
+      shadow: makeShadow({
+        desired: { brightness: 80 },
+        reported: { brightness: { value: 80, time: '2025-01-01T10:00:00Z' } },
+      }),
+      expectedLabel: 'In sync',
+    },
+    {
+      scenario: 'desired has the key and delta still lists it',
+      shadow: makeOutOfSyncShadow(),
+      expectedLabel: 'Out of sync',
+    },
+  ]
+
+  it.each(syncCases)('shows "$expectedLabel" when $scenario', async ({ shadow, expectedLabel }) => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: shadow, isLoading: false })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'State & Configuration')
+
+    const row = within(screen.getByTestId('state-configuration-table'))
+      .getByText('brightness')
+      .closest('tr')
+    expect(row).not.toBeNull()
+    // "Target not set" appears in both the Target and Sync columns for an
+    // untargeted key, so assert presence rather than a single match.
+    expect(within(row as HTMLElement).getAllByText(expectedLabel).length).toBeGreaterThan(0)
+  })
+
+  test('applies a single target property via its Apply button', async () => {
+    const user = userEvent.setup()
+    const mockMutate = vi.fn()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makeOutOfSyncShadow(), isLoading: false })
+    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'State & Configuration')
+
+    await user.click(screen.getByTestId('target-apply-button-brightness'))
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        product_id: 'product-a',
+        device_id: 'test-device-001',
+        desired: { brightness: 80 },
+      },
+      expect.objectContaining({ onError: expect.any(Function) })
+    )
+  })
+
+  test('submits a replacement Target through the Update Target dialog', async () => {
+    const user = userEvent.setup()
+    const mockMutate = vi.fn()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makeOutOfSyncShadow(), isLoading: false })
+    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'State & Configuration')
+
+    await user.click(screen.getByTestId('target-update-button'))
+    // fireEvent.change avoids userEvent's special-character interpretation.
+    fireEvent.change(screen.getByTestId('target-json-input'), {
+      target: { value: '{"brightness": 100}' },
+    })
+    await user.click(screen.getByTestId('submit-button'))
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        product_id: 'product-a',
+        device_id: 'test-device-001',
+        desired: { brightness: 100 },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    )
+  })
+})
+
+describe('Operations section', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('renders one row per operation with its fixed type label', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseDeviceOperations.mockReturnValue({
+      data: {
+        data: [
+          makeOperation({ operationId: 'property:1', operationType: 'targetSync' }),
+          makeOperation({
+            operationId: 'property:2',
+            operationType: 'directPropertyWrite',
+            name: 'Set properties',
+            status: 'Sent',
+          }),
+          makeOperation({
+            operationId: 'action:3',
+            operationType: 'actionInvocation',
+            name: 'reboot',
+            status: 'Failed',
+          }),
+        ],
+        pagination: { page: 1, page_size: 10, total: 3 },
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Operations')
+
+    const table = screen.getByTestId('device-operations-table')
+    expect(within(table).getByText('Target sync')).toBeInTheDocument()
+    expect(within(table).getByText('Direct write')).toBeInTheDocument()
+    expect(within(table).getByText('Action')).toBeInTheDocument()
+  })
+
+  test('passes type and status filters to useDeviceOperations', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Operations')
+
+    expect(lastOperationsParams()).toEqual({
+      product_id: 'product-a',
+      device_id: 'test-device-001',
+      operation_type: null,
+      status: null,
+      page: 1,
+      page_size: 10,
+    })
+
+    fireEvent.change(screen.getByTestId('operation-type-filter'), {
+      target: { value: 'targetSync' },
+    })
+    expect(lastOperationsParams()).toMatchObject({ operation_type: 'targetSync', page: 1 })
+
+    fireEvent.change(screen.getByTestId('operation-status-filter'), {
+      target: { value: 'Failed' },
+    })
+    expect(lastOperationsParams()).toMatchObject({
+      operation_type: 'targetSync',
+      status: 'Failed',
+      page: 1,
+    })
+  })
+
+  test('passes pagination changes to useDeviceOperations', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUseDeviceOperations.mockReturnValue({
+      data: {
+        data: [makeOperation()],
+        pagination: { page: 1, page_size: 10, total: 25 },
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Operations')
+
+    // The two pagination buttons are the only buttons inside the table
+    // container: [previous, next].
+    const [, nextButton] = within(screen.getByTestId('device-operations-table')).getAllByRole(
+      'button'
+    )
+    await user.click(nextButton)
+
+    expect(lastOperationsParams()).toMatchObject({ page: 2, page_size: 10 })
+  })
+})
+
+// Design G3: a successful device reply does not imply Target convergence —
+// the two regions carry independent semantics and must coexist.
+describe('operation success coexisting with Out of sync (G3)', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('shows Out of sync in State & Configuration while the operation shows Success', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makeOutOfSyncShadow(), isLoading: false })
+    mockUseDeviceOperations.mockReturnValue({
+      data: {
+        data: [makeOperation({ operationType: 'targetSync', status: 'Success' })],
+        pagination: { page: 1, page_size: 10, total: 1 },
+      },
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+
+    await openTab(user, 'State & Configuration')
+    expect(
+      within(screen.getByTestId('state-configuration-table')).getByText('Out of sync')
+    ).toBeInTheDocument()
+
+    await openTab(user, 'Operations')
+    const table = screen.getByTestId('device-operations-table')
+    expect(within(table).getByText('Success')).toBeInTheDocument()
+    expect(within(table).getByText('Target sync')).toBeInTheDocument()
+  })
+})
+
+describe('Direct property write conflict warning', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  const conflictCases: Array<{
+    scenario: string
+    input: string
+    expectWarning: boolean
+  }> = [
+    {
+      scenario: 'the value differs from the Target value',
+      input: '{"brightness": 50}',
+      expectWarning: true,
+    },
+    {
+      scenario: 'the value equals the Target value',
+      input: '{"brightness": 80}',
+      expectWarning: false,
+    },
+    {
+      scenario: 'the key is not in Target',
+      input: '{"temperature": 22}',
+      expectWarning: false,
+    },
+  ]
+
+  it.each(conflictCases)('warns only when $scenario', async ({ input, expectWarning }) => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({
+      data: makeShadow({ desired: { brightness: 80 } }),
+      isLoading: false,
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Operations')
+    await user.click(screen.getByTestId('more-actions-button'))
+    await user.click(screen.getByTestId('direct-property-write-button'))
+
+    const dialog = screen.getByTestId('direct-property-write-dialog')
+    fireEvent.change(within(dialog).getByTestId('command-json-input'), {
+      target: { value: input },
+    })
+
+    const warning = within(dialog).queryByTestId('target-conflict-warning')
+    if (expectWarning) {
+      expect(warning).toHaveTextContent(
+        'This one-time write does not change Target and may leave the device out of sync.'
+      )
+    } else {
+      expect(warning).not.toBeInTheDocument()
+    }
+  })
+})
+
+describe('section-level error isolation', () => {
+  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
+
+  test('keeps the page shell and other sections usable when Operations fails to load', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyShadow.mockReturnValue({ data: makeOutOfSyncShadow(), isLoading: false })
+    mockUseDeviceOperations.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('boom'),
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Operations')
+
+    // The failure is scoped to the Operations section: the page shell and the
+    // tab bar stay usable instead of replacing the whole detail page.
+    expect(screen.getByTestId('device-operations-error')).toBeInTheDocument()
+    expect(screen.getByText('Device Detail')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'State & Configuration' })).toBeInTheDocument()
+
+    await openTab(user, 'State & Configuration')
+    expect(screen.getByTestId('state-configuration-table')).toBeInTheDocument()
+    expect(screen.queryByTestId('device-operations-error')).not.toBeInTheDocument()
+  })
+})
 
 // --- Factory metadata section fixtures ---
 
@@ -476,342 +736,6 @@ function makeChangeLogEntry(
   }
 }
 
-describe('Property Shadow section', () => {
-  const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
-
-  test('renders shadow section title and container', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    expect(screen.getByText('Desired State (Shadow)')).toBeInTheDocument()
-    expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
-  })
-
-  test('renders delta rows when delta is not empty', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    mockUsePropertyShadow.mockReturnValue({ data: makePendingShadow(), isLoading: false })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    const table = screen.getByTestId('shadow-delta-table')
-    expect(table).toBeInTheDocument()
-    // colorTemp -> kebab-case "color-temp"
-    expect(screen.getByTestId('shadow-status-color-temp')).toBeInTheDocument()
-    // The delta key value should appear in the desired-value column
-    expect(table.textContent).toContain('4000')
-    // Reported value (3000) should also appear
-    expect(table.textContent).toContain('3000')
-  })
-
-  test('shows converged state when delta is empty', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    mockUsePropertyShadow.mockReturnValue({ data: makeConvergedShadow(), isLoading: false })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    // desired present + delta empty => every desired key has converged, so the
-    // table renders a row whose Status cell shows "Converged" (green).
-    expect(screen.getByTestId('shadow-delta-table')).toBeInTheDocument()
-    expect(screen.getByText('Converged')).toBeInTheDocument()
-  })
-
-  test('opens editor on set button click', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    // Editor is not present initially
-    expect(screen.queryByTestId('shadow-desired-editor')).not.toBeInTheDocument()
-
-    await user.click(screen.getByTestId('shadow-set-button'))
-
-    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
-  })
-
-  test('closes editor on cancel button click', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    await user.click(screen.getByTestId('shadow-set-button'))
-    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
-
-    await user.click(screen.getByTestId('shadow-cancel-button'))
-
-    expect(screen.queryByTestId('shadow-desired-editor')).not.toBeInTheDocument()
-  })
-
-  test('calls mutate with valid JSON', async () => {
-    const user = userEvent.setup()
-    const mockMutate = vi.fn()
-    setupMocks()
-    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    await user.click(screen.getByTestId('shadow-set-button'))
-    const editor = screen.getByTestId('shadow-desired-editor')
-    fireEvent.change(editor, { target: { value: '{"brightness": 90}' } })
-
-    await user.click(screen.getByTestId('shadow-submit-button'))
-
-    expect(mockMutate).toHaveBeenCalledTimes(1)
-    expect(mockMutate).toHaveBeenCalledWith(
-      {
-        product_id: 'product-a',
-        device_id: 'test-device-001',
-        desired: { brightness: 90 },
-      },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      })
-    )
-  })
-
-  test('shows parse error for invalid JSON', async () => {
-    const user = userEvent.setup()
-    const mockMutate = vi.fn()
-    setupMocks()
-    mockUseSetDesired.mockReturnValue({ mutate: mockMutate, isPending: false, error: null })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    await user.click(screen.getByTestId('shadow-set-button'))
-    const editor = screen.getByTestId('shadow-desired-editor')
-    fireEvent.change(editor, { target: { value: 'not valid json' } })
-
-    await user.click(screen.getByTestId('shadow-submit-button'))
-
-    expect(screen.getByText('Invalid JSON')).toBeInTheDocument()
-    expect(mockMutate).not.toHaveBeenCalled()
-  })
-
-  test('shows backend error when submitting empty desired object', async () => {
-    const user = userEvent.setup()
-    const mockMutate = vi.fn()
-    setupMocks()
-    // A desired view already exists so the table/desired area stays intact.
-    mockUsePropertyShadow.mockReturnValue({ data: makeConvergedShadow(), isLoading: false })
-    // Simulate the backend rejecting `{}`; the real error path surfaces via the
-    // mutation's onError callback into a sonner toast.
-    mockUseSetDesired.mockReturnValue({
-      mutate: mockMutate,
-      isPending: false,
-      error: null,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    await user.click(screen.getByTestId('shadow-set-button'))
-    const editor = screen.getByTestId('shadow-desired-editor')
-    fireEvent.change(editor, { target: { value: '{}' } })
-
-    await user.click(screen.getByTestId('shadow-submit-button'))
-
-    // Empty object is a valid JSON object, so mutate IS called with desired: {}
-    expect(mockMutate).toHaveBeenCalledWith(
-      {
-        product_id: 'product-a',
-        device_id: 'test-device-001',
-        desired: {},
-      },
-      expect.objectContaining({ onError: expect.any(Function) })
-    )
-
-    // Drive the backend error path: invoke the onError callback the component
-    // registered, surfacing the backend rejection message via the sonner toast.
-    const onError = mockMutate.mock.calls[0][1].onError as (e: unknown) => void
-    onError(new Error('desired must be a non-empty JSON object'))
-
-    const { toast } = await import('sonner')
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Failed to set desired state', {
-        description: 'desired must be a non-empty JSON object',
-      })
-    })
-
-    // Existing desired view is not destroyed by the failed submit
-    expect(screen.getByTestId('shadow-section')).toBeInTheDocument()
-    // The dialog stays open on failure (editor remains available)
-    expect(screen.getByTestId('shadow-desired-editor')).toBeInTheDocument()
-  })
-
-  test('shows delivery failed status when desired delta command failed', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    // desired brightness=80, reported missing => not converged.
-    mockUsePropertyShadow.mockReturnValue({
-      data: {
-        desired: { brightness: 80 },
-        reported: {},
-        delta: { brightness: 80 },
-        desired_updated_time: '2025-01-01T09:00:00Z',
-        reported_updated_time: null,
-      },
-      isLoading: false,
-    })
-    // Latest DesiredDelta command for brightness is Failed.
-    mockUsePropertyCommands.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 1,
-            product_id: 'product-a',
-            device_id: 'test-device-001',
-            command: { brightness: 80 },
-            status: 'Failed',
-            source: 'DesiredDelta',
-            created_time: '2025-01-01T09:00:00Z',
-            updated_time: '2025-01-01T09:01:00Z',
-          },
-        ],
-        pagination: undefined,
-      },
-      isLoading: false,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Delivery failed')
-  })
-
-  test('shows queued status when desired delta command is pending', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    mockUsePropertyShadow.mockReturnValue({
-      data: {
-        desired: { brightness: 80 },
-        reported: {},
-        delta: { brightness: 80 },
-        desired_updated_time: '2025-01-01T09:00:00Z',
-        reported_updated_time: null,
-      },
-      isLoading: false,
-    })
-    mockUsePropertyCommands.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 1,
-            product_id: 'product-a',
-            device_id: 'test-device-001',
-            command: { brightness: 80 },
-            status: 'Pending',
-            source: 'DesiredDelta',
-            created_time: '2025-01-01T09:00:00Z',
-            updated_time: '2025-01-01T09:00:00Z',
-          },
-        ],
-        pagination: undefined,
-      },
-      isLoading: false,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Queued')
-  })
-
-  test('shows replied not converged when command succeeded but reported still differs', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    // desired brightness=80, reported brightness=50 => not converged despite ack.
-    mockUsePropertyShadow.mockReturnValue({
-      data: {
-        desired: { brightness: 80 },
-        reported: { brightness: { value: 50, time: '2025-01-01T10:00:00Z' } },
-        delta: { brightness: 80 },
-        desired_updated_time: '2025-01-01T09:00:00Z',
-        reported_updated_time: '2025-01-01T10:00:00Z',
-      },
-      isLoading: false,
-    })
-    mockUsePropertyCommands.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 1,
-            product_id: 'product-a',
-            device_id: 'test-device-001',
-            command: { brightness: 80 },
-            status: 'Success',
-            source: 'DesiredDelta',
-            created_time: '2025-01-01T09:00:00Z',
-            updated_time: '2025-01-01T09:01:00Z',
-          },
-        ],
-        pagination: undefined,
-      },
-      isLoading: false,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent(
-      'Replied, not converged'
-    )
-  })
-
-  test('ignores one-shot commands when resolving desired status', async () => {
-    const user = userEvent.setup()
-    setupMocks()
-    // desired brightness=80, reported missing => not converged, no DesiredDelta
-    // command exists. A one-shot command on the same key must NOT be correlated.
-    mockUsePropertyShadow.mockReturnValue({
-      data: {
-        desired: { brightness: 80 },
-        reported: {},
-        delta: { brightness: 80 },
-        desired_updated_time: '2025-01-01T09:00:00Z',
-        reported_updated_time: null,
-      },
-      isLoading: false,
-    })
-    mockUsePropertyCommands.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 1,
-            product_id: 'product-a',
-            device_id: 'test-device-001',
-            command: { brightness: 10 },
-            status: 'Success',
-            source: 'OneShot',
-            created_time: '2025-01-01T08:00:00Z',
-            updated_time: '2025-01-01T08:01:00Z',
-          },
-        ],
-        pagination: undefined,
-      },
-      isLoading: false,
-    })
-
-    renderWithProviders(<Page />)
-    await openTab(user, 'Shadow')
-
-    // One-shot command ignored => falls back to "Pending convergence".
-    expect(screen.getByTestId('shadow-status-brightness')).toHaveTextContent('Pending convergence')
-  })
-})
-
 describe('Factory metadata section', () => {
   const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
 
@@ -820,16 +744,14 @@ describe('Factory metadata section', () => {
     setupMocks()
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     expect(screen.getByTestId('factory-metadata-section')).toBeInTheDocument()
   })
 
-  test('shows device-level metadata not available placeholder', async () => {
+  test('hides device-level metadata block when metadata is absent', async () => {
     const user = userEvent.setup()
     setupMocks()
-    // deviceMetadata is reserved/always null this round; the section surfaces
-    // an explicit "not available" hint rather than rendering nothing.
     mockUseFactoryMetadata.mockReturnValue({
       data: makeFactoryDeviceView({ deviceMetadata: null }),
       isLoading: false,
@@ -837,11 +759,10 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
-    expect(screen.getByText(/Device-level metadata:/i)).toHaveTextContent(
-      'Device-level metadata: not available'
-    )
+    expect(screen.queryByTestId('factory-device-metadata-block')).not.toBeInTheDocument()
+    expect(screen.queryByText(/not available/i)).not.toBeInTheDocument()
   })
 
   test('renders device-level metadata content when deviceMetadata is present', async () => {
@@ -856,7 +777,7 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     // Narrow to the device-level block (avoids catching the section container,
     // which also includes component-level rows / fallbacks).
@@ -890,7 +811,7 @@ describe('Factory metadata section', () => {
     }))
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     await user.click(screen.getByTestId('factory-device-changes-btn'))
 
@@ -922,7 +843,7 @@ describe('Factory metadata section', () => {
     }))
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     // Component-level entry: drawer queries with the component SN.
     await user.click(screen.getByTestId('factory-component-changes-btn-comp-camera-001'))
@@ -959,7 +880,7 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     for (const sn of ['comp-camera-001', 'comp-sensor-002']) {
       expect(screen.getByTestId(`factory-component-row-${sn}`)).toBeInTheDocument()
@@ -1003,7 +924,7 @@ describe('Factory metadata section', () => {
       })
 
       renderWithProviders(<Page />)
-      await openTab(user, 'Factory Metadata')
+      await openTab(user, 'Metadata')
 
       expect(screen.getByTestId('factory-component-row-comp-camera-001')).toBeInTheDocument()
       // The fallback text must appear somewhere inside the section.
@@ -1023,7 +944,7 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     expect(screen.queryByTestId('component-change-log-drawer')).not.toBeInTheDocument()
 
@@ -1049,7 +970,7 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     await user.click(screen.getByTestId('factory-component-changes-btn-comp-camera-001'))
 
@@ -1067,10 +988,10 @@ describe('Factory metadata section', () => {
     })
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
     expect(screen.getByTestId('factory-metadata-error')).toBeInTheDocument()
-    // Non-404 errors surface via a sonner toast (mirrors shadow error path).
+    // Non-404 errors surface via a sonner toast.
     const { toast } = await import('sonner')
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
@@ -1080,7 +1001,7 @@ describe('Factory metadata section', () => {
     })
   })
 
-  test('shows empty state card when hook returns 404 error', async () => {
+  test('renders no empty-state description when hook returns 404 error', async () => {
     const user = userEvent.setup()
     setupMocks()
     // react-query exposes the thrown backend 404 body as `error`. The factory
@@ -1098,11 +1019,10 @@ describe('Factory metadata section', () => {
     vi.mocked(toast.error).mockClear()
 
     renderWithProviders(<Page />)
-    await openTab(user, 'Factory Metadata')
+    await openTab(user, 'Metadata')
 
-    expect(screen.getByTestId('factory-metadata-empty')).toHaveTextContent(
-      'This device has no factory metadata'
-    )
+    expect(screen.queryByTestId('factory-metadata-empty')).not.toBeInTheDocument()
+    expect(screen.queryByText('This device has no factory metadata')).not.toBeInTheDocument()
     // No error card and no toast on the 404 branch.
     expect(screen.queryByTestId('factory-metadata-error')).not.toBeInTheDocument()
     expect(toast.error).not.toHaveBeenCalled()

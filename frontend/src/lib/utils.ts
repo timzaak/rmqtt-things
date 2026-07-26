@@ -28,3 +28,21 @@ export function extractErrorMessage(error: unknown): string {
   }
   return String(error)
 }
+
+/**
+ * Render an arbitrary value (often a JSON payload) as a compact string for
+ * table cells: `null`/`undefined` -> '-', objects -> JSON, else `String(value)`.
+ */
+export function formatValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return '-'
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return String(value)
+    }
+  }
+  return String(value)
+}

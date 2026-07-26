@@ -97,6 +97,21 @@ pub struct PropertyCommand {
     pub updated_time: OffsetDateTime,
 }
 
+/// Internal row of the unified device-operation UNION ALL projection.
+/// `operation_type` stays a raw string here; the repository converts it
+/// explicitly into `DeviceOperationType` and treats an unknown constant as an
+/// internal error (no SQL details leak to the client).
+#[derive(Debug, FromRow)]
+pub struct DeviceOperationRow {
+    pub operation_id: String,
+    pub operation_type: String,
+    pub name: String,
+    pub payload: JsonValue,
+    pub status: CommandStatus,
+    pub created_time: OffsetDateTime,
+    pub updated_time: OffsetDateTime,
+}
+
 /// Persisted one-shot action/service invocation (thing-model-extension,
 /// design §4.3.2/§5.2). Physically isolated from `PropertyCommand` per design
 /// A2 — one-shot actions (reboot / unlock / buzzer) live in their own table

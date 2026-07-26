@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { toast } from '@/components/ui/sonner'
 import { useFactoryMetadata } from '@/hooks/useFactoryMetadata'
-import { extractErrorMessage, formatDatetime } from '@/lib/utils'
+import { extractErrorMessage, formatDatetime, formatValue } from '@/lib/utils'
 import type { FileAttachment, FactoryComponentView } from '@/lib/api-generated/types.gen'
 import { ComponentChangeLogDrawer } from './ComponentChangeLogDrawer'
 
@@ -82,20 +82,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
-function formatValue(value: unknown): string {
-  if (value === undefined || value === null) {
-    return '-'
-  }
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value)
-    } catch {
-      return String(value)
-    }
-  }
-  return String(value)
-}
-
 interface FactoryComponentRow {
   componentSn: string
   componentType: string | null
@@ -146,9 +132,8 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
   const [selectedSn, setSelectedSn] = useState<string | null>(null)
   const [deviceLogOpen, setDeviceLogOpen] = useState(false)
 
-  // Surface non-404 errors via toast (consistent with PropertyShadowSection's
-  // error styling). The 404 "no metadata" branch is a normal empty state and
-  // must NOT toast.
+  // Surface non-404 errors via toast. The 404 "no metadata" branch is a
+  // normal empty state and must NOT toast.
   useEffect(() => {
     if (isError && !isNotFoundError(error)) {
       toast.error('Failed to load factory metadata', {
@@ -157,7 +142,6 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
     }
   }, [isError, error])
 
-  const showNotFoundCard = isError && isNotFoundError(error)
   const showGenericErrorCard = isError && !isNotFoundError(error)
 
   const rows = data ? data.components.map(toRow) : []
@@ -237,57 +221,49 @@ export function FactoryMetadataSection({ deviceSn }: FactoryMetadataSectionProps
         </p>
       </div>
 
-      <p
-        className="mb-4 rounded-xl px-4 py-2 text-[12px]"
-        style={{
-          color: 'var(--color-text-muted)',
-          background: 'var(--color-surface-1)',
-          border: '1px solid var(--color-border)',
-        }}
-        data-testid="factory-device-metadata-block"
-      >
-        {`Device-level metadata:${data?.deviceMetadata ? '' : ' not available'}`}
-        {data?.deviceMetadata && (
-          <>
-            <pre
-              className="mt-2 overflow-auto text-[11px]"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {formatValue(data.deviceMetadata.metadata)}
-            </pre>
-            <FileAttachmentLinks
-              attachments={
-                (data.deviceMetadata.fileAttachments ?? []) as unknown as FileAttachment[]
-              }
-            />
-            {data.deviceMetadata.updatedAt && (
-              <span style={{ display: 'block', marginTop: '4px' }}>
-                Updated {formatDatetime(data.deviceMetadata.updatedAt)}
-              </span>
-            )}
-            <button
-              data-testid="factory-device-changes-btn"
-              onClick={() => setDeviceLogOpen(true)}
-              className="mt-2 text-[12px] font-medium hover:underline transition-opacity hover:opacity-80"
-              style={{ color: 'var(--color-accent)' }}
-            >
-              View change log
-            </button>
-          </>
-        )}
-      </p>
-
-      {showNotFoundCard ? (
-        <p style={placeholderCardStyle} data-testid="factory-metadata-empty">
-          This device has no factory metadata
+      {data?.deviceMetadata && (
+        <p
+          className="mb-4 rounded-xl px-4 py-2 text-[12px]"
+          style={{
+            color: 'var(--color-text-muted)',
+            background: 'var(--color-surface-1)',
+            border: '1px solid var(--color-border)',
+          }}
+          data-testid="factory-device-metadata-block"
+        >
+          Device-level metadata:
+          <pre
+            className="mt-2 overflow-auto text-[11px]"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            {formatValue(data.deviceMetadata.metadata)}
+          </pre>
+          <FileAttachmentLinks
+            attachments={(data.deviceMetadata.fileAttachments ?? []) as unknown as FileAttachment[]}
+          />
+          {data.deviceMetadata.updatedAt && (
+            <span style={{ display: 'block', marginTop: '4px' }}>
+              Updated {formatDatetime(data.deviceMetadata.updatedAt)}
+            </span>
+          )}
+          <button
+            data-testid="factory-device-changes-btn"
+            onClick={() => setDeviceLogOpen(true)}
+            className="mt-2 text-[12px] font-medium hover:underline transition-opacity hover:opacity-80"
+            style={{ color: 'var(--color-accent)' }}
+          >
+            View change log
+          </button>
         </p>
-      ) : showGenericErrorCard ? (
+      )}
+
+      {showGenericErrorCard ? (
         <p style={placeholderCardStyle} data-testid="factory-metadata-error">
           Failed to load factory metadata
         </p>
-      ) : (
+      ) : !isError ? (
         <DataTable columns={columns} data={rows} loading={isLoading} emptyMessage="No components" />
-      )}
+      ) : null}
 
       <ComponentChangeLogDrawer
         key={drawerSn ?? 'closed'}

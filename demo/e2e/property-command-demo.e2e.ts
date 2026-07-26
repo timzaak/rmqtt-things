@@ -8,6 +8,17 @@
  * 2. 设备离线时通过 API 创建属性命令 -> 命令状态为 Pending，前端可见
  * 3. 删除 Pending 状态的命令 -> 命令从列表中移除
  *
+ * DE-D02 适配（device-detail-experience 七区信息架构）：旧 PropertyCommandsSection
+ * 已删除，一次性属性命令历史汇入统一 Operations 表（DeviceOperationsSection.tsx），
+ * 下发入口收敛到 Operations tab 的 More ▾ → Direct property write
+ * （DirectPropertyWriteDialog.tsx）。变化点：
+ * - openCommandsTab → openOperationsTab：点击 device-tab-operations
+ * - 分区 heading "Property Commands" → "Operations"（断言落在 device-operations-table）
+ * - 旧 "Send Command" 按钮 → More ▾ → Direct property write（direct-property-write-dialog /
+ *   command-json-input / target-conflict-warning）
+ * 后端 API（POST /api/admin/property/command 创建、DELETE、GET 状态机）行为不变，
+ * 持久 API 断言保持原样。
+ *
  * 前置条件：系统中已有产品 "demo_product"。
  * 前置条件：RMQTT broker 运行在 MQTT_URL (默认 mqtt://127.0.0.1:1883)。
  * 前置条件：后端 API 运行在 BASE_URL (默认 http://localhost:8080)。
@@ -37,23 +48,22 @@ interface PropertyCommandRow {
 }
 
 /**
- * 导航到设备详情页并切换到 Commands tab（DE-D05，镜像 DE-D04 openShadowTab）。
+ * 导航到设备详情页并切换到 Operations tab。
  *
- * 设备详情页默认 activeTab='overview'，PropertyCommandsSection 仅在
- * activeTab==='commands' 时渲染（show.$id.tsx:125）。原测试在导航后直接查询
- * "Send Command" 按钮或 "Property Commands" 分区，但从不点 Commands tab，导致
- * 用例失败（与 DE-D04 修过的 Shadow tab 问题同源）。参照 openShadowTab
- * （device-shadow-demo.e2e.ts）与 openActionsTab（action-invocation-demo.e2e.ts）
- * 模式，在导航后显式点击 Commands tab 再断言分区可见。Tab 标签文案集中在
- * SELECTORS.deviceTabs。
+ * DE-D02：设备详情页默认 activeTab='overview'，DeviceOperationsSection 仅在
+ * activeTab==='operations' 时渲染（show.$id.tsx:126-128）。Tab 由 data-testid
+ * `device-tab-operations` 定位（优先用 testid），分区 heading "Operations" 为
+ * 持久锚点。Tab 选择器集中在 SELECTORS.deviceTabs.operationsTab。
  */
-async function openCommandsTab(page: Page, deviceId: string): Promise<void> {
-  await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
+async function openOperationsTab(page: Page, deviceId: string): Promise<void> {
+  // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
+    waitUntil: 'commit',
+  })
   await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
-  // The Commands tab is rendered alongside Overview / Shadow / Actions (show.$id.tsx TABS).
-  await page.getByRole('tab', { name: SELECTORS.deviceTabs.commandsTab }).click()
-  // The section heading is the persistent anchor for the property commands panel.
-  await expect(page.getByRole('heading', { name: 'Property Commands' })).toBeVisible()
+  await page.locator(SELECTORS.deviceTabs.operationsTab).click()
+  await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible()
 }
 
 test.describe('Property Command (US-PA-016)', () => {
@@ -74,19 +84,20 @@ test.describe('Property Command (US-PA-016)', () => {
       await updateProduct(request, productId, { auto_provisioning: true })
       await device.connect()
 
-      // 导航到设备详情页并切换到 Commands tab（默认 overview tab 不渲染
-      // PropertyCommandsSection，"Send Command" 按钮在 Commands tab 内）。
-      await openCommandsTab(page, deviceId)
+      // 导航到设备详情页并切换到 Operations tab（DE-D02：属性命令入口收敛到
+      // Operations.region 的 More ▾ → Direct property write）。
+      await openOperationsTab(page, deviceId)
 
-      // Open the Send Command dialog
-      await page.getByRole('button', { name: 'Send Command' }).click()
+      // DE-D02：下发入口为 More ▾ → Direct property write（SELECTORS.operations.*，
+      // 禁止硬编码 testid）。
+      await page.locator(SELECTORS.operations.moreActionsButton).click()
+      await page.locator(SELECTORS.operations.directPropertyWriteButton).click()
 
       // Fill in command JSON in the dialog textarea
       const commandPayload = { power: false, brightness: 55 }
-      const dialog = page.locator('.fixed.inset-0.z-50')
+      const dialog = page.locator(SELECTORS.operations.directWriteDialog)
       await expect(dialog).toBeVisible()
-      const textarea = dialog.locator('textarea')
-      await textarea.fill(JSON.stringify(commandPayload))
+      await dialog.locator(SELECTORS.operations.directWriteJsonInput).fill(JSON.stringify(commandPayload))
 
       // Set up command waiter before clicking Send
       const commandPromise = device.waitForCommand()
@@ -104,9 +115,10 @@ test.describe('Property Command (US-PA-016)', () => {
       // Reply to complete the command
       await device.replyCommand(command)
 
-      // Verify command appears in the table with Success status
-      const commandSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Property Commands' }) })
-      await expect(commandSection.getByText('success')).toBeVisible({ timeout: POLL_TIMEOUT })
+      // DE-D02：命令状态在统一 Operations 表中显示（device-operations-table）。
+      // StatusBadge 渲染 CommandStatus 枚举字符串（StatusBadge.tsx），Success 行可见。
+      const operationsTable = page.locator(SELECTORS.operations.table)
+      await expect(operationsTable.getByText('Success', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
@@ -147,11 +159,11 @@ test.describe('Property Command (US-PA-016)', () => {
         return String(row.status)
       }, { timeout: POLL_TIMEOUT }).toBe('Pending')
 
-      // 导航到设备详情页并切换到 Commands tab，确认 Pending 命令可见
-      await openCommandsTab(page, deviceId)
+      // 导航到设备详情页并切换到 Operations tab，确认 Pending 命令在统一表中可见
+      await openOperationsTab(page, deviceId)
 
-      const commandSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Property Commands' }) })
-      await expect(commandSection.getByText('Pending')).toBeVisible({ timeout: POLL_TIMEOUT })
+      const operationsTable = page.locator(SELECTORS.operations.table)
+      await expect(operationsTable.getByText('Pending', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
     } finally {
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
@@ -180,23 +192,41 @@ test.describe('Property Command (US-PA-016)', () => {
       })
       expect(createResponse.status()).toBe(201)
 
-      // 导航到设备详情页并切换到 Commands tab（默认 overview tab 不渲染
-      // PropertyCommandsSection，Pending 行在 Commands tab 内）。
-      await openCommandsTab(page, deviceId)
+      // 导航到设备详情页并切换到 Operations tab（DE-D02：Pending 行在统一表中）。
+      await openOperationsTab(page, deviceId)
+      const operationsTable = page.locator(SELECTORS.operations.table)
+      await expect(operationsTable.getByText('Pending', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
 
-      // Find the command row with Pending status for this device
-      const commandSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Property Commands' }) })
-      await expect(commandSection.getByText('Pending')).toBeVisible({ timeout: POLL_TIMEOUT })
+      // DE-D02：统一 Operations 表第一阶段不暴露行内 Delete 入口（设计 §5.3：
+      // "第一阶段可不展示统一取消按钮，以减少误操作"；DeviceOperationsSection 列定义
+      // 无 Action/Delete 列）。Pending 命令的取消入口在原 DELETE /admin/property/command
+      // 端点（ids 查询参数；仅 status=Pending 的行可被软删）。先从 GET 列表提取命令 id，
+      // 再调用 DELETE，与前端基线 UI 不可达的取消路径等价。
+      const beforeDelete = await getJson<ListResponse<PropertyCommandRow>>(
+        request,
+        `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,
+      )
+      const pendingRow = beforeDelete.data?.find((row) => String(row.status) === 'Pending')
+      expect(pendingRow, 'Pending command should exist before delete').toBeDefined()
+      const commandId = pendingRow!.id
 
-      // Click the Delete button in the Pending command row
-      const pendingRow = commandSection.locator('tr').filter({ hasText: 'Pending' })
-      await expect(pendingRow.getByRole('button', { name: 'Delete' })).toBeVisible()
-      await pendingRow.getByRole('button', { name: 'Delete' }).click()
+      const deleteResponse = await request.delete('/api/admin/property/command', {
+        // 后端 DeletePropertyCommandsQuery.ids: Vec<i64>，axum Query 解析器要求
+        // 重复的 `ids=` 查询参数；Playwright params 仅接受标量值，故显式构造
+        // URLSearchParams 以正确表达单元素序列（ids=123 => vec![123]）。
+        params: new URLSearchParams([['ids', String(commandId)]]),
+      })
+      expect(deleteResponse.status()).toBeLessThan(300)
 
-      // Verify the command status changed to Deleted (soft delete)
-      await expect(commandSection.getByText('Deleted')).toBeVisible({ timeout: POLL_TIMEOUT })
+      // DE-D02：统一操作表反映状态变更。重新加载页面触发 useDeviceOperations 重新查询
+      // （前端不会主动失效），Deleted 行可见。用 page.reload() 而非再次 page.goto，
+      // 避免 Vite dev server 下连续同 URL goto 偶发卡死（DE-TR01 修复）。
+      await page.reload({ waitUntil: 'commit' })
+      await page.locator(SELECTORS.deviceTabs.operationsTab).click()
+      await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible()
+      await expect(operationsTable.getByText('Deleted', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
 
-      // Double-check via API that the command status is Deleted
+      // 持久业务状态：API 层确认该命令 status=Deleted（软删）。
       const body = await getJson<ListResponse<PropertyCommandRow>>(
         request,
         `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,

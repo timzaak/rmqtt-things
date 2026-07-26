@@ -225,12 +225,13 @@ curl "http://localhost:8080/api/admin/property?product_id=demo&page=1&page_size=
 |------|------|------|------|
 | product_id | string | 是 | 产品 ID |
 | device_id | string | 否 | 设备 ID |
-| status | int16 | 否 | 0=pending, 1=sent, 2=success, 3=failed, 4=deleted |
+| status | string | 否 | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| source | string | 否 | 命令来源：`OneShot`（一次性写入）/ `DesiredDelta`（Target 同步）；缺省返回全部，筛选在分页前生效 |
 | page | int64 | 否 | 页码 |
 | page_size | int64 | 否 | 每页条数 |
 
 ```bash
-curl "http://localhost:8080/api/admin/property/command?product_id=demo&status=0"
+curl "http://localhost:8080/api/admin/property/command?product_id=demo&status=Pending&source=OneShot"
 ```
 
 #### POST /api/admin/property/command
@@ -397,6 +398,45 @@ curl -X DELETE "http://localhost:8080/api/admin/service/command?ids=1,2,3"
 响应：`204 No Content`
 
 > 动作调用的设备端协议、`set_reply` 回环与离线排队见 [物模型协议规范](thing-model-spec.md) 的动作 / 服务调用章节。
+
+### 统一操作历史
+
+统一操作历史把三类平台操作——Target 同步（`targetSync`）、直接属性写入（`directPropertyWrite`）、动作调用（`actionInvocation`）——聚合为一个只读视图，供设备详情页展示操作历史。它只做读侧聚合：三类写入仍走各自原有入口，状态机与持久化语义不变，不提供统一取消/重试。产品语义见 [设备详情信息架构 PRD](../prd/core/device-detail-experience.md)。
+
+#### GET /api/admin/device/operation
+
+查询统一操作历史，按最近状态变更时间倒序排列；排序、筛选、分页均在后端完成。
+
+```bash
+curl "http://localhost:8080/api/admin/device/operation?product_id=demo&device_id=device1&operation_type=targetSync&status=Success&page=1&page_size=10"
+```
+
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| product_id | string | 是 | 产品 ID |
+| device_id | string | 否 | 不传则查产品下全部设备 |
+| operation_type | string | 否 | `targetSync` / `directPropertyWrite` / `actionInvocation`；缺省返回全部类型 |
+| status | string | 否 | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| page | int | 否 | 默认 1 |
+| page_size | int | 否 | 默认 10 |
+
+响应：`200 OK`，`data` 为操作视图数组，`pagination` 含 `page` / `page_size` / `total`。
+
+操作视图字段（camelCase）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| operationId | string | 稳定组合 ID：属性类操作为 `property:{id}`，动作调用为 `action:{id}` |
+| operationType | string | `targetSync` / `directPropertyWrite` / `actionInvocation` |
+| name | string | 直接属性写入固定为 `Set properties`，Target 同步固定为 `Sync target`，动作调用为 serviceType |
+| payload | object | 属性 command 或动作 params |
+| status | string | `Pending` / `Sent` / `Success` / `Failed` / `Deleted` |
+| createdTime | string | 创建时间（RFC3339） |
+| updatedTime | string | 最近状态变更时间（RFC3339） |
+
+> `status` 表示投递/执行结果，不代表属性已同步到 Target；属性同步状态由 `GET /api/admin/property/shadow` 的 delta 视图判定。
 
 ### 事件
 

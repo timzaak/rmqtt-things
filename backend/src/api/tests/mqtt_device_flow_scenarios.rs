@@ -1016,10 +1016,11 @@ async fn scenario_service_set_subscribe_skips_drain_when_not_subscribed(
     let (_, pending_count) = ctx
         ._app_state
         .db
-        .query_property_commands(
+        .query_property_commands_by_source(
             product_id,
             Some(device_id),
             Some(CommandStatus::Pending),
+            None,
             1,
             100,
         )

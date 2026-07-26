@@ -79,6 +79,26 @@ describe('auth helpers', () => {
     await expect(checkAuth()).rejects.toThrow('Auth probe failed with HTTP 503')
   })
 
+  test('surfaces an auth probe network error without masking it as a status read failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input.toString()
+        if (url.includes('/api/auth/config')) {
+          return Promise.resolve(new Response(authEnabled.body, { status: authEnabled.status }))
+        }
+        return Promise.reject(new TypeError('Failed to fetch'))
+      })
+    )
+
+    await expect(checkAuth()).rejects.toThrow('Auth probe failed before receiving an HTTP response')
+  })
+
   test('returns the login_url from config', async () => {
     mockFetch({ '/api/auth/config': authEnabled, '/api/admin/product': ok })
 

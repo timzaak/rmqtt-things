@@ -49,9 +49,9 @@ export function buildLoginRedirectUrl(currentHref: string = window.location.href
 
 export function handle401(): void {
   if (isRedirecting) return
-  isRedirecting = true
   const redirectUrl = buildLoginRedirectUrl()
   resetAuthCheck()
+  isRedirecting = true
   window.location.href = redirectUrl
 }
 
@@ -69,11 +69,16 @@ export async function checkAuth(): Promise<boolean> {
     })
       .then((response) => {
         if ('error' in response) {
-          if (response.response.status === 401) {
+          const status = response.response?.status
+          if (status === 401) {
             return false
           }
 
-          throw new Error(`Auth probe failed with HTTP ${response.response.status}`)
+          if (status === undefined) {
+            throw new Error('Auth probe failed before receiving an HTTP response')
+          }
+
+          throw new Error(`Auth probe failed with HTTP ${status}`)
         }
 
         return true

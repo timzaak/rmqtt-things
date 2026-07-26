@@ -1,3 +1,7 @@
+use crate::api::admin_models::{
+    DeviceOperationListResponse, DeviceOperationQuery, DeviceOperationType, DeviceOperationView,
+    PaginationInfo,
+};
 use crate::api::web_models::{DeviceConnectRequest, DeviceDisconnectRequest};
 use crate::config::AlarmConfig;
 use crate::db::alarm::AlarmRepo;
@@ -289,12 +293,15 @@ impl DatabaseService {
         Ok(result)
     }
 
-    // 查询属性命令（用于管理接口）
-    pub async fn query_property_commands(
+    // 查询属性命令，额外支持可选 `source` 筛选。
+    // 筛选同时进入数据查询与 count 查询，并在分页（LIMIT/OFFSET）之前生效；
+    // `source=None` 时与不筛选的行为完全一致。
+    pub async fn query_property_commands_by_source(
         &self,
         product_id: &str,
         device_id: Option<&str>,
         status: Option<CommandStatus>,
+        source: Option<CommandSource>,
         page: i64,
         page_size: i64,
     ) -> anyhow::Result<(Vec<PropertyCommand>, i64)> {
@@ -307,6 +314,11 @@ impl DatabaseService {
         if let Some(status) = status {
             query_builder.push(" AND status = ");
             query_builder.push_bind(status);
+        }
+
+        if let Some(source) = source {
+            query_builder.push(" AND source = ");
+            query_builder.push_bind(source);
         }
 
         query_builder.push(" ORDER BY updated_time DESC");
@@ -328,11 +340,135 @@ impl DatabaseService {
             count_builder.push_bind(status);
         }
 
+        if let Some(source) = source {
+            count_builder.push(" AND source = ");
+            count_builder.push_bind(source);
+        }
+
         let count_row = count_builder.build().fetch_one(&self.pool).await?;
 
         let total: i64 = count_row.get("count");
 
         Ok((commands, total))
+    }
+
+    // 统一设备操作只读查询。
+    //
+    // 跨 `property_command`（source=0 → directPropertyWrite，source=1 →
+    // targetSync）与 `action_invocation`（→ actionInvocation）做 UNION ALL
+    // 投影，外层按 `updated_time DESC, operation_id DESC` 稳定排序后再分页。
+    // count 使用同样过滤条件的 UNION ALL 子查询，保证 pagination.total 一致。
+    // `operation_id` 为稳定组合 ID（`property:{id}` / `action:{id}`）；属性命令
+    // 的 `name` 固定为 `Set properties` / `Sync target`（前端摘要规则依赖该
+    // 字面值），动作取 `service_type`。
+    pub async fn query_device_operations(
+        &self,
+        query: &DeviceOperationQuery,
+    ) -> anyhow::Result<DeviceOperationListResponse> {
+        let mut data_builder = QueryBuilder::new("SELECT * FROM (");
+        Self::push_device_operation_union(&mut data_builder, query);
+        data_builder.push(") AS ops ORDER BY updated_time DESC, operation_id DESC");
+        Self::add_pagination(&mut data_builder, query.page, query.page_size);
+
+        let rows = data_builder
+            .build_query_as::<DeviceOperationRow>()
+            .fetch_all(&self.pool)
+            .await?;
+
+        // DB 内部行将 operation_type 读为字符串后显式转换；
+        // 非法常量属于内部错误，不向外泄露 SQL 信息。
+        let mut operations = Vec::with_capacity(rows.len());
+        for row in rows {
+            let operation_type = match row.operation_type.as_str() {
+                "directPropertyWrite" => DeviceOperationType::DirectPropertyWrite,
+                "targetSync" => DeviceOperationType::TargetSync,
+                "actionInvocation" => DeviceOperationType::ActionInvocation,
+                other => {
+                    anyhow::bail!("unknown device operation type constant: {other}");
+                }
+            };
+            operations.push(DeviceOperationView {
+                operation_id: row.operation_id,
+                operation_type,
+                name: row.name,
+                payload: row.payload,
+                status: row.status,
+                created_time: row.created_time,
+                updated_time: row.updated_time,
+            });
+        }
+
+        let mut count_builder = QueryBuilder::new("SELECT COUNT(*) AS count FROM (");
+        Self::push_device_operation_union(&mut count_builder, query);
+        count_builder.push(") AS ops");
+
+        let count_row = count_builder.build().fetch_one(&self.pool).await?;
+        let total: i64 = count_row.get("count");
+
+        Ok(DeviceOperationListResponse {
+            data: operations,
+            pagination: PaginationInfo {
+                page: query.page,
+                page_size: query.page_size,
+                total,
+            },
+        })
+    }
+
+    // 向 builder 追加统一操作的 UNION ALL 投影（数据查询与 count 子查询共用，
+    // 保证过滤条件一致）。两个分支共享 product/device/status 过滤；type 过滤
+    // 各自映射：directPropertyWrite → property source=0，targetSync →
+    // source=1，actionInvocation → property 支恒空（反之 action 支恒空）。
+    fn push_device_operation_union<'a>(
+        builder: &mut QueryBuilder<'a, Postgres>,
+        query: &'a DeviceOperationQuery,
+    ) {
+        builder.push(
+            "SELECT 'property:' || id AS operation_id, \
+             CASE source WHEN 0 THEN 'directPropertyWrite' WHEN 1 THEN 'targetSync' END AS operation_type, \
+             CASE source WHEN 0 THEN 'Set properties' WHEN 1 THEN 'Sync target' END AS name, \
+             command AS payload, status, created_time, updated_time \
+             FROM property_command WHERE 1=1",
+        );
+        Self::add_device_product_filter(builder, &query.product_id, query.device_id.as_deref());
+        if let Some(status) = query.status {
+            builder.push(" AND status = ");
+            builder.push_bind(status);
+        }
+        match query.operation_type {
+            Some(DeviceOperationType::DirectPropertyWrite) => {
+                builder.push(" AND source = ");
+                builder.push_bind(CommandSource::OneShot);
+            }
+            Some(DeviceOperationType::TargetSync) => {
+                builder.push(" AND source = ");
+                builder.push_bind(CommandSource::DesiredDelta);
+            }
+            Some(DeviceOperationType::ActionInvocation) => {
+                builder.push(" AND 1=0");
+            }
+            None => {}
+        }
+
+        builder.push(" UNION ALL ");
+
+        builder.push(
+            "SELECT 'action:' || id AS operation_id, 'actionInvocation' AS operation_type, \
+             service_type AS name, params AS payload, status, created_time, updated_time \
+             FROM action_invocation WHERE 1=1",
+        );
+        Self::add_device_product_filter(builder, &query.product_id, query.device_id.as_deref());
+        if let Some(status) = query.status {
+            builder.push(" AND status = ");
+            builder.push_bind(status);
+        }
+        match query.operation_type {
+            Some(DeviceOperationType::DirectPropertyWrite)
+            | Some(DeviceOperationType::TargetSync) => {
+                builder.push(" AND 1=0");
+            }
+            _ => {}
+        }
     }
 
     // 查询最新属性

@@ -17,7 +17,7 @@
  */
 import { client } from '@/lib/api-generated/client.gen'
 import { refreshToken } from '@/lib/api-generated/sdk.gen'
-import { handle401, resetAuthCheck } from '@/lib/auth'
+import { handle401 } from '@/lib/auth'
 
 /** Single in-flight refresh promise; shared by every concurrent 401. */
 let inflightRefresh: Promise<boolean> | null = null
@@ -44,7 +44,6 @@ export function refreshAccessToken(): Promise<boolean> {
     .catch(() => {
       // Refresh rejected (refresh cookie missing/expired/revoked) — the session
       // is genuinely gone. Clear caches and bounce to login; do not retry.
-      resetAuthCheck()
       handle401()
       return false
     })

@@ -178,10 +178,11 @@ pub async fn get_property_commands(
 
     let (commands, total) = state
         .db
-        .query_property_commands(
+        .query_property_commands_by_source(
             &query.product_id,
             query.device_id.as_deref(),
             query.status,
+            query.source,
             query.page,
             query.page_size,
         )
@@ -199,6 +200,45 @@ pub async fn get_property_commands(
             total,
         },
     };
+    Ok(Json(response))
+}
+
+// GET /api/admin/device/operation - read-only unified device-operation view.
+// UNION ALL of property_command (source splits directPropertyWrite / targetSync)
+// and action_invocation. Read-only: no unified cancel/retry. The `/admin/device`
+// middleware prefix already grants `device:read`, no extra auth needed.
+#[utoipa::path(
+    get,
+    path = "/api/admin/device/operation",
+    tag = "admin",
+    params(DeviceOperationQuery),
+    responses(
+        (status = 200, description = "Device operations", body = DeviceOperationListResponse),
+        (status = 400, description = "Invalid identifier, enum or pagination")
+    )
+)]
+pub async fn get_device_operations(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<DeviceOperationQuery>,
+) -> Result<Json<DeviceOperationListResponse>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&query.product_id, "product_id")?;
+    if let Some(ref did) = query.device_id {
+        validate_identifier(did, "device_id")?;
+    }
+    if query.page < 1 || query.page_size < 1 {
+        return Err(ApiError::bad_request("Invalid pagination"));
+    }
+
+    let response = state
+        .db
+        .query_device_operations(&query)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
     Ok(Json(response))
 }
 

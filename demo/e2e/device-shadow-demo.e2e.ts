@@ -16,6 +16,17 @@
  * 关键断言均落在持久业务状态（GET /api/admin/property/shadow 的 desired/delta，
  * GET /api/admin/property/command 的 status），不以 sonner/toast 为唯一验收依据。
  *
+ * DE-D02 适配（device-detail-experience 七区信息架构）：旧 PropertyShadowSection
+ * 已删除，期望状态管理迁移到 State & Configuration 分区
+ * （StateConfigurationSection.tsx）。变化点：
+ * - openShadowTab → openStateConfigurationTab：点击 device-tab-state-configuration
+ * - 分区 heading "Desired State (Shadow)" → "State & Configuration"
+ * - 旧 Set Desired State 对话框 → Update Target 对话框（target-update-button 入口 /
+ *   target-update-dialog / target-json-input / submit-button / cancel-button）
+ * - 旧 shadow-status-${kebabKey} 行结构 → state-configuration-table 内 Property 列 +
+ *   Sync 列（In sync / Out of sync / Target not set）
+ * kebab 规则使用 DE-D01 集中导出的 toKebabKey（禁止内联转换实现）。
+ *
  * 前置条件：系统中已有产品 "demo_product"。
  * 前置条件：RMQTT broker 运行在 MQTT_URL (默认 mqtt://127.0.0.1:1883)。
  * 前置条件：后端 API 运行在 BASE_URL (默认 http://localhost:8080)。
@@ -50,43 +61,39 @@ interface ShadowView {
 }
 
 /**
- * 对齐前端 toKebabKey（PropertyShadowSection.tsx）：
- * camelCase 边界插连字符、连续大写末尾插连字符、非字母数字折叠为单连字符、去首尾、小写。
- * 用于构造动态 testid `shadow-status-${kebabKey}`。
+ * 限定到 State & Configuration 分区，避免误匹配其它 section。
+ *
+ * DE-D02 校准：分区 heading 由旧 "Desired State (Shadow)" 改为
+ * "State & Configuration"（StateConfigurationSection.tsx:198）。
  */
-function shadowStatusSelector(key: string): string {
-  const kebab = key
-    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
-    .replace(/[^a-zA-Z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .toLowerCase()
-  return `[data-testid="shadow-status-${kebab}"]`
-}
-
-/** 限定到 "Desired State (Shadow)" 分区，避免误匹配其它 section。 */
-function shadowSection(page: import('@playwright/test').Page) {
+function stateConfigurationSection(page: import('@playwright/test').Page) {
   return page
     .locator('section')
-    .filter({ has: page.getByRole('heading', { name: 'Desired State (Shadow)' }) })
+    .filter({ has: page.getByRole('heading', { name: 'State & Configuration' }) })
 }
 
 /**
- * 导航到设备详情页并切换到 Shadow tab（DE-D04）。
+ * 导航到设备详情页并切换到 State & Configuration tab。
  *
- * 设备详情页默认 activeTab='overview'，PropertyShadowSection 仅在
- * activeTab==='shadow' 时渲染（show.$id.tsx:79/124）。原测试在导航后直接断言
- * Shadow 标题可见，但从不点 Shadow tab，导致用例失败。参照 DE-D02 的
- * openActionsTab 模式（action-invocation-demo.e2e.ts:61），在导航后显式点击
- * Shadow tab 再断言分区可见。Tab 标签文案集中在 SELECTORS.deviceTabs。
+ * DE-D02：设备详情页默认 activeTab='overview'，StateConfigurationSection 仅在
+ * activeTab==='state-configuration' 时渲染（show.$id.tsx:123-125）。Tab 由
+ * data-testid `device-tab-state-configuration` 定位（优先用 testid），分区
+ * heading "State & Configuration" 为持久锚点。Tab 选择器集中在
+ * SELECTORS.deviceTabs.stateConfigurationTab。
  */
-async function openShadowTab(page: import('@playwright/test').Page, deviceId: string): Promise<void> {
-  await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
+async function openStateConfigurationTab(
+  page: import('@playwright/test').Page,
+  deviceId: string,
+): Promise<void> {
+  // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  // 后续 toBeVisible/Click 自带重试，足以保证 DOM 就绪。
+  await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
+    waitUntil: 'commit',
+  })
   await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
-  // The Shadow tab is rendered alongside Overview / Commands / Actions (show.$id.tsx TABS).
-  await page.getByRole('tab', { name: SELECTORS.deviceTabs.shadowTab }).click()
-  // The section heading is the persistent anchor for the shadow panel.
-  await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+  await page.locator(SELECTORS.deviceTabs.stateConfigurationTab).click()
+  await expect(page.getByRole('heading', { name: 'State & Configuration' })).toBeVisible()
 }
 
 test.describe('Property Shadow (US-PA-042/043/044)', () => {
@@ -114,27 +121,27 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       await updateProduct(request, productId, { auto_provisioning: true })
       await device.connect()
 
-      // 导航到设备详情页并切换到 Shadow tab，确认 Shadow 分区存在
-      await openShadowTab(page, deviceId)
+      // 导航到设备详情页并切换到 State & Configuration tab，确认分区存在
+      await openStateConfigurationTab(page, deviceId)
 
-      // 初始空态：desired 为空时前端渲染该提示
-      await expect(shadowSection(page).getByText('No desired state set')).toBeVisible()
+      // 初始空态：desired 为空时前端渲染该提示（StateConfigurationSection.tsx:219）
+      await expect(stateConfigurationSection(page).getByText('No desired state set')).toBeVisible()
 
-      // 打开 Set Desired State 对话框
-      await page.locator(SELECTORS.shadow.setButton).click()
+      // 打开 Update Target 对话框（DE-D02：旧 Set Desired State 入口已改名）
+      await page.locator(SELECTORS.stateConfiguration.targetUpdateButton).click()
 
       // 在对话框编辑器中填入合法 JSON 对象
       const desiredPayload = { brightness: 80 }
-      const dialog = page.locator('.fixed.inset-0.z-50')
+      const dialog = page.locator(SELECTORS.stateConfiguration.updateDialog)
       await expect(dialog).toBeVisible()
-      await dialog.locator(SELECTORS.shadow.desiredEditor).fill(JSON.stringify(desiredPayload))
+      await dialog.locator(SELECTORS.stateConfiguration.targetJsonInput).fill(JSON.stringify(desiredPayload))
 
       // 在点击 submit 前启动命令等待，避免竞态
       const commandPromise = device.waitForCommand()
 
       // 提交 -> 对话框应关闭
-      await dialog.locator(SELECTORS.shadow.submitButton).click()
-      await expect(page.locator(SELECTORS.shadow.submitButton)).not.toBeVisible({ timeout: POLL_TIMEOUT })
+      await dialog.locator(SELECTORS.stateConfiguration.dialogSubmitButton).click()
+      await expect(page.locator(SELECTORS.stateConfiguration.updateDialog)).not.toBeVisible({ timeout: POLL_TIMEOUT })
 
       // 设备端：收到 delta 命令，params 应匹配发送的 desired
       const command = await commandPromise
@@ -155,6 +162,22 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         },
         { timeout: POLL_TIMEOUT },
       ).toBe(false)
+
+      // 辅助 UI 断言（非主验收）：State & Configuration 表内 brightness 行 Sync
+      // 列在收敛后显示 "In sync"（StateConfigurationSection.tsx:106）。
+      //
+      // DE-TR01 修复：useSetDesired 的 onSuccess 仅在 admin PUT 时失效
+      // property-shadow 查询（useProperties.ts:127-132），设备后续 replyCommand +
+      // postProperties 收敛不会触发前端 refetch。因此需重新加载页面拉取最新
+      // shadow 视图，否则 UI 停留在 PUT 后、reported 前的 "Out of sync" 快照。
+      await page.reload({ waitUntil: 'commit' })
+      await page.locator(SELECTORS.deviceTabs.stateConfigurationTab).click()
+      await expect(
+        stateConfigurationSection(page)
+          .locator('tr')
+          .filter({ hasText: 'brightness' })
+          .getByText('In sync'),
+      ).toBeVisible({ timeout: POLL_TIMEOUT })
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
@@ -224,8 +247,8 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
           { timeout: POLL_TIMEOUT },
         ).toBe('Success')
 
-        // 辅助 UI 断言：导航到详情页并切到 Shadow tab 可见 Shadow 分区（非主验收）
-        await openShadowTab(page, deviceId)
+        // 辅助 UI 断言：导航到详情页并切到 State & Configuration tab 可见分区（非主验收）
+        await openStateConfigurationTab(page, deviceId)
       } finally {
         await device.disconnect()
       }
@@ -301,14 +324,20 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredColorTemp: 400, deltaColorTemp: 400 })
 
-      // 辅助 UI 断言：导航到详情页并切到 Shadow tab，delta 行可见。DesiredDelta
-      // 命令已被设备 ack（Success）但 reported 仍偏离期望值（一次性命令覆盖为
-      // 999），故 Status 显示 "Replied, not converged"（非主验收）。
-      await openShadowTab(page, deviceId)
-      await expect(
-        shadowSection(page).locator(shadowStatusSelector('colorTemp')),
-      ).toBeVisible({ timeout: POLL_TIMEOUT })
-      await expect(shadowSection(page).getByText('Replied, not converged')).toBeVisible()
+      // 辅助 UI 断言（非主验收）：切到 State & Configuration tab，colorTemp 行
+      // 可见且 Sync 列显示 "Out of sync"（reported=999 偏离 target=400，
+      // StateConfigurationSection.tsx:102-104）。
+      //
+      // DE-D02 校准确认：StateConfigurationSection 的 Property 列以原始 key 渲染
+      // （accessor: 'key'，StateConfigurationSection.tsx:154），不经过 toKebabKey；
+      // toKebabKey 仅用于 data-testid（target-apply-button-${kebabKey} :180）。
+      // 因此行匹配器用原始 'colorTemp'（与 Scenario A 的 'brightness' 一致）。
+      await openStateConfigurationTab(page, deviceId)
+      const colorTempRow = stateConfigurationSection(page)
+        .locator('tr')
+        .filter({ hasText: 'colorTemp' })
+      await expect(colorTempRow).toBeVisible({ timeout: POLL_TIMEOUT })
+      await expect(colorTempRow.getByText('Out of sync')).toBeVisible()
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
@@ -347,16 +376,17 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       expect(text).toContain('desired must be a non-empty JSON object')
 
       // 辅助 UI 断言：通过 UI 提交空对象，前端视图 desired 仍为空（持久业务状态，非 toast）
-      await openShadowTab(page, deviceId)
+      await openStateConfigurationTab(page, deviceId)
 
-      await page.locator(SELECTORS.shadow.setButton).click()
-      const dialog = page.locator('.fixed.inset-0.z-50')
+      await page.locator(SELECTORS.stateConfiguration.targetUpdateButton).click()
+      const dialog = page.locator(SELECTORS.stateConfiguration.updateDialog)
       await expect(dialog).toBeVisible()
-      await dialog.locator(SELECTORS.shadow.desiredEditor).fill('{}')
-      await dialog.locator(SELECTORS.shadow.submitButton).click()
+      await dialog.locator(SELECTORS.stateConfiguration.targetJsonInput).fill('{}')
+      await dialog.locator(SELECTORS.stateConfiguration.dialogSubmitButton).click()
 
-      // 持久业务状态：shadow 视图仍为空态
-      await expect(shadowSection(page).getByText('No desired state set')).toBeVisible()
+      // 持久业务状态：State & Configuration 视图仍为空态（空对象被后端 400 拒绝，
+      // 前端 desired 未落库）
+      await expect(stateConfigurationSection(page).getByText('No desired state set')).toBeVisible()
     } finally {
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
@@ -417,13 +447,15 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredBrightness: 60, cmdStatus: 'Failed' })
 
-      // 辅助 UI 断言：切到 Shadow tab 后 delta 行可见。DesiredDelta 命令设备回复
-      // 失败（Failed），故 Status 显示 "Delivery failed"（持久业务状态为主验收）。
-      await openShadowTab(page, deviceId)
-      await expect(
-        shadowSection(page).locator(shadowStatusSelector('brightness')),
-      ).toBeVisible({ timeout: POLL_TIMEOUT })
-      await expect(shadowSection(page).getByText('Delivery failed')).toBeVisible()
+      // 辅助 UI 断言（非主验收）：切到 State & Configuration tab，brightness 行可见
+      // 且 Sync 列显示 "Out of sync"（desired=60 但 delta 仍含 brightness，因为
+      // DesiredDelta 命令 Failed 未收敛；StateConfigurationSection.tsx:102-104）。
+      await openStateConfigurationTab(page, deviceId)
+      const brightnessRow = stateConfigurationSection(page)
+        .locator('tr')
+        .filter({ hasText: 'brightness' })
+      await expect(brightnessRow).toBeVisible({ timeout: POLL_TIMEOUT })
+      await expect(brightnessRow.getByText('Out of sync')).toBeVisible()
     } finally {
       await device.disconnect()
       await updateProduct(request, productId, { auto_provisioning: originalAutoProv })

@@ -3,14 +3,12 @@ import { createRoute, Link } from '@tanstack/react-router'
 import { rootRoute } from '../__root'
 import { useDevices, type DeviceRow } from '@/hooks/useDevices'
 import { PageHeader } from '@/components/ui/page-header'
-import { PropertyShadowSection } from '@/components/property-shadow/PropertyShadowSection'
 import { FactoryMetadataSection } from '@/components/factory-metadata/FactoryMetadataSection'
-import { DeviceInfoSection } from '@/components/device-detail/DeviceInfoSection'
-import { LatestPropertiesSection } from '@/components/device-detail/LatestPropertiesSection'
-import { PropertyHistorySection } from '@/components/device-detail/PropertyHistorySection'
+import { DeviceOverviewSection } from '@/components/device-detail/DeviceOverviewSection'
+import { StateConfigurationSection } from '@/components/device-detail/StateConfigurationSection'
+import { DeviceOperationsSection } from '@/components/device-detail/DeviceOperationsSection'
+import { ReportedDataSection } from '@/components/device-detail/ReportedDataSection'
 import { EventHistorySection } from '@/components/device-detail/EventHistorySection'
-import { PropertyCommandsSection } from '@/components/device-detail/PropertyCommandsSection'
-import { ActionInvocationsSection } from '@/components/device-detail/ActionInvocationsSection'
 import { ConnectionHistorySection } from '@/components/device-detail/ConnectionHistorySection'
 
 export const devicesShowRoute = createRoute({
@@ -22,14 +20,17 @@ export const devicesShowRoute = createRoute({
 export const Route = devicesShowRoute
 
 const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'shadow', label: 'Shadow' },
-  { key: 'commands', label: 'Commands' },
-  { key: 'actions', label: 'Actions' },
-  { key: 'property-history', label: 'Property History' },
-  { key: 'events', label: 'Events' },
-  { key: 'connection', label: 'Connection' },
-  { key: 'factory-metadata', label: 'Factory Metadata' },
+  { key: 'overview', label: 'Overview', testid: undefined },
+  {
+    key: 'state-configuration',
+    label: 'State & Configuration',
+    testid: 'device-tab-state-configuration',
+  },
+  { key: 'operations', label: 'Operations', testid: 'device-tab-operations' },
+  { key: 'reported-data', label: 'Reported Data', testid: 'device-tab-reported-data' },
+  { key: 'events', label: 'Events', testid: undefined },
+  { key: 'connectivity', label: 'Connectivity', testid: undefined },
+  { key: 'metadata', label: 'Metadata', testid: undefined },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -101,6 +102,7 @@ function DeviceDetailContent({
               key={tab.key}
               role="tab"
               aria-selected={active}
+              data-testid={tab.testid}
               onClick={() => setActiveTab(tab.key)}
               className="rounded-t-lg px-3 py-2 text-[13px] font-medium transition-colors"
               style={{
@@ -116,22 +118,20 @@ function DeviceDetailContent({
       </div>
 
       {activeTab === 'overview' && (
-        <div className="space-y-8">
-          <DeviceInfoSection device={device} />
-          <LatestPropertiesSection productId={productId} deviceId={id} />
-        </div>
+        <DeviceOverviewSection device={device} productId={productId} deviceId={id} />
       )}
-      {activeTab === 'shadow' && <PropertyShadowSection productId={productId} deviceId={id} />}
-      {activeTab === 'commands' && <PropertyCommandsSection productId={productId} deviceId={id} />}
-      {activeTab === 'actions' && <ActionInvocationsSection productId={productId} deviceId={id} />}
-      {activeTab === 'property-history' && (
-        <PropertyHistorySection productId={productId} deviceId={id} />
+      {activeTab === 'state-configuration' && (
+        <StateConfigurationSection productId={productId} deviceId={id} />
       )}
+      {activeTab === 'operations' && (
+        <DeviceOperationsSection productId={productId} deviceId={id} />
+      )}
+      {activeTab === 'reported-data' && <ReportedDataSection productId={productId} deviceId={id} />}
       {activeTab === 'events' && <EventHistorySection productId={productId} deviceId={id} />}
-      {activeTab === 'connection' && (
+      {activeTab === 'connectivity' && (
         <ConnectionHistorySection productId={productId} deviceId={id} />
       )}
-      {activeTab === 'factory-metadata' && <FactoryMetadataSection deviceSn={id} />}
+      {activeTab === 'metadata' && <FactoryMetadataSection deviceSn={id} />}
     </div>
   )
 }
