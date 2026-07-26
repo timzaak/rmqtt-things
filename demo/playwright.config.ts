@@ -39,7 +39,10 @@ export default defineConfig({
     video: 'off',
     trace: 'off',
     actionTimeout: 0,
-    navigationTimeout: 15 * 1000,
+    // 设备详情页在并发 MQTT 设备连接下首次加载可能 >15s（如 device-shadow-demo
+    // Scen B/C：在 device.connect() 之后立即 page.goto，后端日志/poll 负载较高）。
+    // 全局放宽到 30s 以消除导航超时（DE-D05 缺陷 B），不影响断言等待（expect.timeout）。
+    navigationTimeout: 30 * 1000,
   },
 
   projects: [

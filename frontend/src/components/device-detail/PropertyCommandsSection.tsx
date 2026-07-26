@@ -7,6 +7,7 @@ import {
 import { DataTable, type Column } from '@/components/ui/data-table'
 import { formatDatetime } from '@/lib/utils'
 import { sectionHeading } from './styles'
+import { StatusBadge } from './StatusBadge'
 
 export function PropertyCommandsSection({
   productId,
@@ -34,14 +35,6 @@ export function PropertyCommandsSection({
     deleteCommands.mutate([commandId])
   }
 
-  const statusColors: Record<string, string> = {
-    Pending: '#d97706',
-    Sent: 'var(--color-accent)',
-    Success: '#059669',
-    Failed: '#dc2626',
-    Deleted: 'var(--color-text-muted)',
-  }
-
   const columns: Column<Record<string, unknown>>[] = [
     { header: 'ID', accessor: 'id' },
     {
@@ -57,17 +50,7 @@ export function PropertyCommandsSection({
     },
     {
       header: 'Status',
-      accessor: (row) => {
-        const status = row.status as string
-        return (
-          <span
-            className="text-[12px] font-semibold"
-            style={{ color: statusColors[status] ?? 'var(--color-text-secondary)' }}
-          >
-            {status}
-          </span>
-        )
-      },
+      accessor: (row) => <StatusBadge status={row.status as string} />,
     },
     { header: 'Created Time', accessor: (row) => formatDatetime(row.created_time as string) },
     { header: 'Updated Time', accessor: (row) => formatDatetime(row.updated_time as string) },

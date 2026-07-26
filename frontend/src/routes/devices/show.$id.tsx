@@ -10,6 +10,7 @@ import { LatestPropertiesSection } from '@/components/device-detail/LatestProper
 import { PropertyHistorySection } from '@/components/device-detail/PropertyHistorySection'
 import { EventHistorySection } from '@/components/device-detail/EventHistorySection'
 import { PropertyCommandsSection } from '@/components/device-detail/PropertyCommandsSection'
+import { ActionInvocationsSection } from '@/components/device-detail/ActionInvocationsSection'
 import { ConnectionHistorySection } from '@/components/device-detail/ConnectionHistorySection'
 
 export const devicesShowRoute = createRoute({
@@ -24,6 +25,7 @@ const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'shadow', label: 'Shadow' },
   { key: 'commands', label: 'Commands' },
+  { key: 'actions', label: 'Actions' },
   { key: 'property-history', label: 'Property History' },
   { key: 'events', label: 'Events' },
   { key: 'connection', label: 'Connection' },
@@ -121,6 +123,7 @@ function DeviceDetailContent({
       )}
       {activeTab === 'shadow' && <PropertyShadowSection productId={productId} deviceId={id} />}
       {activeTab === 'commands' && <PropertyCommandsSection productId={productId} deviceId={id} />}
+      {activeTab === 'actions' && <ActionInvocationsSection productId={productId} deviceId={id} />}
       {activeTab === 'property-history' && (
         <PropertyHistorySection productId={productId} deviceId={id} />
       )}

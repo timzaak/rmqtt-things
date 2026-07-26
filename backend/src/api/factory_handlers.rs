@@ -22,7 +22,7 @@ use crate::api::error::ApiError;
 use crate::api::handlers::is_file_upload_directory_allowed;
 use crate::api::utils::{extract_and_validate_product_id, validate_identifier};
 use crate::api::web_models::{
-    FileUploadRequest, FileUploadResponse, MqttResponse, RMqttPublishMessage,
+    AckStatus, FileUploadRequest, FileUploadResponse, MqttResponse, RMqttPublishMessage,
 };
 use crate::db::factory_metadata::{
     ComponentAssociationInput, FactoryDeviceMetadataRow, FactoryDeviceViewRow,
@@ -683,7 +683,7 @@ pub async fn factory_metadata_get_handler(
     });
 
     let response = MqttResponse {
-        id: payload.id,
+        id: payload.id.clone(),
         code: 200,
         data,
     };
@@ -694,10 +694,13 @@ pub async fn factory_metadata_get_handler(
         ApiError::internal("Failed to serialise response")
     })?;
 
-    if let Err(e) = state
-        .rmqtt_client
-        .publish_response(&mqtt_msg.topic, &response_payload)
-        .await
+    // Ack gating (design §5.3 / §1.5): publish the `_reply` only when the
+    // device asked for one. Matches file_upload_handler and ota_handlers.
+    if payload.ack == AckStatus::Yes
+        && let Err(e) = state
+            .rmqtt_client
+            .publish_response(&mqtt_msg.topic, &response_payload)
+            .await
     {
         error!("Failed to publish factory-metadata response: {}", e);
     }

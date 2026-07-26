@@ -24,16 +24,19 @@ rule.client_connected = [{action = "client_connected", urls = ["http://host.dock
 rule.client_disconnected = [{action = "client_disconnected", urls = ["http://host.docker.internal:8080/api/device/disconnect"]}]
 
 # Message publishing rules
+# NOTE on shadow: device shadow (desired/reported) introduces NO new rules here.
+# The platform delivers desired deltas over the existing property command channel
+# (thing/service/property/set + set_reply). See docs/tutorials/thing-model-spec.md
+# "Device Shadow" section.
 rule.message_publish = [
-    {action = "message_publish", topics=["+/+/thing/event/property/post"], urls = ["http://host.docker.internal:8080/api/thing/property/post"]},
-    {action = "message_publish", topics=["+/+/thing/event/test/post"], urls = ["http://host.docker.internal:8080/api/thing/event/post"]},
-    {action = "message_publish", topics=["+/+/thing/service/property/set_reply"], urls = ["http://host.docker.internal:8080/api/thing/property/set_reply"]},
+    {action = "message_publish", topics=["+/+/thing/event/+/post"], urls = ["http://host.docker.internal:8080/api/thing/event/post"]},
+    {action = "message_publish", topics=["+/+/thing/service/+/set_reply"], urls = ["http://host.docker.internal:8080/api/thing/service/set_reply"]},
     {action = "message_publish", topics=["+/+/thing/file/upload"], urls = ["http://host.docker.internal:8080/api/thing/file/upload"]},
-    {action = "message_publish", topics=["+/+/ota/version"], urls = ["http://host.docker.internal:8080/api/ota/version"]}
+    {action = "message_publish", topics=["+/+/ota/version"], urls = ["http://host.docker.internal:8080/api/ota/version"]},
 ]
 
 rule.client_subscribe = [
-    {action = "client_subscribe", topics=["+/+/thing/service/property/set"], urls = ["http://host.docker.internal:8080/api/thing/property/set_subscribe"]}
+    {action = "client_subscribe", topics=["+/+/thing/service/+/set"], urls = ["http://host.docker.internal:8080/api/thing/service/set_subscribe"]},
 ]
 
 # You can also enable other events as needed, for example:

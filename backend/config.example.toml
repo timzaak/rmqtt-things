@@ -13,7 +13,17 @@ clientid = "rmqtt_things"
 qos = 2
 retain = false
 clientid = "rmqtt_things"
-topic = "productId/$clientid/thing/service/property/set"
+topic = "${productId}/${clientid}/thing/service/property/set"
+
+# Service / action command publish (thing-model-extension design §5.2). Adds the
+# `${service_type}` placeholder so each action row targets its own topic segment
+# (`{productId}/{clientid}/thing/service/{service_type}/set`). Mirrors
+# `[mqtt.property_command.publish]` semantics.
+[mqtt.service_command.publish]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+topic = "${productId}/${clientid}/thing/service/${service_type}/set"
 
 [otel]
 # log = ""

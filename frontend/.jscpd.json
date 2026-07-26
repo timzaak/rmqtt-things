@@ -1,0 +1,15 @@
+{
+  "threshold": 12,
+  "reporters": ["console"],
+  "ignore": [
+    "**/routeTree.gen.ts",
+    "**/lib/api-generated/**",
+    "**/*.gen.ts",
+    "**/*.gen.tsx",
+    "**/dist/**",
+    "**/node_modules/**"
+  ],
+  "absolute": true,
+  "output": "./report/",
+  "silent": true
+}

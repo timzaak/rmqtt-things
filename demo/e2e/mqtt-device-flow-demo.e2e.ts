@@ -7,6 +7,7 @@
 import { test, expect } from './fixtures/demo-auth.fixtures'
 import type { APIRequestContext } from '@playwright/test'
 import { DemoMqttDevice } from './helpers/mqtt-device'
+import { findSeedProductId, getProduct, updateProduct } from './helpers/product-api'
 
 const PRODUCT_ID = 'demo_product'
 const POLL_TIMEOUT = 15_000
@@ -36,11 +37,18 @@ interface DeviceStatusRow {
 
 test.describe('MQTT device flow demo', () => {
   test('[US-DV-003] device posts properties and admin queries them', async ({ request }) => {
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     const deviceId = `demo-e2e-prop-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 
-    await device.connect()
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+      await device.connect()
+
       const temperature = 20 + Math.round(Math.random() * 1000) / 100
 
       await device.postProperties({ temperature, humidity: 51, power: true })
@@ -57,15 +65,23 @@ test.describe('MQTT device flow demo', () => {
       }, { timeout: POLL_TIMEOUT }).toBeCloseTo(temperature, 1)
     } finally {
       await device.disconnect()
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
   test('[US-DV-005] device posts events and admin queries them', async ({ request }) => {
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     const deviceId = `demo-e2e-evt-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 
-    await device.connect()
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+      await device.connect()
+
       const eventMarker = `mqtt-e2e-${Date.now()}`
 
       await device.postEvent({ event: 'mqtt_e2e_boot', marker: eventMarker })
@@ -79,15 +95,23 @@ test.describe('MQTT device flow demo', () => {
       }, { timeout: POLL_TIMEOUT }).toBe(true)
     } finally {
       await device.disconnect()
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
   test('[US-DV-004] admin creates command, device receives and replies', async ({ request }) => {
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     const deviceId = `demo-e2e-cmd-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 
-    await device.connect()
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+      await device.connect()
+
       const commandPromise = device.waitForCommand()
       const commandValue = { power: false, brightness: 42 }
       const createResponse = await request.post('/api/admin/property/command', {
@@ -96,99 +120,126 @@ test.describe('MQTT device flow demo', () => {
       expect(createResponse.status()).toBe(201)
 
       const command = await commandPromise
-      expect(command.data).toMatchObject(commandValue)
-      expect(command.ids.length).toBeGreaterThan(0)
+      // Protocol assertion (spec envelope): params carries the command object
+      // directly; id is the property:{db_id} association string for the row.
+      expect(command.params).toMatchObject(commandValue)
+      const commandDbId = parsePropertyCommandId(command.id)
 
       await device.replyCommand(command)
       await expect.poll(async () => {
         const body = await getJson<ListResponse<PropertyCommandRow>>(
           request,
-          `/api/admin/property/command?product_id=${PRODUCT_ID}&page=1&page_size=20`,
+          `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=20`,
         )
-        const row = body.data?.find(item => command.ids.includes(item.id))
+        const row = body.data?.find(item => item.id === commandDbId)
         if (!row) {
-          throw new Error(`Command ${command.ids} not found in response`)
+          throw new Error(`Command property:${commandDbId} not found in response`)
         }
         return row.status
       }, { timeout: POLL_TIMEOUT }).toBe('Success')
     } finally {
       await device.disconnect()
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
   test('[US-DV-009] admin creates command while device offline, command queued and delivered on connect', async ({ request }) => {
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     const deviceId = `demo-e2e-queued-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 
-    const commandValue = { power: true, brightness: 80 }
-    const createResponse = await request.post('/api/admin/property/command', {
-      data: { product_id: PRODUCT_ID, device_id: deviceId, command: commandValue },
-    })
-    expect(createResponse.status()).toBe(201)
-
-    await expect.poll(async () => {
-      const body = await getJson<ListResponse<PropertyCommandRow>>(
-        request,
-        `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=20`,
-      )
-      const row = body.data?.[0]
-      if (!row) {
-        throw new Error('Command not found in list')
-      }
-      return String(row.status)
-    }, { timeout: POLL_TIMEOUT }).toBe('Pending')
-
-    // Register command waiter BEFORE connecting to avoid race condition
-    // (waitForCommand only registers a Promise resolver, no MQTT connection needed)
-    const commandPromise = device.waitForCommand()
-
-    // subscribe triggers RMQTT webhook to deliver queued commands
-    await device.connect()
     try {
-      const command = await commandPromise
-      expect(command.data).toMatchObject(commandValue)
-      expect(command.ids.length).toBeGreaterThan(0)
+      await updateProduct(request, productId, { auto_provisioning: true })
 
-      await device.replyCommand(command)
+      const commandValue = { power: true, brightness: 80 }
+      const createResponse = await request.post('/api/admin/property/command', {
+        data: { product_id: PRODUCT_ID, device_id: deviceId, command: commandValue },
+      })
+      expect(createResponse.status()).toBe(201)
 
       await expect.poll(async () => {
         const body = await getJson<ListResponse<PropertyCommandRow>>(
           request,
           `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=20`,
         )
-        const row = body.data?.find(item => command.ids.includes(item.id))
+        const row = body.data?.[0]
         if (!row) {
-          throw new Error(`Command ${command.ids} not found in response`)
+          throw new Error('Command not found in list')
         }
         return String(row.status)
-      }, { timeout: POLL_TIMEOUT }).toBe('Success')
+      }, { timeout: POLL_TIMEOUT }).toBe('Pending')
+
+      // Register command waiter BEFORE connecting to avoid race condition
+      // (waitForCommand only registers a Promise resolver, no MQTT connection needed)
+      const commandPromise = device.waitForCommand()
+
+      // subscribe triggers RMQTT webhook to deliver queued commands
+      await device.connect()
+      try {
+        const command = await commandPromise
+        // Protocol assertion (spec envelope): params carries the command object
+        // directly; id is the property:{db_id} association string for the row.
+        expect(command.params).toMatchObject(commandValue)
+        const commandDbId = parsePropertyCommandId(command.id)
+
+        await device.replyCommand(command)
+
+        await expect.poll(async () => {
+          const body = await getJson<ListResponse<PropertyCommandRow>>(
+            request,
+            `/api/admin/property/command?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=20`,
+          )
+          const row = body.data?.find(item => item.id === commandDbId)
+          if (!row) {
+            throw new Error(`Command property:${commandDbId} not found in response`)
+          }
+          return String(row.status)
+        }, { timeout: POLL_TIMEOUT }).toBe('Success')
+      } finally {
+        await device.disconnect()
+      }
     } finally {
-      await device.disconnect()
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
   test('[US-DV-008] device online/offline status is tracked', async ({ request }) => {
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     const deviceId = `demo-e2e-status-${Date.now()}`
     const device = new DemoMqttDevice({ productId: PRODUCT_ID, deviceId })
 
-    await device.connect()
-    await expect.poll(async () => {
-      const body = await getJson<ListResponse<DeviceStatusRow>>(
-        request,
-        `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,
-      )
-      return body.data?.[0]?.status
-    }, { timeout: POLL_TIMEOUT }).toBe('Online')
+    try {
+      await updateProduct(request, productId, { auto_provisioning: true })
 
-    await device.disconnect()
+      await device.connect()
+      await expect.poll(async () => {
+        const body = await getJson<ListResponse<DeviceStatusRow>>(
+          request,
+          `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,
+        )
+        return body.data?.[0]?.status
+      }, { timeout: POLL_TIMEOUT }).toBe('Online')
 
-    await expect.poll(async () => {
-      const body = await getJson<ListResponse<DeviceStatusRow>>(
-        request,
-        `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,
-      )
-      return body.data?.[0]?.status
-    }, { timeout: POLL_TIMEOUT }).toBe('Offline')
+      await device.disconnect()
+
+      await expect.poll(async () => {
+        const body = await getJson<ListResponse<DeviceStatusRow>>(
+          request,
+          `/api/admin/device/status?product_id=${PRODUCT_ID}&device_id=${deviceId}&page=1&page_size=10`,
+        )
+        return body.data?.[0]?.status
+      }, { timeout: POLL_TIMEOUT }).toBe('Offline')
+    } finally {
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
+    }
   })
 })
 
@@ -199,4 +250,18 @@ async function getJson<T>(request: APIRequestContext, path: string): Promise<T> 
     throw new Error(`GET ${path} returned ${response.status()}: ${text}`)
   }
   return response.json()
+}
+
+/**
+ * Parse the spec envelope command id (`property:{db_id}`) back to the DB row id
+ * so the e2e test can correlate the MQTT message with the admin list response.
+ * Per spec the id is an opaque string to the device, but the platform-generated
+ * `property:{db_id}` format is deterministic and documented in design §5.2.
+ */
+function parsePropertyCommandId(id: string): number {
+  const match = /^property:(\d+)$/.exec(id)
+  if (!match) {
+    throw new Error(`Expected command id "property:{db_id}", got: ${id}`)
+  }
+  return Number(match[1])
 }

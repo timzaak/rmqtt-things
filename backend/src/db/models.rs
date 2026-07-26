@@ -97,6 +97,27 @@ pub struct PropertyCommand {
     pub updated_time: OffsetDateTime,
 }
 
+/// Persisted one-shot action/service invocation (thing-model-extension,
+/// design §4.3.2/§5.2). Physically isolated from `PropertyCommand` per design
+/// A2 — one-shot actions (reboot / unlock / buzzer) live in their own table
+/// and reuse the `CommandStatus` enum for state semantics. `params` is the
+/// action input document (free-form JSONB), and `service_type` is the
+/// free-form service identifier routed via the MQTT topic segment.
+#[derive(Debug, FromRow, Serialize, Deserialize, ToSchema)]
+#[allow(dead_code)]
+pub struct ActionInvocation {
+    pub id: i64,
+    pub product_id: String,
+    pub device_id: String,
+    pub service_type: String,
+    pub params: JsonValue,
+    pub status: CommandStatus,
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_time: OffsetDateTime,
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_time: OffsetDateTime,
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize, ToSchema,
 )]

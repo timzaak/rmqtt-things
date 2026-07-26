@@ -1,3 +1,4 @@
+mod action_invocation_scenarios;
 mod alarm_api_extended_scenarios;
 mod alarm_duration_scenarios;
 mod alarm_lifecycle_scenarios;
@@ -17,5 +18,6 @@ mod redis_rule_state_scenarios;
 mod s3_tests;
 mod shadow_scenarios;
 mod simple_tests;
+mod spec_deviation_scenarios;
 mod validator_tests;
 mod webhook_retry_scenarios;

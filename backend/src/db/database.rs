@@ -261,7 +261,7 @@ impl DatabaseService {
     ) -> anyhow::Result<Vec<(i64, JsonValue, OffsetDateTime)>> {
         let commands = sqlx::query(
             r#"
-            UPDATE property_command 
+            UPDATE property_command
             SET status = $1, updated_time = CURRENT_TIMESTAMP
             WHERE product_id = $2 AND device_id = $3 AND status = $4
             RETURNING id, command, created_time
@@ -274,10 +274,17 @@ impl DatabaseService {
         .fetch_all(&self.pool)
         .await?;
 
-        let result = commands
+        // PostgreSQL `UPDATE ... RETURNING` returns rows in arbitrary order.
+        // Sort deterministically by `created_time ASC, id ASC` so the publish
+        // order in `send_property_command_to_device` matches the action-side
+        // `claim_next_pending_action` contract (design §5.3 last-write-wins).
+        // All matched rows are flipped to Sent regardless of order; this only
+        // fixes the published Vec ordering.
+        let mut result: Vec<(i64, JsonValue, OffsetDateTime)> = commands
             .into_iter()
             .map(|row| (row.get("id"), row.get("command"), row.get("created_time")))
             .collect();
+        result.sort_by_key(|(id, _, created_time)| (*created_time, *id));
 
         Ok(result)
     }
@@ -430,7 +437,183 @@ impl DatabaseService {
     pub async fn delete_property_commands(&self, ids: &[i64]) -> anyhow::Result<i64> {
         let result = sqlx::query(
             r#"
-            UPDATE property_command 
+            UPDATE property_command
+            SET status = $1, updated_time = CURRENT_TIMESTAMP
+            WHERE id = ANY($2) AND status = $3
+            "#,
+        )
+        .bind(CommandStatus::Deleted)
+        .bind(ids)
+        .bind(CommandStatus::Pending)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() as i64)
+    }
+
+    // --- Action invocation data layer (thing-model-extension, design §4.3.2/§5.2) ---
+    // Mirrors the property_command family. Action invocations are physically
+    // isolated from property_command per design A2 but reuse CommandStatus.
+
+    // Insert an action invocation. Returns the new row id. Admin entry point
+    // (BE-D03 create_service_command); rows start at Pending and are claimed
+    // later by `claim_next_pending_action` when the device is subscribed.
+    pub async fn insert_action_invocation(
+        &self,
+        product_id: &str,
+        device_id: &str,
+        service_type: &str,
+        params: &JsonValue,
+    ) -> anyhow::Result<i64> {
+        let row = sqlx::query(
+            r#"
+            INSERT INTO action_invocation (product_id, device_id, service_type, params)
+            VALUES ($1, $2, $3, $4)
+            RETURNING id
+            "#,
+        )
+        .bind(product_id)
+        .bind(device_id)
+        .bind(service_type)
+        .bind(params)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(row.get("id"))
+    }
+
+    // Atomically claim the next Pending action for a device and flip it to Sent.
+    //
+    // `FOR UPDATE SKIP LOCKED LIMIT 1` inside the subselect guarantees that
+    // concurrent callers never claim the same row (design §5.1 step 2 / failure
+    // attribution): SKIP LOCKED skips rows already locked by another backend
+    // instance, so each Pending row is published at most once. Ordering by
+    // (created_time ASC, id ASC) preserves submission order across mixed
+    // service_types on the same device.
+    pub async fn claim_next_pending_action(
+        &self,
+        product_id: &str,
+        device_id: &str,
+    ) -> anyhow::Result<Option<ActionInvocation>> {
+        let row = sqlx::query_as::<_, ActionInvocation>(
+            r#"
+            UPDATE action_invocation
+            SET status = $1, updated_time = CURRENT_TIMESTAMP
+            WHERE id = (
+                SELECT id FROM action_invocation
+                WHERE product_id = $2 AND device_id = $3 AND status = $4
+                ORDER BY created_time ASC, id ASC
+                FOR UPDATE SKIP LOCKED
+                LIMIT 1
+            )
+            RETURNING id, product_id, device_id, service_type, params, status, created_time, updated_time
+            "#,
+        )
+        .bind(CommandStatus::Sent)
+        .bind(product_id)
+        .bind(device_id)
+        .bind(CommandStatus::Pending)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row)
+    }
+
+    // Conditional status transition (id + product_id + device_id + service_type
+    // + prev_status). Returns rows_affected (0 when the row is no longer in the
+    // expected prev_status, e.g. a duplicate reply or a concurrent transition).
+    pub async fn update_action_invocation_status(
+        &self,
+        id: i64,
+        product_id: &str,
+        device_id: &str,
+        service_type: &str,
+        status: CommandStatus,
+        prev_status: CommandStatus,
+    ) -> anyhow::Result<u64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE action_invocation
+            SET status = $1, updated_time = CURRENT_TIMESTAMP
+            WHERE id = $2 AND product_id = $3 AND device_id = $4 AND service_type = $5 AND status = $6
+            "#,
+        )
+        .bind(status)
+        .bind(id)
+        .bind(product_id)
+        .bind(device_id)
+        .bind(service_type)
+        .bind(prev_status)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
+    }
+
+    // Paginated history query with optional device / service_type / status
+    // filters. Mirrors `query_property_commands` and additionally threads the
+    // service_type filter (the action analog of property's implicit type).
+    pub async fn query_action_invocations(
+        &self,
+        product_id: &str,
+        device_id: Option<&str>,
+        service_type: Option<&str>,
+        status: Option<CommandStatus>,
+        page: i64,
+        page_size: i64,
+    ) -> anyhow::Result<(Vec<ActionInvocation>, i64)> {
+        let mut query_builder = QueryBuilder::new(
+            "SELECT id, product_id, device_id, service_type, params, status, created_time, updated_time FROM action_invocation WHERE 1=1",
+        );
+
+        Self::add_device_product_filter(&mut query_builder, product_id, device_id);
+
+        if let Some(service_type) = service_type {
+            query_builder.push(" AND service_type = ");
+            query_builder.push_bind(service_type);
+        }
+
+        if let Some(status) = status {
+            query_builder.push(" AND status = ");
+            query_builder.push_bind(status);
+        }
+
+        query_builder.push(" ORDER BY updated_time DESC");
+        Self::add_pagination(&mut query_builder, page, page_size);
+
+        let invocations = query_builder
+            .build_query_as::<ActionInvocation>()
+            .fetch_all(&self.pool)
+            .await?;
+
+        let mut count_builder =
+            QueryBuilder::new("SELECT COUNT(*) as count FROM action_invocation WHERE 1=1");
+
+        Self::add_device_product_filter(&mut count_builder, product_id, device_id);
+
+        if let Some(service_type) = service_type {
+            count_builder.push(" AND service_type = ");
+            count_builder.push_bind(service_type);
+        }
+
+        if let Some(status) = status {
+            count_builder.push(" AND status = ");
+            count_builder.push_bind(status);
+        }
+
+        let count_row = count_builder.build().fetch_one(&self.pool).await?;
+        let total: i64 = count_row.get("count");
+
+        Ok((invocations, total))
+    }
+
+    // Soft-delete Pending action invocations (status -> Deleted). Mirrors
+    // `delete_property_commands`; only Pending rows may be cancelled, since
+    // Sent rows are already in flight to the device.
+    pub async fn delete_action_invocations(&self, ids: &[i64]) -> anyhow::Result<i64> {
+        let result = sqlx::query(
+            r#"
+            UPDATE action_invocation
             SET status = $1, updated_time = CURRENT_TIMESTAMP
             WHERE id = ANY($2) AND status = $3
             "#,

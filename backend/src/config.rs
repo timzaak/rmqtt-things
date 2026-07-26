@@ -108,6 +108,8 @@ pub struct MqttConfig {
     #[serde(default)]
     pub property_command: PropertyCommandConfig,
     #[serde(default)]
+    pub service_command: ServiceCommandConfig,
+    #[serde(default)]
     pub access: AccessConfig,
 }
 
@@ -132,6 +134,19 @@ pub struct PropertyCommandPublishConfig {
     #[serde(default = "default_retries")]
     pub retries: u8,
 }
+
+// Service/action command publish configuration (thing-model-extension design
+// §5.2). The publish field shape is identical to the property command's, so the
+// inner config is a type alias rather than a redefinition — only the wrapper
+// stays distinct because its `Default` topic differs (`${service_type}/set` vs
+// `property/set`; see the `Default` impls below). The `${service_type}`
+// placeholder is substituted at publish time in `send_action_invocations_to_device`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ServiceCommandConfig {
+    pub publish: ServiceCommandPublishConfig,
+}
+
+pub type ServiceCommandPublishConfig = PropertyCommandPublishConfig;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MqttResponseConfig {
@@ -162,6 +177,7 @@ impl Default for MqttConfig {
                 },
             },
             property_command: PropertyCommandConfig::default(),
+            service_command: ServiceCommandConfig::default(),
             access: AccessConfig::default(),
         }
     }
@@ -174,7 +190,27 @@ impl Default for PropertyCommandConfig {
                 qos: 2,
                 retain: false,
                 clientid: "rmqtt_things".to_string(),
-                topic: "thing/$clientid/thing/service/property/set".to_string(),
+                // Unified topic-family placeholders (design §5.3): `${productId}`
+                // and `${clientid}`. The previous default had a duplicated
+                // `thing/` prefix AND mixed `$clientid` with `${clientid}`.
+                topic: "${productId}/${clientid}/thing/service/property/set".to_string(),
+                retries: 2,
+            },
+        }
+    }
+}
+
+impl Default for ServiceCommandConfig {
+    fn default() -> Self {
+        Self {
+            publish: ServiceCommandPublishConfig {
+                qos: 2,
+                retain: false,
+                clientid: "rmqtt_things".to_string(),
+                // Three full placeholders per design §5.2/§5.3 — `${productId}`,
+                // `${clientid}`, `${service_type}`. Each action row replaces all
+                // three with its own values before publishing.
+                topic: "${productId}/${clientid}/thing/service/${service_type}/set".to_string(),
                 retries: 2,
             },
         }

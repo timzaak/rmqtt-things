@@ -70,6 +70,11 @@
 - 设备端 MQTT SDK
 - 消息持久化和可靠性保证（由 RMQTT Broker 负责）
 
+### 2.2.1 影子设备与动作（action）的 WebHook 边界
+
+- **影子设备（desired/reported）**：不需要新增 WebHook 规则。平台把 desired 与 reported 的差异（delta）作为普通属性命令，经既有的 `thing/service/property/set` 下发、`set_reply` 回收——两条规则已存在于 `rmqtt-web-hook.toml` 的 `rule.message_publish` 与 `rule.client_subscribe` 中。设备端零改动。详见 [影子设备 PRD](../core/shadow-device-support.md)。
+- **动作 / 服务调用（action）**：物模型协议的 `service_type` 设计上可扩展（如 `reboot`、`unlock`），但当前后端只实现并配置了 `property` 一种。为支持非 `property` 的 `service_type`，`rmqtt-web-hook.toml` 与 `rmqtt-auto-subscription.toml` 已预置对应的规则模板（当前为注释态，标记为「待后端实现」），避免启用后向不存在的回调端点转发造成 404 噪声。详见物模型能力扩展 PRD（`.ai/prd/core/thing-model-extension.md`）。
+
 ### 2.3 依赖项
 - RMQTT Broker：作为 MQTT 中间件，配置 WebHook 回调到本服务
 - MQTT 主题协议：设备与平台约定的 MQTT 主题格式和数据结构

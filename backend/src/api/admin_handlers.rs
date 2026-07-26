@@ -4,6 +4,7 @@ use crate::api::error::ApiError;
 use crate::api::handlers::is_file_upload_directory_allowed;
 use crate::api::shadow::compute_delta;
 use crate::api::utils::{
+    first_invalid_identifier_char, send_action_invocations_to_device,
     send_property_command_to_device, validate_identifier, validate_version_format,
 };
 use crate::api::web_models::{FileUploadRequest, FileUploadResponse};
@@ -828,6 +829,222 @@ pub async fn delete_property_commands(
     Ok(StatusCode::OK)
 }
 
+// ---- Action / service invocation admin handlers (thing-model-extension §4.2.2) ----
+// Mirrors the property command family above (create/get/delete). Each handler is
+// a thin DTO → repository → drain passthrough; behavioural correctness is
+// covered by the scenario tests listed in the test-slot handoff.
+
+/// Validate a `service_type` against design §4.5: `[a-zA-Z0-9_-]{1,32}`.
+/// Extracted as a pure function so the validation matrix (empty / overlong /
+/// illegal character) is unit-testable without spinning up a router. Mirrors
+/// `validate_file_key`'s style.
+fn validate_service_type(service_type: &str) -> Result<(), ApiError> {
+    if service_type.is_empty() || service_type.len() > 32 {
+        return Err(ApiError::bad_request("serviceType must be 1-32 characters"));
+    }
+    if let Some(ch) = first_invalid_identifier_char(service_type) {
+        return Err(ApiError::bad_request(format!(
+            "serviceType contains invalid character '{ch}'. Only alphanumeric characters, hyphens, and underscores are allowed"
+        )));
+    }
+    Ok(())
+}
+
+// POST /api/admin/service/command - 发起一次动作 / 服务调用（设计 §4.2.2）。
+//
+// 入队流程：校验 → insert_action_invocation（Pending）→ 若设备已订阅
+// `thing/service/{service_type}/set` 则立即 drain（drain 内部原子 claim 并发
+// 投递，可能将状态推到 Sent），否则留 Pending 等待 subscribe 触发。
+// MQTT 发送失败仅记录日志——命令已入队，设备下次订阅/上线时会重新 drain。
+#[utoipa::path(
+    post,
+    path = "/api/admin/service/command",
+    tag = "admin",
+    request_body = CreateActionCommandRequest,
+    responses(
+        (status = 201, description = "Action invocation created", body = CreateActionCommandResponse),
+        (status = 400, description = "Invalid productId / deviceId / serviceType")
+    )
+)]
+pub async fn create_service_command(
+    State(state): State<Arc<ApiState>>,
+    Json(request): Json<CreateActionCommandRequest>,
+) -> Result<(StatusCode, Json<CreateActionCommandResponse>), ApiError> {
+    let state = &state.admin;
+    validate_identifier(&request.product_id, "product_id")?;
+    validate_identifier(&request.device_id, "device_id")?;
+    validate_service_type(&request.service_type)?;
+
+    // `params` 缺省 `{}`（serde default），null 也按 `{}` 兜底，避免向设备下发
+    // 不合法的 `params: null`（设计 §4.2.2 "空对象允许"，未提及 null）。
+    let params = if request.params.is_null() {
+        serde_json::Value::Object(serde_json::Map::new())
+    } else {
+        request.params.clone()
+    };
+
+    let id = state
+        .db
+        .insert_action_invocation(
+            &request.product_id,
+            &request.device_id,
+            &request.service_type,
+            &params,
+        )
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    // 初始状态为 Pending；若设备已订阅对应 service topic 则立即 drain，
+    // drain 内部会把行从 Pending → Sent（再由设备 reply 决定最终 Success /
+    // Failed）。这里读回的最简可信状态是 Pending——只有成功 drain 一行时才升
+    // Sent。为避免再发一次 SELECT，对前端只承诺 Pending（drain 异步发生），与
+    // property command admin handler 保持同等保真度（property 侧不回读状态）。
+    let mut status = crate::db::models::CommandStatus::Pending;
+
+    match state
+        .rmqtt_client
+        .is_subscribed_to_service_action(
+            &request.product_id,
+            &request.device_id,
+            &request.service_type,
+        )
+        .await
+    {
+        Ok(is_subscribed) => {
+            if is_subscribed {
+                info!(
+                    "Device {} is subscribed to service action {}, sending invocation immediately",
+                    request.device_id, request.service_type
+                );
+                match send_action_invocations_to_device(
+                    &state.db,
+                    &state.rmqtt_client,
+                    &request.product_id,
+                    &request.device_id,
+                )
+                .await
+                {
+                    Ok(()) => {
+                        // drain 成功即意味着本行已被 claim 并发布（Pending→Sent）。
+                        status = crate::db::models::CommandStatus::Sent;
+                    }
+                    Err(e) => {
+                        // 命令已入队，发送失败仅记录日志；状态保持 Pending，
+                        // 与 property command 的容错策略一致。
+                        error!(
+                            "Failed to send action invocation id={id} service_type={} to device {}: {e}",
+                            request.service_type, request.device_id
+                        );
+                    }
+                }
+            } else {
+                info!(
+                    "Device {} is not subscribed to service action {}, invocation will be sent when device subscribes",
+                    request.device_id, request.service_type
+                );
+            }
+        }
+        Err(e) => {
+            warn!(
+                "Failed to check device {} subscription for service action {}: {}, invocation will be sent when device subscribes",
+                request.device_id, request.service_type, e
+            );
+        }
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(CreateActionCommandResponse { id, status }),
+    ))
+}
+
+// GET /api/admin/service/command - 查询动作调用历史（设计 §4.2.2）。
+#[utoipa::path(
+    get,
+    path = "/api/admin/service/command",
+    tag = "admin",
+    params(ActionCommandQuery),
+    responses(
+        (status = 200, description = "Action invocations", body = ActionInvocationListResponse)
+    )
+)]
+pub async fn get_service_commands(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<ActionCommandQuery>,
+) -> Result<Json<ActionInvocationListResponse>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&query.product_id, "product_id")?;
+    if let Some(ref did) = query.device_id {
+        validate_identifier(did, "device_id")?;
+    }
+    if let Some(ref st) = query.service_type {
+        validate_service_type(st)?;
+    }
+
+    let (invocations, total) = state
+        .db
+        .query_action_invocations(
+            &query.product_id,
+            query.device_id.as_deref(),
+            query.service_type.as_deref(),
+            query.status,
+            query.page,
+            query.page_size,
+        )
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    let response = ActionInvocationListResponse {
+        data: invocations
+            .into_iter()
+            .map(ActionInvocationView::from)
+            .collect(),
+        pagination: PaginationInfo {
+            page: query.page,
+            page_size: query.page_size,
+            total,
+        },
+    };
+    Ok(Json(response))
+}
+
+// DELETE /api/admin/service/command - 软删动作调用记录（设计 §4.2.2）。
+//
+// 仅 Pending 行可被软删（Sent 行已发出，避免与设备 reply 竞争）。与
+// `delete_property_commands` 一致：DB 层 `delete_action_invocations` 通过
+// `WHERE status = Pending` 条件实现该约束；返回 200。
+#[utoipa::path(
+    delete,
+    path = "/api/admin/service/command",
+    tag = "admin",
+    params(DeleteActionCommandsQuery),
+    responses((status = 200, description = "Action invocations deleted"))
+)]
+pub async fn delete_service_commands(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<DeleteActionCommandsQuery>,
+) -> Result<StatusCode, ApiError> {
+    let state = &state.admin;
+
+    info!("Deleting action invocations with ids: {:?}", query.ids);
+
+    state
+        .db
+        .delete_action_invocations(&query.ids)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+    Ok(StatusCode::OK)
+}
+
 // GET /admin/property - 查询最新属性
 #[utoipa::path(
     get,
@@ -1204,7 +1421,7 @@ pub async fn delete_ota_version(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_file_key;
+    use super::{validate_file_key, validate_service_type};
     use crate::api::error::ApiError;
     use axum::http::StatusCode;
 
@@ -1255,5 +1472,45 @@ mod tests {
         // Exactly 1024 chars is the upper bound and must pass.
         let max = "a".repeat(1024);
         assert!(validate_file_key(&max).is_ok());
+    }
+
+    // serviceType validation matrix (design §4.5: `[a-zA-Z0-9_-]{1,32}`).
+    // Reuses `assert_bad_request` since `create_service_command` returns 400
+    // for invalid serviceType via the same `ApiError::bad_request` mapping.
+    #[test]
+    fn validate_service_type_rejects_empty() {
+        assert_bad_request(validate_service_type(""));
+    }
+
+    #[test]
+    fn validate_service_type_rejects_overlong() {
+        // 33 chars — one past the limit.
+        let overlong = "a".repeat(33);
+        assert_bad_request(validate_service_type(&overlong));
+    }
+
+    #[test]
+    fn validate_service_type_rejects_slash() {
+        assert_bad_request(validate_service_type("reboot/now"));
+    }
+
+    #[test]
+    fn validate_service_type_rejects_space() {
+        assert_bad_request(validate_service_type("reboot now"));
+    }
+
+    #[test]
+    fn validate_service_type_rejects_dot() {
+        assert_bad_request(validate_service_type("reboot.now"));
+    }
+
+    #[test]
+    fn validate_service_type_accepts_valid_identifiers() {
+        assert!(validate_service_type("reboot").is_ok());
+        assert!(validate_service_type("unlock-door").is_ok());
+        assert!(validate_service_type("set_volume_1").is_ok());
+        // Exactly 32 chars is the upper bound and must pass.
+        let max = "a".repeat(32);
+        assert!(validate_service_type(&max).is_ok());
     }
 }

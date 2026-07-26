@@ -65,27 +65,27 @@ Base URL: `http://localhost:8080/api`
 
 响应：`204 No Content`
 
-### POST /api/thing/property/set_subscribe
+### POST /api/thing/service/set_subscribe
 
-设备订阅属性下发主题时触发。后端检查是否有待发送的属性命令，如果有就立即下发。
+设备订阅服务下发主题（统一通配 `+/{deviceId}/thing/service/+/set`）时触发。后端依次投递该设备待发送的属性命令与动作调用（按 `created_time` 顺序逐条 claim/publish，原子标记为 Sent 防止并发重复投递）。
 
 响应：`204 No Content`
 
-### POST /api/thing/property/set_reply
+### POST /api/thing/service/set_reply
 
-设备回复属性下发命令的执行结果。payload 解码后：
+设备回复服务调用（属性设置或动作调用）的执行结果。后端从 WebHook topic 中提取 `service_type` 分派：`property` 更新属性命令状态，其他值更新对应动作调用状态。payload 解码后为统一响应格式：
 
 ```json
 {
-  "id": "request_id",
-  "data": [1, 2, 3],
+  "id": "property:12",
+  "data": {"result": "ok"},
   "code": 200
 }
 ```
 
-`data` 是命令 ID 列表。`code` 为 200 标记成功，其他标记失败。
+`id` 是平台下发时生成的不透明关联标识（属性命令为 `property:{db_id}`，动作调用为 `action:{db_id}`），设备原样回填。`data` 为 object，无数据时省略。`code` 任意 2xx 标记成功，其他标记失败。
 
-响应：`204 No Content`
+响应：`204 No Content`（重复或已处理的回复同样返回 204，不触发 Broker 重试）
 
 ### POST /api/thing/file/upload
 
@@ -111,12 +111,12 @@ Base URL: `http://localhost:8080/api`
 ```json
 {
   "id": "request_id",
-  "params": [{"key": "main", "version": 102034}, {"key": "camera", "version": 201000}],
+  "params": [{"key": "main", "version": "1.2.34"}, {"key": "camera", "version": "2.1.0"}],
   "ack": 0
 }
 ```
 
-`version` 是整数编码的版本号（如 `1.2.34` = `102034`）。如果有匹配的 OTA 升级任务，后端会通过 MQTT 推送升级信息到 `{productId}/{deviceId}/ota/upgrade`。
+`version` 是 `主.次.修订` 字符串（主/次范围 0–99，修订范围 0–999）。后端接收后转成内部整数编码用于存储和比较。如果有匹配的 OTA 升级任务，后端会通过 MQTT 推送升级信息到 `{productId}/{deviceId}/ota/upgrade`。
 
 响应：`204 No Content`
 
@@ -262,6 +262,141 @@ curl -X DELETE "http://localhost:8080/api/admin/property/command?ids=1&ids=2&ids
 ```
 
 响应：`200 OK`
+
+#### GET /api/admin/property/shadow
+
+查询设备影子：当前期望状态（desired）、实际上报状态（reported）以及两者的逐属性差异（delta）。delta 为空表示设备已收敛到期望状态。
+
+参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| product_id | string | 是 | 产品 ID |
+| device_id | string | 是 | 设备 ID |
+
+```bash
+curl "http://localhost:8080/api/admin/property/shadow?product_id=demo&device_id=device1"
+```
+
+响应字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| desired | object | 当前 desired 文档（裸值，无 `{value,time}` 包裹）；无则 `{}` |
+| reported | object | 当前 reported 快照（沿用 `{value, time}` 结构）；无则 `{}` |
+| delta | object | 逐属性 delta（裸期望值）；空表示已收敛 |
+| desired_updated_time | string\|null | desired 文档最后更新时间（RFC3339）；无 desired 行则 null |
+| reported_updated_time | string\|null | reported 快照最后更新时间（RFC3339）；无 reported 行则 null |
+
+> 关于 desired/reported/delta 的语义、被动收敛、与一次性命令的区别，详见 [物模型协议规范](thing-model-spec.md) 的设备影子章节。
+
+#### PUT /api/admin/property/shadow/desired
+
+为设备设置期望属性（Set-Desired）。这是写 desired 的唯一入口；一次性命令和设备上报都不写 desired。
+
+平台在写入后计算 desired 与 reported 的 delta；delta 非空时借现有属性命令通道尝试投递（在线即时 / 离线排队 / 上线投递），设备端零改动。设备端不会收到任何 shadow 专有协议——它仍只收到普通的 `thing/service/property/set`。
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/property/shadow/desired \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":"demo","device_id":"device1","desired":{"brightness":80}}'
+```
+
+请求体：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| product_id | string | 是 | 产品 ID |
+| device_id | string | 是 | 设备 ID |
+| desired | object | 是 | 期望属性 patch。非 null 覆盖、`null` 删除该属性（RFC 7396 子集，对齐 AWS IoT Shadow / Azure IoT Hub）。空对象 `{}` 会被拒绝 |
+
+响应字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| desired | object | 合并后的完整 desired 文档（裸值） |
+| delta | object | 本次 Set-Desired 触发的 delta（待收敛属性，裸期望值） |
+| pushed | boolean | 是否插入了 delta 命令（delta 非空为 true；在线即时 / 离线排队均为 true） |
+
+示例：删除某个 desired 属性，把 `desired` 里对应键设为 `null`。
+
+```bash
+curl -X PUT http://localhost:8080/api/admin/property/shadow/desired \
+  -H "Content-Type: application/json" \
+  -d '{"product_id":"demo","device_id":"device1","desired":{"brightness":null}}'
+```
+
+> 平台不会在设备上报偏离 desired 时自动重推（被动收敛）。设备回报失败时 desired 保持期望值不变，delta 仍显示待收敛，由管理员决定是否再次 Set-Desired。
+
+### 动作 / 服务调用
+
+动作 / 服务调用（action / service invocation）是与属性设置语义分离的一次性下行命令，不进入 desired/reported 状态视图。详见 [物模型协议规范](thing-model-spec.md) 的动作 / 服务调用章节。
+
+#### POST /api/admin/service/command
+
+对设备发起一次动作 / 服务调用。
+
+```bash
+curl -X POST http://localhost:8080/api/admin/service/command \
+  -H "Content-Type: application/json" \
+  -d '{"productId":"demo","deviceId":"device1","serviceType":"reboot","params":{"delaySeconds":5}}'
+```
+
+请求字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| productId | string | 是 | 产品 ID |
+| deviceId | string | 是 | 设备 ID |
+| serviceType | string | 是 | 服务类型标识，如 `reboot` / `unlock`；仅允许 `[a-zA-Z0-9_-]`，长度 1–32 |
+| params | object | 否 | 动作入参，透传给设备；空对象 `{}` 允许，省略时按 `{}` 处理 |
+
+设备在线且已订阅对应服务主题时立即投递；否则排队，等设备订阅时投递。MQTT 下发固定 `ack=1`，设备必须回报 `set_reply`。
+
+响应：`201 Created`
+
+```json
+{"id": 42, "status": "Pending"}
+```
+
+`status` 取值 `Pending` / `Sent` / `Success` / `Failed` / `Deleted`。
+
+#### GET /api/admin/service/command
+
+查询动作调用历史。
+
+```bash
+curl "http://localhost:8080/api/admin/service/command?product_id=demo&device_id=device1&service_type=reboot&page=1&page_size=10"
+```
+
+查询参数：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| product_id | string | 是 | 产品 ID |
+| device_id | string | 否 | 不传则查产品下全部设备 |
+| service_type | string | 否 | 按服务类型过滤 |
+| status | string | 否 | `Pending` / `Sent` / `Success` / `Failed` |
+| page | int | 否 | 默认 1 |
+| page_size | int | 否 | 默认 10 |
+
+响应：`200 OK`，`data` 为动作调用视图数组（字段：`id` / `serviceType` / `params` / `status` / `createdTime` / `updatedTime`），`pagination` 含 `page` / `page_size` / `total`。
+
+#### DELETE /api/admin/service/command
+
+软删动作调用记录（仅 `Pending` 状态可删，标记为 `Deleted`）。
+
+```bash
+curl -X DELETE "http://localhost:8080/api/admin/service/command?ids=1,2,3"
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| ids | string | 是 | 待删 ID 列表，逗号分隔 |
+
+响应：`204 No Content`
+
+> 动作调用的设备端协议、`set_reply` 回环与离线排队见 [物模型协议规范](thing-model-spec.md) 的动作 / 服务调用章节。
 
 ### 事件
 

@@ -36,8 +36,8 @@ fn property_post_topic(product_id: &str, device_id: &str) -> String {
     format!("/{product_id}/{device_id}/thing/event/property/post")
 }
 
-fn property_set_reply_topic(product_id: &str, device_id: &str) -> String {
-    format!("/{product_id}/{device_id}/thing/event/property/reply")
+fn service_set_reply_topic(product_id: &str, device_id: &str, service_type: &str) -> String {
+    format!("/{product_id}/{device_id}/thing/service/{service_type}/set_reply")
 }
 
 fn mqtt_publish_message(client_id: &str, topic: &str, payload: &JsonValue) -> RMqttPublishMessage {
@@ -214,16 +214,19 @@ async fn scenario_shadow_set_desired_online_converges(ctx: &mut TestContext) {
         request_json(&ctx.service, Method::POST, "/api/thing/property/post", &msg).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 
-    // 7. Acknowledge the delivered command: reply code 200 -> Success.
+    // 7. Acknowledge the delivered command via the unified service_set_reply
+    //    webhook (BE-D02): reply code 200 with the top-level string correlation
+    //    id -> Success. The old property-private `/property/set_reply` route
+    //    and `{data:[id]}` batch payload were deleted.
     let reply_msg = mqtt_publish_message(
         device_id,
-        &property_set_reply_topic(product_id, device_id),
-        &json!({ "id": "shdw-online-reply-001", "data": [command_id], "code": 200 }),
+        &service_set_reply_topic(product_id, device_id, "property"),
+        &json!({ "id": format!("property:{command_id}"), "code": 200 }),
     );
     let (status, _) = request_json(
         &ctx.service,
         Method::POST,
-        "/api/thing/property/set_reply",
+        "/api/thing/service/set_reply",
         &reply_msg,
     )
     .await;

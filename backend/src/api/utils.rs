@@ -1,19 +1,31 @@
 use crate::api::error::ApiError;
 use crate::api::web_models::{AckStatus, MqttPayload};
 use crate::db::database::DatabaseService;
+use crate::db::models::{ActionInvocation, CommandStatus};
 use crate::rmqtt_client::{PublishRequest, RmqttHttpClient};
 use serde_json::Value as JsonValue;
-use tracing::info;
+use tracing::{info, warn};
 
-// 辅助函数：向设备发送属性命令
+// Drain and publish all Pending property commands for a device as spec
+// single-row envelopes (thing-model-extension design §5.1 / §1.4).
+//
+// Each claimed row is published independently with its own
+// `command_payload("property", id, command)` envelope (`id = "property:{db_id}"`)
+// rather than the deleted legacy private batch payload (which grouped rows into
+// a single keyed-object params blob). Rows keep the
+// existing drain semantics: `update_pending_commands_to_sent` flips every
+// Pending row for (product, device) to Sent and returns them; this helper then
+// publishes each one. On per-row publish failure the row is flipped Sent ->
+// Failed via `update_sent_commands_to_failed` and the loop continues with the
+// next row (no batching, matching the action-side behaviour in
+// `send_action_invocations_to_device`).
 pub async fn send_property_command_to_device(
     db: &DatabaseService,
     rmqtt_client: &RmqttHttpClient,
     product_id: &str,
     device_id: &str,
 ) -> anyhow::Result<()> {
-    // 更新 pending 状态的命令为 sent，并获取命令信息
-    let mut commands = db
+    let commands = db
         .update_pending_commands_to_sent(product_id, device_id)
         .await?;
 
@@ -22,61 +34,134 @@ pub async fn send_property_command_to_device(
         return Ok(());
     }
 
-    // 按 created_time ASC, id ASC 排序后合并，保证同属性并发下发的 last-write-wins
-    //（后到者覆盖先到者）。RETURNING 无序，需在合并前显式排序。
-    commands.sort_by(|a, b| a.2.cmp(&b.2).then(a.0.cmp(&b.0)));
-
-    let mut merged_command = serde_json::Map::new();
-    let mut command_ids = Vec::new();
-
-    for (id, command, _created_time) in commands {
-        command_ids.push(id);
-
-        if let JsonValue::Object(cmd_obj) = command {
-            for (key, value) in cmd_obj {
-                merged_command.insert(key, value);
-            }
-        }
-    }
-
-    // 构造下发指令
-    let config = &rmqtt_client.config;
-    let publish_config = &config.property_command.publish;
-
+    let publish_config = &rmqtt_client.config.property_command.publish;
+    // Topic is constant across all rows of a device drain; build it once.
     let topic = publish_config
         .topic
         .replace("${productId}", product_id)
-        .replace("$clientid", device_id);
+        .replace("${clientid}", device_id);
 
-    let command_payload = MqttPayload {
-        id: uuid::Uuid::new_v4().to_string(),
-        ack: AckStatus::Yes,
-        params: Some(serde_json::json!({
-            "ids": command_ids,
-            "data": JsonValue::Object(merged_command.clone())
-        })),
-    };
+    for (id, command, _created_time) in commands {
+        let payload = command_payload("property", id, command);
+        let publish_request = PublishRequest {
+            topic: topic.clone(),
+            clientid: publish_config.clientid.clone(),
+            payload: serde_json::to_string(&payload)?,
+            encoding: Some("plain".to_string()),
+            qos: Some(publish_config.qos),
+            retain: Some(publish_config.retain),
+        };
 
-    let publish_request = PublishRequest {
-        topic,
-        clientid: publish_config.clientid.clone(),
-        payload: serde_json::to_string(&command_payload)?,
-        encoding: Some("plain".to_string()),
-        qos: Some(publish_config.qos),
-        retain: Some(publish_config.retain),
-    };
+        if let Err(e) = rmqtt_client.publish_command(publish_request).await {
+            warn!(
+                "Failed to publish property command id={} for device {}: {}",
+                id, device_id, e
+            );
+            // Flip Sent -> Failed so the row is not stuck; keep draining the rest.
+            db.update_sent_commands_to_failed(&[id]).await?;
+            continue;
+        }
 
-    // 发布命令到 RMQTT
-    if let Err(e) = rmqtt_client.publish_command(publish_request).await {
-        // 如果发布失败，将命令状态更新为 Failed
-        db.update_sent_commands_to_failed(&command_ids).await?;
-        return Err(e);
+        info!(
+            "Published property command id={} to device {}",
+            id, device_id
+        );
     }
 
-    info!(
-        "Published property command to device: {}, command_ids: {:?}",
-        device_id, command_ids
-    );
+    Ok(())
+}
+
+/// Construct the standard service-command payload (thing-model-extension
+/// design §5.1). Refines the design's `format!("action:{id}")` hardcoding into
+/// a `prefix` parameter so the same builder serves both property
+/// (`property:{id}`, BE-D02) and action (`action:{id}`, this item) without
+/// changing the wire protocol. Callers pass `"property"` or `"action"`.
+pub fn command_payload(prefix: &str, id: i64, params: JsonValue) -> MqttPayload {
+    MqttPayload {
+        id: format!("{prefix}:{id}"),
+        params: Some(params),
+        ack: AckStatus::Yes,
+    }
+}
+
+/// Drain and publish all Pending action invocations for a device (design §5.1).
+///
+/// Each iteration atomically claims the next Pending row (Pending -> Sent) via
+/// `claim_next_pending_action` (which uses `FOR UPDATE SKIP LOCKED` so concurrent
+/// callers never double-publish), builds the per-row MQTT topic by substituting
+/// the `${productId}` / `${clientid}` / `${service_type}` placeholders from
+/// `service_command.publish.topic`, publishes with the standard
+/// `command_payload("action", ...)` shape, and on publish failure flips the
+/// row from Sent back to Failed before continuing with the next row. The loop
+/// terminates when `claim_next_pending_action` returns `None`.
+///
+/// Actions are published one-by-one (no batching/merging): each `service_type`
+/// targets its own topic segment and must be delivered independently.
+pub async fn send_action_invocations_to_device(
+    db: &DatabaseService,
+    rmqtt_client: &RmqttHttpClient,
+    product_id: &str,
+    device_id: &str,
+) -> anyhow::Result<()> {
+    let publish_config = &rmqtt_client.config.service_command.publish;
+    // `${productId}` / `${clientid}` are constant for a device drain; only
+    // `${service_type}` varies per row. Build the prefix once.
+    let topic_prefix = publish_config
+        .topic
+        .replace("${productId}", product_id)
+        .replace("${clientid}", device_id);
+
+    loop {
+        let claimed = db.claim_next_pending_action(product_id, device_id).await?;
+
+        let Some(row) = claimed else {
+            break;
+        };
+
+        // Move `params` (free-form JSONB, unbounded) out of the owned row
+        // instead of cloning it per iteration.
+        let ActionInvocation {
+            id,
+            service_type,
+            params,
+            ..
+        } = row;
+        let topic = topic_prefix.replace("${service_type}", &service_type);
+
+        let payload = command_payload("action", id, params);
+        let publish_request = PublishRequest {
+            topic,
+            clientid: publish_config.clientid.clone(),
+            payload: serde_json::to_string(&payload)?,
+            encoding: Some("plain".to_string()),
+            qos: Some(publish_config.qos),
+            retain: Some(publish_config.retain),
+        };
+
+        if let Err(e) = rmqtt_client.publish_command(publish_request).await {
+            warn!(
+                "Failed to publish action invocation id={} service_type={} for device {}: {}",
+                id, service_type, device_id, e
+            );
+            // Flip Sent -> Failed so the row is not stuck; keep draining the rest.
+            let _ = db
+                .update_action_invocation_status(
+                    id,
+                    product_id,
+                    device_id,
+                    &service_type,
+                    CommandStatus::Failed,
+                    CommandStatus::Sent,
+                )
+                .await;
+            continue;
+        }
+
+        info!(
+            "Published action invocation id={} service_type={} to device {}",
+            id, service_type, device_id
+        );
+    }
 
     Ok(())
 }
@@ -115,7 +200,41 @@ pub fn extract_event_identifier_from_topic(topic: &str) -> Option<String> {
     }
 }
 
+/// Extract the `service_type` segment from a thing/service topic of the form
+/// `/{product}/{device}/thing/service/{service_type}/set_reply` (or `.../set`).
+/// Mirrors `extract_event_identifier_from_topic` but matches the service
+/// segment layout. Used by the unified `service_set_reply` webhook handler
+/// (thing-model-extension design §5.2) to dispatch by `service_type`:
+/// `property` routes to `property_command`, any other value to
+/// `action_invocation`.
+pub fn extract_service_type_from_topic(topic: &str) -> Option<String> {
+    let mut parts = topic.trim_start_matches('/').split('/');
+    // expected: {product}, {device}, "thing", "service", {service_type}, ...
+    match (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) {
+        (Some(_), Some(_), Some(seg3), Some(seg4), Some(service_type))
+            if seg3 == "thing" && seg4 == "service" && !service_type.is_empty() =>
+        {
+            Some(service_type.to_string())
+        }
+        _ => None,
+    }
+}
+
 const MAX_IDENTIFIER_LENGTH: usize = 128;
+
+/// First character that is not allowed in an identifier or `service_type`
+/// (`[a-zA-Z0-9_-]`). Shared by `validate_identifier` and the service-type
+/// validator so the accepted character set has a single source of truth.
+pub(crate) fn first_invalid_identifier_char(id: &str) -> Option<char> {
+    id.chars()
+        .find(|c| !c.is_ascii_alphanumeric() && *c != '-' && *c != '_')
+}
 
 pub fn validate_identifier(id: &str, field_name: &str) -> Result<(), ApiError> {
     if id.is_empty() {
@@ -128,10 +247,7 @@ pub fn validate_identifier(id: &str, field_name: &str) -> Result<(), ApiError> {
             "{field_name} must not exceed {MAX_IDENTIFIER_LENGTH} characters"
         )));
     }
-    if let Some(ch) = id
-        .chars()
-        .find(|c| !c.is_ascii_alphanumeric() && *c != '-' && *c != '_')
-    {
+    if let Some(ch) = first_invalid_identifier_char(id) {
         return Err(ApiError::bad_request(format!(
             "{field_name} contains invalid character '{ch}'. Only alphanumeric characters, hyphens, and underscores are allowed"
         )));

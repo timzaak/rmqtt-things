@@ -1,0 +1,307 @@
+import { createElement } from 'react'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { renderHook, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { client } from '@/lib/api-generated/client.gen'
+import type { ActionInvocationView } from '@/lib/api-generated/types.gen'
+import {
+  useActionInvocations,
+  useCreateActionInvocation,
+  useDeleteActionInvocations,
+} from '@/hooks/useActionInvocations'
+
+// The generated client builds `new Request(url)`, which rejects relative URLs
+// under jsdom. Pin an absolute baseUrl so the probe resolves; the fetch stub
+// matches on the path substring regardless of host (mirrors auth.test.ts).
+const BASE_URL = 'http://test.local'
+
+/** Captured request: URL string + parsed JSON body (undefined for bodyless). */
+interface CapturedCall {
+  url: string
+  body: unknown
+}
+
+/**
+ * Stub global fetch so we observe the *real* request the shared `client`
+ * emits. Returns a 200 JSON response by default and records every call for
+ * later URL/body assertions. We never mock the hooks' internals — the request
+ * goes through the real generated sdk functions.
+ */
+function stubFetch(
+  respond: (
+    url: string
+  ) => { status: number; body?: string } | Promise<{ status: number; body?: string }>
+): { calls: CapturedCall[] } {
+  const calls: CapturedCall[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      // The client always passes a Request here; read `.url` directly because
+      // Request.toString() does not yield its URL in this jsdom (auth.test.ts).
+      const url =
+        typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString()
+      const { status, body } = await respond(url)
+      // Drain the request body once so it is readable; GET/DELETE have none.
+      let parsedBody: unknown
+      if (input instanceof Request) {
+        const raw = await input.clone().text()
+        parsedBody = raw ? JSON.parse(raw) : undefined
+      }
+      calls.push({ url, body: parsedBody })
+      return new Response(body ?? null, {
+        status,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      })
+    })
+  )
+  return { calls }
+}
+
+/** A list response shaped like the backend `ActionInvocationListResponse`. */
+function listBody(): string {
+  return JSON.stringify({
+    data: [
+      {
+        id: 1,
+        serviceType: 'reboot',
+        params: { delaySeconds: 5 },
+        status: 'Pending',
+        createdTime: '2025-01-01T10:00:00Z',
+        updatedTime: '2025-01-01T10:00:00Z',
+      } satisfies ActionInvocationView,
+    ],
+    pagination: { page: 1, page_size: 10, total: 1 },
+  })
+}
+
+/** Build a fresh QueryClient per test so caches never bleed across cases. */
+function createTestQueryClient(): QueryClient {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } })
+}
+
+/**
+ * Wrapper that injects an isolated QueryClient into the hook under test.
+ * A named function satisfies react/display-name (anonymous arrow components
+ * would trip it).
+ */
+function makeWrapper(queryClient: QueryClient) {
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(QueryClientProvider, { client: queryClient }, children)
+  }
+  return Wrapper
+}
+
+describe('useActionInvocations query', () => {
+  beforeEach(() => {
+    client.setConfig({ baseUrl: BASE_URL })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('passes product_id/device_id/page/page_size as query params', async () => {
+    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(
+      () =>
+        useActionInvocations({
+          product_id: 'product-a',
+          device_id: 'device-001',
+          page: 2,
+          page_size: 25,
+        }),
+      { wrapper: makeWrapper(queryClient) }
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(calls).toHaveLength(1)
+    const params = new URL(calls[0].url).searchParams
+    // Backend expects snake_case query keys (ActionCommandQuery).
+    expect(params.get('product_id')).toBe('product-a')
+    expect(params.get('device_id')).toBe('device-001')
+    expect(params.get('page')).toBe('2')
+    expect(params.get('page_size')).toBe('25')
+    expect(calls[0].url).toContain('/api/admin/service/command')
+  })
+
+  test('defaults page to 1 and page_size to 10 when omitted', async () => {
+    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(() => useActionInvocations({ product_id: 'product-a' }), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const params = new URL(calls[0].url).searchParams
+    expect(params.get('page')).toBe('1')
+    expect(params.get('page_size')).toBe('10')
+  })
+
+  test('uses separate cache entries for different params', async () => {
+    const { calls } = stubFetch(() => ({ status: 200, body: listBody() }))
+    const queryClient = createTestQueryClient()
+
+    const paramsA = { product_id: 'product-a', device_id: 'device-1', page: 1, page_size: 10 }
+    const paramsB = { product_id: 'product-b', device_id: 'device-2', page: 2, page_size: 20 }
+
+    const { result: resultA } = renderHook(() => useActionInvocations(paramsA), {
+      wrapper: makeWrapper(queryClient),
+    })
+    await waitFor(() => expect(resultA.current.isSuccess).toBe(true))
+
+    const { result: resultB } = renderHook(() => useActionInvocations(paramsB), {
+      wrapper: makeWrapper(queryClient),
+    })
+    await waitFor(() => expect(resultB.current.isSuccess).toBe(true))
+
+    // Two distinct GETs because the cache keys differ by the whole params object.
+    expect(calls).toHaveLength(2)
+
+    // Each params object is cached independently — neither overwrites the other.
+    const cachedA = queryClient.getQueryData(['action-invocations', paramsA])
+    const cachedB = queryClient.getQueryData(['action-invocations', paramsB])
+    expect(cachedA).toBeDefined()
+    expect(cachedB).toBeDefined()
+    expect(cachedA).not.toBe(cachedB)
+  })
+
+  test('surfaces HTTP errors via throwOnError', async () => {
+    // 500 must throw inside the queryFn because the hook sets throwOnError:true,
+    // landing the hook in error state. (Without throwOnError the client would
+    // resolve to `{ error }` and React Query would treat it as success.)
+    stubFetch(() => ({ status: 500, body: JSON.stringify({ error: 'boom' }) }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(() => useActionInvocations({ product_id: 'product-a' }), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toBeDefined()
+  })
+})
+
+describe('useCreateActionInvocation', () => {
+  beforeEach(() => {
+    client.setConfig({ baseUrl: BASE_URL })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('posts productId/deviceId/serviceType/params as JSON body', async () => {
+    const { calls } = stubFetch(() => ({ status: 201, body: '{}' }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(() => useCreateActionInvocation(), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await result.current.mutateAsync({
+      productId: 'product-a',
+      deviceId: 'device-001',
+      serviceType: 'reboot',
+      params: { delaySeconds: 5 },
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toContain('/api/admin/service/command')
+    // Body is the CreateActionCommandRequest shape, all four fields exact.
+    expect(calls[0].body).toEqual({
+      productId: 'product-a',
+      deviceId: 'device-001',
+      serviceType: 'reboot',
+      params: { delaySeconds: 5 },
+    })
+  })
+
+  test('omits params from body when not provided', async () => {
+    const { calls } = stubFetch(() => ({ status: 201, body: '{}' }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(() => useCreateActionInvocation(), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await result.current.mutateAsync({
+      productId: 'product-a',
+      deviceId: 'device-001',
+      serviceType: 'unlock',
+    })
+
+    expect(calls[0].body).toEqual({
+      productId: 'product-a',
+      deviceId: 'device-001',
+      serviceType: 'unlock',
+    })
+    // The optional params key must not leak into the wire payload.
+    expect(calls[0].body).not.toHaveProperty('params')
+  })
+
+  test('invalidates action-invocations queries on success', async () => {
+    stubFetch(() => ({ status: 201, body: '{}' }))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+    const { result } = renderHook(() => useCreateActionInvocation(), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await result.current.mutateAsync({
+      productId: 'product-a',
+      deviceId: 'device-001',
+      serviceType: 'reboot',
+    })
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['action-invocations'] })
+  })
+})
+
+describe('useDeleteActionInvocations', () => {
+  beforeEach(() => {
+    client.setConfig({ baseUrl: BASE_URL })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('sends ids as comma-separated query param', async () => {
+    // The hook joins ids into "1,2" and types it through as number[] so the
+    // serializer treats it as a primitive, producing `ids=1,2` rather than the
+    // exploded `ids=1&ids=2` (mirrors useProperties delete convention).
+    const { calls } = stubFetch(() => ({ status: 204 }))
+    const queryClient = createTestQueryClient()
+
+    const { result } = renderHook(() => useDeleteActionInvocations(), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await result.current.mutateAsync([1, 2])
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].url).toContain('/api/admin/service/command')
+    expect(new URL(calls[0].url).searchParams.get('ids')).toBe('1,2')
+  })
+
+  test('invalidates action-invocations queries on success', async () => {
+    stubFetch(() => ({ status: 204 }))
+    const queryClient = createTestQueryClient()
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+    const { result } = renderHook(() => useDeleteActionInvocations(), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    await result.current.mutateAsync([1])
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['action-invocations'] })
+  })
+})

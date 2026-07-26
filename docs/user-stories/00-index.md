@@ -8,7 +8,7 @@
 
 | 文件 | 角色 | 故事数量 |
 |------|------|----------|
-| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 41 |
+| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 49 |
 | [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 10 |
 | [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 25 |
 
@@ -59,6 +59,14 @@
 | US-PA-039 | 配置告警清除条件 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-040 | 查看告警生命周期状态 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-041 | 手动清除告警 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-042 | 设置设备期望状态 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-043 | 查看设备期望状态与差异 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-044 | 在前端管理设备期望状态 | P2 | 01-platform-admin-user-stories.md |
+| US-PA-045 | 分批上报子组件元数据 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-046 | 上报设备-子组件关联 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-047 | 管理员查询设备出厂元数据与子组件清单 | P0 | 01-platform-admin-user-stories.md |
+| US-PA-048 | 调用设备动作 / 服务 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-049 | 在前端区分动作调用与属性下发 | P2 | 01-platform-admin-user-stories.md |
 
 ### Demo E2E (DEMO-xxx)
 

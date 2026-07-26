@@ -1,5 +1,6 @@
 use crate::api::utils::{
     extract_and_validate_product_id, extract_event_identifier_from_topic,
+    extract_service_type_from_topic, send_action_invocations_to_device,
     send_property_command_to_device, validate_identifier,
 };
 use crate::api::web_models::*;
@@ -16,24 +17,14 @@ use s3::bucket::Bucket;
 use s3::creds::Credentials;
 use s3::post_policy::{PostPolicy, PostPolicyField, PostPolicyValue};
 use s3::region::Region;
-use serde::Deserialize;
 use serde_json::{Value as JsonValue, json};
 use std::sync::Arc;
 use time::OffsetDateTime;
 use tracing::{debug, error, info, warn};
-use utoipa::ToSchema;
 
 use crate::api::ApiState;
 use crate::api::error::ApiError;
 use crate::rule_engine::{TriggerContext, TriggerType, evaluate_and_trigger};
-
-#[derive(Deserialize, ToSchema)]
-pub struct PropertySetReplyPayload {
-    data: Vec<i64>,
-    #[allow(dead_code)]
-    id: String,
-    code: u32,
-}
 
 pub struct AppState {
     pub db: DatabaseService,
@@ -85,53 +76,64 @@ pub async fn property_post(
             })?;
 
             let validator = if let Some(schema) = schema_value {
-                compile_schema(&schema).map_err(|e| {
+                Some(compile_schema(&schema).map_err(|e| {
                     error!("Failed to compile schema from cache: {}", e);
                     ApiError::internal("Schema compilation failed")
-                })?
+                })?)
             } else {
                 // 从数据库获取 schema
-                let schema_template = app_state
+                match app_state
                     .db
                     .get_property_schema(&product_id)
                     .await
                     .map_err(|e| {
                         error!("Database error while getting schema: {}", e);
                         ApiError::internal("Database operation failed")
-                    })?
-                    .ok_or_else(|| {
-                        error!("Schema not found for product_id: {}", product_id);
-                        ApiError::bad_request("Schema not found")
-                    })?;
+                    })? {
+                    Some(schema_template) => {
+                        // 编译 schema
+                        let validator = compile_schema(&schema_template.schema).map_err(|e| {
+                            error!("Failed to compile schema: {}", e);
+                            ApiError::internal("Schema compilation failed")
+                        })?;
 
-                // 编译 schema
-                let validator = compile_schema(&schema_template.schema).map_err(|e| {
-                    error!("Failed to compile schema: {}", e);
-                    ApiError::internal("Schema compilation failed")
-                })?;
-
-                // 异步地将 schema 存入缓存
-                let cache_clone = app_state.cache.clone();
-                let product_id_clone = product_id.clone();
-                let schema_to_cache = schema_template.schema.clone();
-                tokio::spawn(async move {
-                    if let Err(e) = cache_clone.set(product_id_clone, schema_to_cache).await {
-                        error!("Failed to cache schema: {}", e);
+                        // 异步地将 schema 存入缓存
+                        let cache_clone = app_state.cache.clone();
+                        let product_id_clone = product_id.clone();
+                        let schema_to_cache = schema_template.schema.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = cache_clone.set(product_id_clone, schema_to_cache).await
+                            {
+                                error!("Failed to cache schema: {}", e);
+                            }
+                        });
+                        Some(validator)
                     }
-                });
-                validator
+                    None => {
+                        // 无 Active 模板时放行（thing-model-extension 设计 §8 /
+                        // §414）：总开关只控制是否启用校验流程，无模板时不拒绝，
+                        // 与 event_post 的"无 schema 即放行"语义一致。
+                        debug!(
+                            "No property schema template for product_id={}, accepting",
+                            product_id
+                        );
+                        None
+                    }
+                }
             };
 
-            // 验证属性
-            let errors: Vec<_> = validator.iter_errors(&properties).collect();
-            if !errors.is_empty() {
-                let error_messages: Vec<String> =
-                    errors.into_iter().map(|err| err.to_string()).collect();
-                error!(
-                    "Property validation failed for device {}: {:?}",
-                    device_id, error_messages
-                );
-                return Err(ApiError::bad_request("Property validation failed"));
+            // 验证属性（仅当存在模板时）
+            if let Some(validator) = validator {
+                let errors: Vec<_> = validator.iter_errors(&properties).collect();
+                if !errors.is_empty() {
+                    let error_messages: Vec<String> =
+                        errors.into_iter().map(|err| err.to_string()).collect();
+                    error!(
+                        "Property validation failed for device {}: {:?}",
+                        device_id, error_messages
+                    );
+                    return Err(ApiError::bad_request("Property validation failed"));
+                }
             }
         }
 
@@ -190,6 +192,17 @@ pub async fn event_post(
     State(state): State<Arc<ApiState>>,
     Json(mqtt_msg): Json<RMqttPublishMessage>,
 ) -> Result<StatusCode, ApiError> {
+    // Unified event dispatch (thing-model-extension design §5.2): the single
+    // wildcard rule `+/+/thing/event/+/post` routes every event publish here.
+    // When the `event_type` topic segment is `property`, delegate to
+    // `property_post` so its full side-effects are preserved (thing schema
+    // validation, `upsert_property_latest` snapshot, and `TriggerType::Property`
+    // rule evaluation). This MUST NOT be reduced to "only snapshot the value" —
+    // doing so would drop validation and the property rule trigger.
+    if extract_event_identifier_from_topic(&mqtt_msg.topic).as_deref() == Some("property") {
+        return property_post(State(state.clone()), Json(mqtt_msg)).await;
+    }
+
     let app_state = &state.app;
 
     let payload = mqtt_msg.decode_payload_as_json().map_err(|e| {
@@ -388,7 +401,7 @@ pub async fn file_upload_handler(
         };
 
         let response = MqttResponse {
-            id: payload.id,
+            id: payload.id.clone(),
             code: 200,
             data: Some(json!(response_data)),
         };
@@ -398,10 +411,14 @@ pub async fn file_upload_handler(
             ApiError::internal("Failed to serialize response")
         })?;
 
-        if let Err(e) = state
-            .rmqtt_client
-            .publish_response(&mqtt_msg.topic, &response_payload)
-            .await
+        // Ack gating (design §5.3 / §1.5): only publish the `_reply` when the
+        // device asked for one (`ack == AckStatus::Yes`). Matches the pattern
+        // in ota_handlers.rs and event_post.
+        if payload.ack == AckStatus::Yes
+            && let Err(e) = state
+                .rmqtt_client
+                .publish_response(&mqtt_msg.topic, &response_payload)
+                .await
         {
             error!("Failed to publish response: {}", e);
         }
@@ -409,19 +426,24 @@ pub async fn file_upload_handler(
         Ok(StatusCode::NO_CONTENT)
     } else {
         warn!("does not support file upload");
+        // Object-data contract (design §5.3 / §1.5): error responses carry a
+        // `{message}` object, NOT a bare string. The previous `json!("…")`
+        // emitted a JSON string and violated spec.
         let response = MqttResponse {
-            id: payload.id,
+            id: payload.id.clone(),
             code: 503,
-            data: Some(json!("do not support file upload")),
+            data: Some(json!({"message": "do not support file upload"})),
         };
         let response_payload = serde_json::to_string(&response).map_err(|e| {
             error!("Failed to serialize response: {}", e);
             ApiError::internal("Failed to serialize response")
         })?;
-        if let Err(e) = state
-            .rmqtt_client
-            .publish_response(&mqtt_msg.topic, &response_payload)
-            .await
+        // Same ack gating as the success branch.
+        if payload.ack == AckStatus::Yes
+            && let Err(e) = state
+                .rmqtt_client
+                .publish_response(&mqtt_msg.topic, &response_payload)
+                .await
         {
             error!("Failed to publish response: {}", e);
         }
@@ -450,53 +472,21 @@ pub fn is_file_upload_directory_allowed(
     })
 }
 
+// 统一服务下发结果上报接口（thing-model-extension 设计 §5.2）
+//
+// Replaces the deleted `property_set_reply` private-batch handler. The Broker
+// forwards every `thing/service/{service_type}/set_reply` publish here via a
+// single wildcard rule. The handler dispatches by the `service_type` topic
+// segment and by the `{prefix}:{db_id}` correlation id encoded in the spec
+// response payload's top-level `id` field:
+//   - `property:{db_id}` -> `property_command` (prev_status = Sent)
+//   - `action:{db_id}`   -> `action_invocation` (prev_status = Sent)
+// Any 2xx `code` is treated as Success; everything else is Failed (HTTP
+// semantics, design §5.2). Duplicate / unknown / non-Sent rows return 204 +
+// warn so the Broker does not retry.
 #[utoipa::path(
     post,
-    path = "/api/thing/property/set_subscribe",
-    tag = "thing",
-    request_body = RMqttSubscribeMessage,
-    responses(
-        (status = 204, description = "Subscription accepted"),
-        (status = 400, description = "Invalid request"),
-        (status = 500, description = "Server error")
-    )
-)]
-pub async fn property_set_subscribe(
-    State(state): State<Arc<ApiState>>,
-    Json(mqtt_msg): Json<RMqttSubscribeMessage>,
-) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
-
-    let device_id = &mqtt_msg.client_id;
-    validate_identifier(device_id, "device_id")?;
-    info!("Processing property post for device: {}", device_id);
-
-    let topic = mqtt_msg.topic.as_deref().ok_or_else(|| {
-        error!(
-            "Topic not found in subscribe message for device: {}",
-            device_id
-        );
-        ApiError::bad_request("Topic not found")
-    })?;
-    let product_id = extract_and_validate_product_id(topic)?;
-    // 使用共享函数发送命令
-    if let Err(e) =
-        send_property_command_to_device(&state.db, &state.rmqtt_client, &product_id, device_id)
-            .await
-    {
-        error!(
-            "Failed to send property command to device {}: {}",
-            device_id, e
-        );
-        return Err(ApiError::internal("Failed to publish command"));
-    }
-    Ok(StatusCode::NO_CONTENT)
-}
-
-// 属性下发结果上报接口
-#[utoipa::path(
-    post,
-    path = "/api/thing/property/set_reply",
+    path = "/api/thing/service/set_reply",
     tag = "thing",
     request_body = RMqttPublishMessage,
     responses(
@@ -505,50 +495,236 @@ pub async fn property_set_subscribe(
         (status = 500, description = "Server error")
     )
 )]
-pub async fn property_set_reply(
+pub async fn service_set_reply(
     State(state): State<Arc<ApiState>>,
     Json(mqtt_msg): Json<RMqttPublishMessage>,
 ) -> Result<StatusCode, ApiError> {
-    let state = &state.app;
+    let app_state = &state.app;
+
+    validate_identifier(&mqtt_msg.client_id, "device_id")?;
+    let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
+    let service_type = extract_service_type_from_topic(&mqtt_msg.topic).ok_or_else(|| {
+        warn!(
+            "service_set_reply: could not extract service_type from topic '{}'",
+            mqtt_msg.topic
+        );
+        ApiError::bad_request("Invalid service topic")
+    })?;
 
     let bytes = mqtt_msg.decode_payload().map_err(|e| {
         debug!("Failed to decode base64 payload: {}", e);
         ApiError::bad_request("Invalid payload encoding")
     })?;
-    let payload: PropertySetReplyPayload = serde_json::from_slice(&bytes).map_err(|e| {
-        debug!("Failed to parse payload JSON: {}", e);
+    let payload: MqttResponse = serde_json::from_slice(&bytes).map_err(|e| {
+        debug!("Failed to parse payload JSON as MqttResponse: {}", e);
         ApiError::bad_request("Invalid payload format")
     })?;
 
-    let command_ids = payload.data;
-    let status = if payload.code == 200 {
+    // HTTP-style 2xx success boundary (design §5.2). Not `== 200`.
+    let status = if (200..=299).contains(&payload.code) {
         CommandStatus::Success
     } else {
         CommandStatus::Failed
     };
 
-    let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
-    validate_identifier(&mqtt_msg.client_id, "device_id")?;
-    // 更新命令状态
-    state
-        .db
-        .update_property_command_status(
-            &command_ids,
-            &product_id,
-            &mqtt_msg.client_id,
-            status,
-            CommandStatus::Sent,
-        )
-        .await
-        .map_err(|e| {
-            error!("Database error: {}", e);
-            ApiError::internal("Database operation failed")
-        })?;
+    // Parse the platform-generated correlation id `{prefix}:{db_id}`.
+    let (prefix, db_id_str) = payload.id.split_once(':').ok_or_else(|| {
+        warn!(
+            "service_set_reply: id '{}' is not a '{{prefix}}:{{db_id}}' correlation id",
+            payload.id
+        );
+        ApiError::bad_request("Invalid id format")
+    })?;
+    let db_id: i64 = db_id_str.parse().map_err(|_| {
+        warn!(
+            "service_set_reply: id '{}' has non-numeric db_id part '{}'",
+            payload.id, db_id_str
+        );
+        ApiError::bad_request("Invalid id format")
+    })?;
+
+    match prefix {
+        "property" => {
+            // Note: the existing `update_property_command_status` takes
+            // `&Vec<i64>` (database.rs). The single-id form for action is the
+            // BE-D01 asymmetry; we wrap the single id rather than touch the
+            // property signature (BE-D02 scope).
+            app_state
+                .db
+                .update_property_command_status(
+                    &vec![db_id],
+                    &product_id,
+                    &mqtt_msg.client_id,
+                    status,
+                    CommandStatus::Sent,
+                )
+                .await
+                .map_err(|e| {
+                    error!("Database error: {}", e);
+                    ApiError::internal("Database operation failed")
+                })?;
+            info!(
+                "Updated property command id={} status to {:?}",
+                db_id, status
+            );
+        }
+        "action" => {
+            let affected = app_state
+                .db
+                .update_action_invocation_status(
+                    db_id,
+                    &product_id,
+                    &mqtt_msg.client_id,
+                    &service_type,
+                    status,
+                    CommandStatus::Sent,
+                )
+                .await
+                .map_err(|e| {
+                    error!("Database error: {}", e);
+                    ApiError::internal("Database operation failed")
+                })?;
+            if affected == 0 {
+                // Duplicate reply, unknown id, or row no longer Sent. Return
+                // 204 + warn so the Broker does not retry the webhook.
+                warn!(
+                    "service_set_reply: action id={} not updated (duplicate/unknown/non-Sent)",
+                    db_id
+                );
+            } else {
+                info!(
+                    "Updated action invocation id={} service_type={} status to {:?}",
+                    db_id, service_type, status
+                );
+            }
+        }
+        other => {
+            // Unknown correlation prefix. Return 204 + warn so the Broker does
+            // not retry; this is not a client-format error worth a 4xx.
+            warn!(
+                "service_set_reply: unknown id prefix '{}' (id='{}')",
+                other, payload.id
+            );
+        }
+    }
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// 统一服务订阅触发投递接口（thing-model-extension 设计 §5.2 / §4.2.2）
+//
+// Replaces the deleted `property_set_subscribe` handler. The Broker fires this
+// once when a device subscribes to the wildcard `thing/service/+/set` filter.
+// The subscribe filter's first segment is `+`, so productId cannot be read from
+// the topic; it is read from the WebHook `username`. The handler then drains
+// both property and action pending commands for the device.
+#[utoipa::path(
+    post,
+    path = "/api/thing/service/set_subscribe",
+    tag = "thing",
+    request_body = RMqttSubscribeMessage,
+    responses(
+        (status = 204, description = "Subscription accepted"),
+        (status = 400, description = "Invalid request"),
+        (status = 500, description = "Server error")
+    )
+)]
+pub async fn service_set_subscribe(
+    State(state): State<Arc<ApiState>>,
+    Json(mqtt_msg): Json<RMqttSubscribeMessage>,
+) -> Result<StatusCode, ApiError> {
+    let app_state = &state.app;
+
+    let device_id = &mqtt_msg.client_id;
+    validate_identifier(device_id, "device_id")?;
+
+    // productId comes from the WebHook username, not the topic: the device
+    // subscribes to the wildcard `+/{deviceId}/thing/service/+/set`, so the
+    // first topic segment is `+` and cannot serve as productId.
+    let product_id = mqtt_msg.username.as_deref().unwrap_or("");
+    validate_identifier(product_id, "product_id")?;
+
+    // Validate that the topic's second segment equals the reported clientId,
+    // guarding against mismatched subscribe/client identity.
+    if let Some(topic) = mqtt_msg.topic.as_deref() {
+        let mut parts = topic.trim_start_matches('/').split('/');
+        let _first = parts.next();
+        let second = parts.next();
+        if second.is_none_or(|seg| seg != device_id) {
+            warn!(
+                "service_set_subscribe: topic '{}' second segment does not match clientId '{}'",
+                topic, device_id
+            );
+            return Err(ApiError::bad_request("Topic does not match clientId"));
+        }
+    }
 
     info!(
-        "Updated property command {:?} status to {:?}",
-        command_ids, status
+        "Processing service set_subscribe for product={} device={}",
+        product_id, device_id
     );
+
+    // Subscription-readiness gate (design offline-queued-delivery-drain-timing.md
+    // §4 方案 A): the `client_subscribe` webhook is dispatched by the broker
+    // during CONNECT (auto-subscription), which may happen BEFORE the device's
+    // own SUBACK is registered in the broker's subscription table. Publishing
+    // at that moment loses the message (no matching subscriber). Mirror the
+    // already-working online path (admin_handlers.rs `is_subscribed` gate):
+    // query the broker's live `/subscriptions` and only drain when the device is
+    // actually subscribed. If not ready, leave rows Pending — they will be
+    // drained by a later trigger (device_connect fallback below, the next
+    // webhook, or the online immediate-delivery path).
+    //
+    // The auto-subscription filter is the single wildcard
+    // `+/{clientid}/thing/service/+/set` (rmqtt-auto-subscription.toml), which
+    // covers every service_type including `property`. So checking the concrete
+    // `property/set` topic via `is_subscribed_to_properties` is sufficient to
+    // know the whole service-set filter is registered — no separate per-
+    // service_type gate is needed.
+    let subscribed = app_state
+        .rmqtt_client
+        .is_subscribed_to_properties(product_id, device_id)
+        .await
+        .unwrap_or(false);
+    if !subscribed {
+        info!(
+            "service_set_subscribe: device {} not yet registered as subscribed at broker, skip drain (will retry on next trigger)",
+            device_id
+        );
+        return Ok(StatusCode::NO_CONTENT);
+    }
+
+    // Drain property pending first, then action pending. Each helper publishes
+    // its own per-row spec envelope (BE-D02 property single-row + BE-D01 action).
+    if let Err(e) = send_property_command_to_device(
+        &app_state.db,
+        &app_state.rmqtt_client,
+        product_id,
+        device_id,
+    )
+    .await
+    {
+        error!(
+            "Failed to send property command to device {}: {}",
+            device_id, e
+        );
+        return Err(ApiError::internal("Failed to publish command"));
+    }
+
+    if let Err(e) = send_action_invocations_to_device(
+        &app_state.db,
+        &app_state.rmqtt_client,
+        product_id,
+        device_id,
+    )
+    .await
+    {
+        error!(
+            "Failed to send action invocations to device {}: {}",
+            device_id, e
+        );
+        return Err(ApiError::internal("Failed to publish command"));
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -761,6 +937,57 @@ pub async fn device_connect(
             error!("Database error on device connect: {}", e);
             ApiError::internal("Database operation failed")
         })?;
+
+    // Offline-queue fallback drain (design
+    // offline-queued-delivery-drain-timing.md §4 方案 A.1): the primary drain
+    // trigger is `service_set_subscribe` (client_subscribe webhook), but that
+    // webhook fires during CONNECT, when the device subscription may not yet be
+    // registered at the broker — the gate there skips the drain in that case.
+    // `client_connected` fires after CONNACK, by which time the auto-subscription
+    // is usually registered, so this is a reliable fallback to drain anything
+    // the primary trigger skipped. Same subscription-readiness gate as the
+    // primary path; drain helpers are idempotent (atomic Pending->Sent flip via
+    // FOR UPDATE SKIP LOCKED), so concurrent/ repeated calls are safe.
+    let product_id = req.product_id.clone();
+    let device_id = req.device_id.clone();
+    let subscribed = app_state
+        .rmqtt_client
+        .is_subscribed_to_properties(&product_id, &device_id)
+        .await
+        .unwrap_or(false);
+    if subscribed {
+        if let Err(e) = send_property_command_to_device(
+            &app_state.db,
+            &app_state.rmqtt_client,
+            &product_id,
+            &device_id,
+        )
+        .await
+        {
+            warn!(
+                "Failed to drain property commands for device {} on connect: {}",
+                device_id, e
+            );
+        }
+        if let Err(e) = send_action_invocations_to_device(
+            &app_state.db,
+            &app_state.rmqtt_client,
+            &product_id,
+            &device_id,
+        )
+        .await
+        {
+            warn!(
+                "Failed to drain action invocations for device {} on connect: {}",
+                device_id, e
+            );
+        }
+    } else {
+        info!(
+            "device_connect: device {} not yet subscribed at broker, skip fallback drain",
+            device_id
+        );
+    }
 
     // 异步触发规则评估（不阻塞主流程）
     let admin = Arc::clone(&state.admin);

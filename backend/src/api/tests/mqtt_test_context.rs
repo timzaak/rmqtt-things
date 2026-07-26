@@ -4,7 +4,7 @@ use crate::api::{AdminAppState, create_router};
 use crate::cache::{InMemorySchemaCache, SchemaCache};
 use crate::config::{
     AccessConfig, AuthConfig, Config, MqttConfig, MqttPublishConfig, MqttResponseConfig,
-    PropertyCommandConfig, PropertyCommandPublishConfig, S3Config,
+    PropertyCommandConfig, PropertyCommandPublishConfig, S3Config, ServiceCommandConfig,
 };
 use crate::db::database::DatabaseService;
 use crate::rmqtt_client::RmqttHttpClient;
@@ -91,6 +91,12 @@ impl AsyncTestContext for MqttTestContext {
                         retries: 2,
                     },
                 },
+                // thing-model-extension: service/action command publish config
+                // (design §5.2). Uses the same three placeholders as production
+                // (`${productId}` / `${clientid}` / `${service_type}`) so the
+                // scenario tests for action invocations publish to the right
+                // topic segment per service_type.
+                service_command: ServiceCommandConfig::default(),
                 access: AccessConfig {
                     auth: AuthConfig {
                         suffix: AUTH_SUFFIX.to_string(),

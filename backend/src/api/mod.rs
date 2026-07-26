@@ -91,13 +91,13 @@ pub fn create_router(
         .route("/access/auth", post(auth_handlers::auth))
         .route("/access/acl", post(auth_handlers::acl))
         .route(
-            "/thing/property/set_subscribe",
-            post(handlers::property_set_subscribe),
+            "/thing/service/set_subscribe",
+            post(handlers::service_set_subscribe),
         )
         .route("/thing/property/post", post(handlers::property_post))
         .route(
-            "/thing/property/set_reply",
-            post(handlers::property_set_reply),
+            "/thing/service/set_reply",
+            post(handlers::service_set_reply),
         )
         .route("/thing/event/post", post(handlers::event_post))
         .route("/thing/file/upload", post(handlers::file_upload_handler))
@@ -119,6 +119,16 @@ pub fn create_router(
             get(admin_handlers::get_property_commands)
                 .post(admin_handlers::create_property_command)
                 .delete(admin_handlers::delete_property_commands),
+        )
+        // Action / service invocation admin endpoints (thing-model-extension
+        // design §4.2.2). Compound route mirrors `/admin/property/command`:
+        // GET → history query, POST → create, DELETE → soft delete.
+        // `extract_permission` maps `/admin/service/*` to the `device` resource.
+        .route(
+            "/admin/service/command",
+            get(admin_handlers::get_service_commands)
+                .post(admin_handlers::create_service_command)
+                .delete(admin_handlers::delete_service_commands),
         )
         .route(
             "/admin/property/shadow/desired",

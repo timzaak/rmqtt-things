@@ -74,6 +74,18 @@ vi.mock('@/hooks/useEvents', () => ({
   useEventHistory: (...args: unknown[]) => mockUseEventHistory(...args),
 }))
 
+// Actions tab (thing-model-extension). The section mounts only when its tab is
+// active, but the hook module is imported at page-load time; mock it so no
+// network call is ever issued.
+const mockUseActionInvocations = vi.fn()
+const mockUseCreateActionInvocation = vi.fn()
+const mockUseDeleteActionInvocations = vi.fn()
+vi.mock('@/hooks/useActionInvocations', () => ({
+  useActionInvocations: (...args: unknown[]) => mockUseActionInvocations(...args),
+  useCreateActionInvocation: () => mockUseCreateActionInvocation(),
+  useDeleteActionInvocations: () => mockUseDeleteActionInvocations(),
+}))
+
 const mockUseFactoryMetadata = vi.fn()
 const mockUseComponentChangeLog = vi.fn()
 vi.mock('@/hooks/useFactoryMetadata', () => ({
@@ -119,6 +131,13 @@ function setupMocks(deviceData = mockDevice) {
   })
   mockUseCreatePropertyCommand.mockReturnValue({ mutate: vi.fn(), isPending: false })
   mockUseDeletePropertyCommands.mockReturnValue({ mutate: vi.fn(), isPending: false })
+  // Actions tab defaults: empty list, idle mutations.
+  mockUseActionInvocations.mockReturnValue({
+    data: { data: [], pagination: undefined },
+    isLoading: false,
+  })
+  mockUseCreateActionInvocation.mockReturnValue({ mutate: vi.fn(), isPending: false })
+  mockUseDeleteActionInvocations.mockReturnValue({ mutate: vi.fn(), isPending: false })
   mockUsePropertyShadow.mockReturnValue({
     data: { desired: {}, reported: {}, delta: {} },
     isLoading: false,
@@ -201,6 +220,9 @@ describe('DevicesShowPage', () => {
 
     await openTab(user, 'Commands')
     expect(screen.getByRole('heading', { name: 'Property Commands' })).toBeInTheDocument()
+
+    await openTab(user, 'Actions')
+    expect(screen.getByRole('heading', { name: 'Action Invocations' })).toBeInTheDocument()
 
     await openTab(user, 'Property History')
     expect(screen.getByRole('heading', { name: 'Property History' })).toBeInTheDocument()

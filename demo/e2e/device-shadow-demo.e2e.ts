@@ -71,6 +71,24 @@ function shadowSection(page: import('@playwright/test').Page) {
     .filter({ has: page.getByRole('heading', { name: 'Desired State (Shadow)' }) })
 }
 
+/**
+ * 导航到设备详情页并切换到 Shadow tab（DE-D04）。
+ *
+ * 设备详情页默认 activeTab='overview'，PropertyShadowSection 仅在
+ * activeTab==='shadow' 时渲染（show.$id.tsx:79/124）。原测试在导航后直接断言
+ * Shadow 标题可见，但从不点 Shadow tab，导致用例失败。参照 DE-D02 的
+ * openActionsTab 模式（action-invocation-demo.e2e.ts:61），在导航后显式点击
+ * Shadow tab 再断言分区可见。Tab 标签文案集中在 SELECTORS.deviceTabs。
+ */
+async function openShadowTab(page: import('@playwright/test').Page, deviceId: string): Promise<void> {
+  await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
+  await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
+  // The Shadow tab is rendered alongside Overview / Commands / Actions (show.$id.tsx TABS).
+  await page.getByRole('tab', { name: SELECTORS.deviceTabs.shadowTab }).click()
+  // The section heading is the persistent anchor for the shadow panel.
+  await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+}
+
 test.describe('Property Shadow (US-PA-042/043/044)', () => {
   test.beforeAll(async () => {
     await verifyTestEnvironment(null)
@@ -96,10 +114,8 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       await updateProduct(request, productId, { auto_provisioning: true })
       await device.connect()
 
-      // 导航到设备详情页，确认 Shadow 分区存在
-      await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
-      await expect(page.getByRole('heading', { name: 'Device Detail' })).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+      // 导航到设备详情页并切换到 Shadow tab，确认 Shadow 分区存在
+      await openShadowTab(page, deviceId)
 
       // 初始空态：desired 为空时前端渲染该提示
       await expect(shadowSection(page).getByText('No desired state set')).toBeVisible()
@@ -120,9 +136,9 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       await dialog.locator(SELECTORS.shadow.submitButton).click()
       await expect(page.locator(SELECTORS.shadow.submitButton)).not.toBeVisible({ timeout: POLL_TIMEOUT })
 
-      // 设备端：收到 delta 命令，data 应匹配发送的 desired
+      // 设备端：收到 delta 命令，params 应匹配发送的 desired
       const command = await commandPromise
-      expect(command.data).toMatchObject(desiredPayload)
+      expect(command.params).toMatchObject(desiredPayload)
 
       // 设备回复 200，随后上报 reported 收敛
       await device.replyCommand(command)
@@ -193,7 +209,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       await device.connect()
       try {
         const command = await device.waitForCommand()
-        expect(command.data).toMatchObject(desiredPayload)
+        expect(command.params).toMatchObject(desiredPayload)
         await device.replyCommand(command)
 
         // 断言命令状态收敛为 Success
@@ -208,9 +224,8 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
           { timeout: POLL_TIMEOUT },
         ).toBe('Success')
 
-        // 辅助 UI 断言：导航到详情页可见 Shadow 分区（非主验收）
-        await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
-        await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+        // 辅助 UI 断言：导航到详情页并切到 Shadow tab 可见 Shadow 分区（非主验收）
+        await openShadowTab(page, deviceId)
       } finally {
         await device.disconnect()
       }
@@ -251,7 +266,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
 
       // 等待 delta 命令投递并回复，使其状态收敛为 Success
       const shadowCommand = await shadowCommandPromise
-      expect(shadowCommand.data).toMatchObject(desiredPayload)
+      expect(shadowCommand.params).toMatchObject(desiredPayload)
       await device.replyCommand(shadowCommand)
 
       // 通过一次性属性命令通道（非 shadow desired 端点）下发与 desired 不同的值
@@ -265,7 +280,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
 
       // 设备收到一次性命令并回复 200
       const oneShotCommand = await oneShotCommandPromise
-      expect(oneShotCommand.data).toMatchObject(oneShotPayload)
+      expect(oneShotCommand.params).toMatchObject(oneShotPayload)
       await device.replyCommand(oneShotCommand)
 
       // 上报 reported 为一次性命令的值（仍偏离 desired）
@@ -286,11 +301,10 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredColorTemp: 400, deltaColorTemp: 400 })
 
-      // 辅助 UI 断言：导航到详情页，delta 行可见。DesiredDelta 命令已被设备
-      // ack（Success）但 reported 仍偏离期望值（一次性命令覆盖为 999），
-      // 故 Status 显示 "Replied, not converged"（非主验收）。
-      await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
-      await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+      // 辅助 UI 断言：导航到详情页并切到 Shadow tab，delta 行可见。DesiredDelta
+      // 命令已被设备 ack（Success）但 reported 仍偏离期望值（一次性命令覆盖为
+      // 999），故 Status 显示 "Replied, not converged"（非主验收）。
+      await openShadowTab(page, deviceId)
       await expect(
         shadowSection(page).locator(shadowStatusSelector('colorTemp')),
       ).toBeVisible({ timeout: POLL_TIMEOUT })
@@ -333,8 +347,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       expect(text).toContain('desired must be a non-empty JSON object')
 
       // 辅助 UI 断言：通过 UI 提交空对象，前端视图 desired 仍为空（持久业务状态，非 toast）
-      await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
-      await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+      await openShadowTab(page, deviceId)
 
       await page.locator(SELECTORS.shadow.setButton).click()
       const dialog = page.locator('.fixed.inset-0.z-50')
@@ -382,7 +395,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
 
       // 设备收到 delta 命令后用非 200 回复（Failed）
       const command = await commandPromise
-      expect(command.data).toMatchObject(desiredPayload)
+      expect(command.params).toMatchObject(desiredPayload)
       await device.replyCommand(command, 500)
 
       // 断言持久状态：desired 未变；对应命令状态为 Failed
@@ -404,10 +417,9 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
         { timeout: POLL_TIMEOUT },
       ).toEqual({ desiredBrightness: 60, cmdStatus: 'Failed' })
 
-      // 辅助 UI 断言：delta 行可见。DesiredDelta 命令设备回复失败（Failed），
-      // 故 Status 显示 "Delivery failed"（持久业务状态为主验收）。
-      await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`)
-      await expect(page.getByRole('heading', { name: 'Desired State (Shadow)' })).toBeVisible()
+      // 辅助 UI 断言：切到 Shadow tab 后 delta 行可见。DesiredDelta 命令设备回复
+      // 失败（Failed），故 Status 显示 "Delivery failed"（持久业务状态为主验收）。
+      await openShadowTab(page, deviceId)
       await expect(
         shadowSection(page).locator(shadowStatusSelector('brightness')),
       ).toBeVisible({ timeout: POLL_TIMEOUT })

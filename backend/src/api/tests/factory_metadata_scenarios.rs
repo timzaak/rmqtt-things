@@ -953,9 +953,12 @@ async fn scenario_factory_device_get_publishes_reply_with_merged_view(
     assert_eq!(status_meta, StatusCode::NO_CONTENT);
 
     // --- Trigger the device-pull webhook. ---
+    // ack: 1 (BE-D04 ack gating): factory-metadata publishes `_reply` ONLY
+    // when `payload.ack == AckStatus::Yes`. ack: 0 would no longer publish,
+    // and `take_published_body()` below would return None.
     let topic = factory_metadata_get_topic(product_id, device_sn);
     let request_id = "factory-pull-req-001";
-    let payload = json!({ "id": request_id, "ack": 0, "params": {} });
+    let payload = json!({ "id": request_id, "ack": 1, "params": {} });
     let msg = mqtt_publish_message(device_sn, &topic, &payload);
 
     let (status_hook, _) = request_json(
@@ -1343,9 +1346,12 @@ async fn scenario_factory_device_metadata_in_device_webhook(ctx: &mut FactoryWeb
     assert_eq!(status_meta, StatusCode::NO_CONTENT);
 
     // --- Trigger the device-pull webhook. ---
+    // ack: 1 (BE-D04 ack gating): factory-metadata publishes `_reply` ONLY
+    // when `payload.ack == AckStatus::Yes`. ack: 0 would no longer publish,
+    // and `take_published_body()` below would return None.
     let topic = factory_metadata_get_topic(product_id, device_sn);
     let request_id = "factory-dev-meta-req-001";
-    let payload = json!({ "id": request_id, "ack": 0, "params": {} });
+    let payload = json!({ "id": request_id, "ack": 1, "params": {} });
     let msg = mqtt_publish_message(device_sn, &topic, &payload);
 
     let (status_hook, _) = request_json(

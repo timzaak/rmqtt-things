@@ -17,6 +17,7 @@ import { test, expect } from './fixtures/demo-auth.fixtures'
 import type { APIRequestContext } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { DemoMqttDevice } from './helpers/mqtt-device'
+import { findSeedProductId, getProduct, updateProduct } from './helpers/product-api'
 import { OtaListPage } from './pages/ota-list-page'
 import { OtaCreatePage } from './pages/ota-create-page'
 import { OtaEditPage } from './pages/ota-edit-page'
@@ -130,8 +131,15 @@ test.describe('OTA MQTT flow demo', () => {
     })
     expect(createResponse.status()).toBe(201)
 
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     let otaVersionId: number | undefined
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+
       const listBody = await getJson<OtaVersionListResponse>(
         request,
         `/api/admin/ota/version?product_id=${PRODUCT_ID}&page=1&page_size=10`,
@@ -145,20 +153,24 @@ test.describe('OTA MQTT flow demo', () => {
       try {
         await device.subscribeOtaUpgrade()
 
-        await device.publishOtaVersionReport([{ key: 'firmware', version: 100000 }])
+        await device.publishOtaVersionReport([{ key: 'firmware', version: '1.0.0' }])
 
-        if (await isS3Available(request)) {
-          const upgrade = await device.waitForOtaUpgrade(POLL_TIMEOUT)
-          expect(upgrade.params.length).toBeGreaterThan(0)
-          expect(upgrade.params[0].key).toBe('firmware')
-          expect(upgrade.params[0].version).toBe(200000)
-        } else {
-          const upgradeResult = await Promise.race([
-            device.waitForOtaUpgrade(3000).catch(() => null),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-          ])
-          expect(upgradeResult).toBeNull()
-        }
+        // S3 门控的是固件文件"下载"（file upload/presign），不是 upgrade "推送"。
+        // 后端在设备版本 < min_version 匹配时，无论 S3 是否可用都会 push upgrade
+        // （ota_handlers 在 min_version 匹配时无条件 publish upgrade）。
+        // 因此 Scen1 的 if/else 两个分支对 upgrade 投递的断言必须一致：upgrade
+        // 到达、ack===0、file_url===file_key、version==='2.0.0'。原 else 分支
+        // 误断言 upgradeResult 为 null（DE-D05 缺陷 D，预存在腐烂）。
+        const upgrade = await device.waitForOtaUpgrade(POLL_TIMEOUT)
+        expect(upgrade.params.length).toBeGreaterThan(0)
+        expect(upgrade.params[0].key).toBe('firmware')
+        // Spec contract (design §5.3 / ota_handlers.rs:159-164):
+        // - ack is present and 0 (no OTA upgrade reply topic)
+        // - file_url is the S3 object key (ota_versions.file_key), NOT a URL
+        // - version is the "major.minor.patch" semver string on the wire
+        expect(upgrade.ack).toBe(0)
+        expect(upgrade.params[0].file_url).toBe(fileKey)
+        expect(upgrade.params[0].version).toBe('2.0.0')
       } finally {
         await device.disconnect()
       }
@@ -167,6 +179,7 @@ test.describe('OTA MQTT flow demo', () => {
       if (otaVersionId !== undefined) {
         await request.delete(`/api/admin/ota/version/${otaVersionId}`)
       }
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
@@ -194,9 +207,16 @@ test.describe('OTA MQTT flow demo', () => {
     })
     expect(createTargeted.status()).toBe(201)
 
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     let targetedOtaId: number | undefined
     let broadcastOtaId: number | undefined
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+
       // Find the targeted OTA version ID
       const listBody = await getJson<OtaVersionListResponse>(
         request,
@@ -238,12 +258,14 @@ test.describe('OTA MQTT flow demo', () => {
       try {
         await targetedDevice.subscribeOtaUpgrade()
 
-        await targetedDevice.publishOtaVersionReport([{ key: 'firmware', version: 100000 }])
+        await targetedDevice.publishOtaVersionReport([{ key: 'firmware', version: '1.0.0' }])
 
         if (await isS3Available(request)) {
           const upgrade = await targetedDevice.waitForOtaUpgrade(POLL_TIMEOUT)
           expect(upgrade.params.length).toBeGreaterThan(0)
-          expect(upgrade.params[0].version).toBe(300000) // 3.0.0
+          expect(upgrade.ack).toBe(0)
+          expect(upgrade.params[0].file_url).toBe(targetedFileKey)
+          expect(upgrade.params[0].version).toBe('3.0.0')
         }
       } finally {
         await targetedDevice.disconnect()
@@ -254,12 +276,14 @@ test.describe('OTA MQTT flow demo', () => {
       try {
         await otherDevice.subscribeOtaUpgrade()
 
-        await otherDevice.publishOtaVersionReport([{ key: 'firmware', version: 100000 }])
+        await otherDevice.publishOtaVersionReport([{ key: 'firmware', version: '1.0.0' }])
 
         if (await isS3Available(request)) {
           const upgrade = await otherDevice.waitForOtaUpgrade(POLL_TIMEOUT)
           expect(upgrade.params.length).toBeGreaterThan(0)
-          expect(upgrade.params[0].version).toBe(250000) // 2.5.0
+          expect(upgrade.ack).toBe(0)
+          expect(upgrade.params[0].file_url).toBe(broadcastFileKey)
+          expect(upgrade.params[0].version).toBe('2.5.0')
         }
       } finally {
         await otherDevice.disconnect()
@@ -271,6 +295,7 @@ test.describe('OTA MQTT flow demo', () => {
       if (broadcastOtaId !== undefined) {
         await request.delete(`/api/admin/ota/version/${broadcastOtaId}`)
       }
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 
@@ -296,8 +321,15 @@ test.describe('OTA MQTT flow demo', () => {
     })
     expect(createResponse.status()).toBe(201)
 
+    // 设备为全新、未注册的 deviceId，需要先开启 auto_provisioning 才能通过认证
+    const productId = await findSeedProductId(request)
+    const originalProduct = await getProduct(request, productId)
+    const originalAutoProv = originalProduct.auto_provisioning
+
     let otaVersionId: number | undefined
     try {
+      await updateProduct(request, productId, { auto_provisioning: true })
+
       const listBody = await getJson<OtaVersionListResponse>(
         request,
         `/api/admin/ota/version?product_id=${PRODUCT_ID}&page=1&page_size=10`,
@@ -317,7 +349,7 @@ test.describe('OTA MQTT flow demo', () => {
       try {
         await device.subscribeOtaUpgrade()
 
-        await device.publishOtaVersionReport([{ key: 'firmware', version: 200000 }])
+        await device.publishOtaVersionReport([{ key: 'firmware', version: '2.0.0' }])
 
         const upgradeResult = await Promise.race([
           device.waitForOtaUpgrade(3000).catch(() => null),
@@ -331,6 +363,7 @@ test.describe('OTA MQTT flow demo', () => {
       if (otaVersionId !== undefined) {
         await request.delete(`/api/admin/ota/version/${otaVersionId}`)
       }
+      await updateProduct(request, productId, { auto_provisioning: originalAutoProv })
     }
   })
 })

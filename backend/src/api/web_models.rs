@@ -84,10 +84,18 @@ pub enum AckStatus {
 }
 
 // 响应结构
+//
+// `data` is omitted from the serialised payload when `None` (thing-model-spec
+// §1.5 「无数据时省略 data」; design §5.3). This is a **global** effect: every
+// `MqttResponse` serialisation site (ack_response, file_upload_handler,
+// factory_metadata_get_handler, property_post/event_post ack, etc.) stops
+// emitting `"data": null`. Per design §1.4 the system is not yet live, so no
+// compatibility branch is retained.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MqttResponse {
     pub id: String,
     pub code: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<JsonValue>,
 }
 
@@ -193,10 +201,17 @@ pub struct FileUploadResponse {
     pub fields: HashMap<String, String>,
 }
 
+/// Device OTA version report (design §5.3).
+///
+/// `version` is received as a spec `"major.minor.patch"` **string**
+/// (e.g. `"1.2.3"`) — the internal packed-integer storage is produced by
+/// `ota_handlers::ota_version_post` via `parse_version_to_int`. The DB
+/// `device_versions.version` column stays `i32`; only the handler/API layer
+/// translates between the wire string and the packed int.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct OtaReport {
     pub key: String,
-    pub version: i32,
+    pub version: String,
 }
 
 #[cfg(test)]

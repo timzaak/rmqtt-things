@@ -68,16 +68,25 @@ pub fn extract_permission(path: &str, method: &Method) -> Option<Rule> {
     } else if path.starts_with("/admin/device")
         || path.starts_with("/admin/property")
         || path.starts_with("/admin/event")
+        || path.starts_with("/admin/service")
         || path.starts_with("/admin/alarm-rule")
         || path.starts_with("/admin/alarm")
         || path.starts_with("/admin/factory")
     {
         // `/admin/factory/*` (design §4.5) maps to the `device` resource so
-        // Herald `device:read`/`device:write` governs the factory admin read
+        // that Herald `device:read`/`device:write` governs the factory admin read
         // endpoints. Without this, `extract_permission` returns `None` and
         // `herald_auth_middleware` forbids every `/admin/factory/*` request in
         // Herald-configured deployments (single-tenant deployments don't mount
         // the middleware, so they're unaffected).
+        //
+        // `/admin/service/*` (thing-model-extension design §4.5) maps to the
+        // same `device` resource with the same action mapping as `/admin/property`
+        // (GET → `device:read`, POST/PUT/PATCH/DELETE → `device:write`). Without
+        // this entry `extract_permission` returns `None` and every
+        // `/api/admin/service/command` request is forbidden in Herald-configured
+        // deployments — single-tenant deployments don't mount the middleware so
+        // they're unaffected.
         "device"
     } else if path.starts_with("/admin/ca") || path.starts_with("/admin/ota") {
         "cert"
@@ -213,6 +222,24 @@ mod tests {
             (
                 "/api/admin/property/command",
                 Method::POST,
+                "device",
+                "write",
+            ),
+            // Action / service invocation admin endpoints map to the `device`
+            // resource (thing-model-extension design §4.5), mirroring the
+            // property command assertions above. Without the whitelist entry
+            // `extract_permission` returns None → Herald-configured deployments
+            // forbid every `/api/admin/service/*` request with 403.
+            ("/api/admin/service/command", Method::GET, "device", "read"),
+            (
+                "/api/admin/service/command",
+                Method::POST,
+                "device",
+                "write",
+            ),
+            (
+                "/api/admin/service/command",
+                Method::DELETE,
                 "device",
                 "write",
             ),

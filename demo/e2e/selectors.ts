@@ -176,6 +176,46 @@ export const SELECTORS = {
     submitButton: '[data-testid="shadow-submit-button"]',
     cancelButton: '[data-testid="shadow-cancel-button"]',
   },
+
+  /**
+   * Action Invocation 面板选择器 (US-TME-002 / US-TME-003)
+   *
+   * 对应组件：
+   * - frontend/src/components/device-detail/ActionInvocationsSection.tsx
+   *   （`invokeButton` / `invocationTable`）
+   * - frontend/src/components/device-detail/ActionInvokeDialog.tsx
+   *   （`invokeDialog` / `serviceTypeInput` / `paramsInput` / `submitButton` /
+   *   `cancelButton`）
+   *
+   * 选择器校准证据（DE-D02）：设计 §4.4.3 七个 data-testid 全部存在于
+   * 前端实现（见 item Validation 的 rg 输出）。
+   */
+  actions: {
+    invokeButton: '[data-testid="action-invoke-button"]',
+    invokeDialog: '[data-testid="action-invoke-dialog"]',
+    serviceTypeInput: '[data-testid="service-type-input"]',
+    paramsInput: '[data-testid="params-input"]',
+    invocationTable: '[data-testid="action-invocation-table"]',
+    submitButton: '[data-testid="submit-button"]',
+    cancelButton: '[data-testid="cancel-button"]',
+  },
+
+  /**
+   * 设备详情页 Tab 切换选择器 (DE-D04)
+   *
+   * 设备详情页 (`frontend/src/routes/devices/show.$id.tsx` TABS) 默认 tab 为
+   * `overview`，Shadow / Commands / Actions / ... 各分区仅在对应 activeTab 时
+   * 渲染。Tab 按钮使用语义化 role=tab，标签文案稳定（不随测试数据变化），故
+   * 以 getByRole('tab', { name }) 表达；此处集中常量避免测试文件各自硬编码。
+   */
+  deviceTabs: {
+    /** getByRole('tab', { name }) — Shadow tab（渲染 PropertyShadowSection） */
+    shadowTab: 'Shadow',
+    /** getByRole('tab', { name }) — Actions tab（渲染 ActionInvocationsSection） */
+    actionsTab: 'Actions',
+    /** getByRole('tab', { name }) — Commands tab（渲染 PropertyCommandsSection） */
+    commandsTab: 'Commands',
+  },
 }
 
 /**

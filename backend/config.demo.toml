@@ -17,7 +17,16 @@ clientid = "rmqtt_things"
 qos = 2
 retain = false
 clientid = "rmqtt_things"
-topic = "${productId}/$clientid/thing/service/property/set"
+topic = "${productId}/${clientid}/thing/service/property/set"
+retries = 2
+
+# Service / action command publish (design §5.2). `${service_type}` is replaced
+# per-row; matches `[mqtt.property_command.publish]` defaults.
+[mqtt.service_command.publish]
+qos = 2
+retain = false
+clientid = "rmqtt_things"
+topic = "${productId}/${clientid}/thing/service/${service_type}/set"
 retries = 2
 
 [mqtt.access.auth]

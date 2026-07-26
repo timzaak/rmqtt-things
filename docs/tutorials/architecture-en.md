@@ -109,7 +109,7 @@ sequenceDiagram
     S-->>A: 200 OK (command id)
     B->>D: PUBLISH {pid}/{did}/thing/service/property/set
     D->>B: PUBLISH {topic}_reply (code=200)
-    B->>S: HTTP POST /api/thing/property/set_reply
+    B->>S: HTTP POST /api/thing/service/set_reply
     S->>DB: UPDATE status=success
 ```
 

@@ -168,8 +168,27 @@ impl RmqttHttpClient {
         product_id: &str,
         client_id: &str,
     ) -> Result<bool> {
+        // Property set is the `service_type = "property"` case of the general
+        // service-action topic check (thing-model spec: service_type "property"
+        // denotes the property-set topic). Delegate rather than duplicate.
+        self.is_subscribed_to_service_action(product_id, client_id, "property")
+            .await
+    }
+
+    /// Check whether the device is subscribed to the action/service topic for a
+    /// specific `service_type` (thing-model-extension design §5.2). Parameterizes
+    /// `is_subscribed_to_properties` with the `service_type` topic segment:
+    /// `{product_id}/{client_id}/thing/service/{service_type}/set`. Reuses the
+    /// same `get_subscriptions` + `mqtt_topic_matches` machinery (no abstraction
+    /// introduced, matching the existing helper's style).
+    pub async fn is_subscribed_to_service_action(
+        &self,
+        product_id: &str,
+        client_id: &str,
+        service_type: &str,
+    ) -> Result<bool> {
         let subscriptions = self.get_subscriptions(client_id).await?;
-        let topic_to_check = format!("{product_id}/{client_id}/thing/service/property/set");
+        let topic_to_check = format!("{product_id}/{client_id}/thing/service/{service_type}/set");
         let is_subscribed = subscriptions
             .iter()
             .any(|sub| mqtt_topic_matches(&sub.topic, &topic_to_check));

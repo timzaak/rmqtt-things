@@ -1,7 +1,7 @@
 use crate::db::models::{
-    CertIssue, CommandStatus, DeviceConnectionStatus, DeviceStatusHistory, DeviceStatusWithSource,
-    EventHistory, EventValidTemplate, EventValidTemplateStatus, PropertyCommand, PropertyHistory,
-    PropertyLatest, RegistrationSource,
+    ActionInvocation, CertIssue, CommandStatus, DeviceConnectionStatus, DeviceStatusHistory,
+    DeviceStatusWithSource, EventHistory, EventValidTemplate, EventValidTemplateStatus,
+    PropertyCommand, PropertyHistory, PropertyLatest, RegistrationSource,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -84,6 +84,105 @@ pub struct CreatePropertyCommandRequest {
     pub command: JsonValue,
 }
 
+// ---- Action / service invocation admin DTOs (thing-model-extension §4.2.2) ----
+// Field naming follows design §4.2.2 (camelCase: productId / deviceId /
+// serviceType / params) and mirrors the existing `CreatePropertyCommandRequest`
+// pattern. `params` defaults to `{}` when omitted (design §4.2.2 "空对象允许").
+
+/// 管理端发起动作 / 服务调用的请求体（设计 §4.2.2）。
+/// camelCase 与前端 `ActionInvokeDialog` 表单字段一致。
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateActionCommandRequest {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID
+    pub device_id: String,
+    /// 服务类型标识，如 `reboot` / `unlock`；协议层不枚举（A4）
+    pub service_type: String,
+    /// 动作入参，透传给设备；缺省为 `{}`，空对象允许
+    #[serde(default = "default_empty_object")]
+    pub params: JsonValue,
+}
+
+/// `create_service_command` 的响应（设计 §4.2.2 / §5.2）。
+/// `status` 反映入队后的瞬时状态：`pending`（设备未订阅/离线）或 `sent`（在线
+/// 且已订阅，drain 已立即投递）。
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateActionCommandResponse {
+    /// 新建 action_invocation.id
+    pub id: i64,
+    /// 初始 `pending`（设备在线且订阅时可能直接 `sent`）
+    pub status: CommandStatus,
+}
+
+/// 动作调用历史查询入参。对齐 `PropertyCommandQuery`，额外携带可选
+/// `service_type` 过滤（动作侧的"类型"维度）。分页沿用既有默认值
+/// （`page` 默认 1、`page_size` 默认 10）。
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct ActionCommandQuery {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID，可选
+    pub device_id: Option<String>,
+    /// 服务类型，可选
+    pub service_type: Option<String>,
+    /// 命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted
+    pub status: Option<CommandStatus>,
+    /// 页码，默认为1
+    #[serde(default = "default_page")]
+    pub page: i64,
+    /// 每页大小，默认为10
+    #[serde(default = "default_page_size")]
+    pub page_size: i64,
+}
+
+/// 动作调用视图。字段对齐设计 §4.2.2 GET 响应
+/// （`id / serviceType / params / status / createdTime / updatedTime`），
+/// camelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪
+/// 不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionInvocationView {
+    pub id: i64,
+    pub service_type: String,
+    pub params: JsonValue,
+    pub status: CommandStatus,
+    /// 创建时间（action 入队）
+    #[serde(with = "time::serde::rfc3339")]
+    pub created_time: OffsetDateTime,
+    /// 最后状态变更时间
+    #[serde(with = "time::serde::rfc3339")]
+    pub updated_time: OffsetDateTime,
+}
+
+impl From<ActionInvocation> for ActionInvocationView {
+    fn from(row: ActionInvocation) -> Self {
+        Self {
+            id: row.id,
+            service_type: row.service_type,
+            params: row.params,
+            status: row.status,
+            created_time: row.created_time,
+            updated_time: row.updated_time,
+        }
+    }
+}
+
+/// DELETE /api/admin/service/command 的 query 入参。对齐
+/// `DeletePropertyCommandsQuery`（软删 Pending 行）。
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct DeleteActionCommandsQuery {
+    pub ids: Vec<i64>,
+}
+
+fn default_empty_object() -> JsonValue {
+    JsonValue::Object(serde_json::Map::new())
+}
+
 // 通用分页响应结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct PaginatedResponse<T> {
@@ -123,6 +222,7 @@ pub struct SimplePaginatedResponse<T> {
 
 // 类型别名
 pub type PropertyCommandListResponse = PaginatedResponse<PropertyCommand>;
+pub type ActionInvocationListResponse = PaginatedResponse<ActionInvocationView>;
 pub type PropertyLatestListResponse = SimplePaginatedResponse<PropertyLatest>;
 
 pub type CertificatesListResponse = SimplePaginatedResponse<CertIssue>;

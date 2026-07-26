@@ -43,8 +43,8 @@ fn event_post_topic(product_id: &str, device_id: &str) -> String {
     format!("/{product_id}/{device_id}/thing/event/test/post")
 }
 
-fn property_set_reply_topic(product_id: &str, device_id: &str) -> String {
-    format!("/{product_id}/{device_id}/thing/event/property/reply")
+fn service_set_reply_topic(product_id: &str, device_id: &str, service_type: &str) -> String {
+    format!("/{product_id}/{device_id}/thing/service/{service_type}/set_reply")
 }
 
 fn mqtt_publish_message(
@@ -162,7 +162,7 @@ async fn scenario_event_post_and_query(ctx: &mut TestContext) {
 /// Mirrors demo steps:
 /// 1. `POST /api/admin/property/command` → 201
 /// 2. Manually set status to Sent (simulates MQTT delivery)
-/// 3. `POST /api/thing/property/set_reply` with code 200
+/// 3. `POST /api/thing/service/set_reply` with `{id:"property:{cmd_id}", code:200}`
 /// 4. `GET /api/admin/property/command` → status = "Success"
 #[test_context(TestContext)]
 #[tokio::test]
@@ -216,18 +216,21 @@ async fn scenario_property_command_lifecycle(ctx: &mut TestContext) {
         .await
         .unwrap();
 
-    // 4. Device replies via webhook with code 200
-    let reply_topic = property_set_reply_topic(product_id, device_id);
+    // 4. Device replies via the unified service_set_reply webhook with code 200.
+    // BE-D02 deleted the property-private `/property/set_reply` route and its
+    // batch reply DTO (the old `{data: Vec<i64>}` shape); the reply now
+    // correlates by the top-level string `id` ("property:{db_id}") and routes
+    // through `POST /api/thing/service/set_reply`.
+    let reply_topic = service_set_reply_topic(product_id, device_id, "property");
     let reply_payload = json!({
-        "id": "reply-001",
-        "data": [command_id],
+        "id": format!("property:{command_id}"),
         "code": 200
     });
     let reply_msg = mqtt_publish_message(device_id, &reply_topic, &reply_payload);
     let (status, _) = request_json(
         &ctx.service,
         Method::POST,
-        "/api/thing/property/set_reply",
+        "/api/thing/service/set_reply",
         &reply_msg,
     )
     .await;
@@ -381,18 +384,17 @@ async fn scenario_full_device_flow(ctx: &mut TestContext) {
         .await
         .unwrap();
 
-    // --- Step 4: Device replies ---
-    let reply_topic = property_set_reply_topic(product_id, device_id);
+    // --- Step 4: Device replies via the unified service_set_reply webhook ---
+    let reply_topic = service_set_reply_topic(product_id, device_id, "property");
     let reply_payload = json!({
-        "id": "full-reply-001",
-        "data": [command_id],
+        "id": format!("property:{command_id}"),
         "code": 200
     });
     let msg = mqtt_publish_message(device_id, &reply_topic, &reply_payload);
     let (status, _) = request_json(
         &ctx.service,
         Method::POST,
-        "/api/thing/property/set_reply",
+        "/api/thing/service/set_reply",
         &msg,
     )
     .await;
@@ -437,7 +439,7 @@ fn rand_float() -> f64 {
 // and that the fix applies identically to ALL THREE callers of
 // `send_property_command_to_device`:
 //   1. create_property_command        (POST /api/admin/property/command)
-//   2. property_set_subscribe         (POST /api/thing/property/set_subscribe)
+//   2. service_set_subscribe          (POST /api/thing/service/set_subscribe)
 //   3. set_property_desired           (PUT /api/admin/property/shadow/desired)
 //
 // The default `TestContext` points rmqtt_client at an unreachable URL, so a
@@ -445,9 +447,10 @@ fn rand_float() -> f64 {
 // instead points rmqtt at a mockito server that (a) answers
 // `GET /subscriptions?clientid=` with a matching subscription so the
 // `is_subscribed_to_properties` gate opens for the HTTP callers, and (b) accepts
-// `POST /mqtt/publish` while capturing the published body into an
-// `Arc<Mutex<Option<JsonValue>>>` cloned between the mock (which needs a
-// `Send + Sync + 'static` capture callback) and the test context.
+// `POST /mqtt/publish` while appending the parsed `{id, params}` envelope into
+// an `Arc<Mutex<Vec<CapturedPublish>>>` cloned between the mock (which needs a
+// `Send + Sync + 'static` capture callback) and the test context. The Vec is
+// required because BE-D02 publishes each Pending row independently.
 // ===========================================================================
 
 /// Test context for merge-order regression. Mirrors `simple_tests::TestContext`
@@ -455,9 +458,13 @@ fn rand_float() -> f64 {
 /// `property/set` payload can be captured.
 struct MergeOrderTestContext {
     service: Router,
-    /// Captured `params` object of the last `POST /mqtt/publish` body
-    /// (`{ id, ack, params: { ids, data } }`). `None` until a publish lands.
-    captured_params: Arc<Mutex<Option<JsonValue>>>,
+    /// Every captured `POST /mqtt/publish` body, parsed into the spec envelope
+    /// fields (`{id, params}`). BE-D02 single-row-ised property publishes: each
+    /// Pending row is now published independently with `id = "property:{db_id}"`
+    /// and `params` = the bare business object (no legacy `{ids, data}` batch
+    /// blob), so the regression assertions need the full publish history rather
+    /// than just the latest.
+    captured_messages: Arc<Mutex<Vec<CapturedPublish>>>,
     _admin_pool: PgPool,
     schema_name: String,
     _app_state: Arc<AppState>,
@@ -466,11 +473,19 @@ struct MergeOrderTestContext {
     _temp_dir: TempDir,
 }
 
+/// One captured `POST /mqtt/publish`: the platform correlation `id`
+/// (`property:{db_id}`) and the per-row `params` object.
+#[derive(Debug, Clone)]
+struct CapturedPublish {
+    id: String,
+    params: JsonValue,
+}
+
 impl MergeOrderTestContext {
-    /// Drain and return the most recently captured publish `params` object,
-    /// clearing the slot so subsequent triggers start from a known-empty state.
-    async fn take_published_params(&self) -> Option<JsonValue> {
-        self.captured_params.lock().await.take()
+    /// Drain and return all captured publishes, clearing the buffer so
+    /// subsequent triggers start from a known-empty state.
+    async fn take_published_messages(&self) -> Vec<CapturedPublish> {
+        self.captured_messages.lock().await.drain(..).collect()
     }
 }
 
@@ -486,10 +501,31 @@ impl AsyncTestContext for MergeOrderTestContext {
         //  - GET /subscriptions?clientid=<x> -> returns a subscription whose
         //    topic matches `{product}/{device}/thing/service/property/set`,
         //    so `is_subscribed_to_properties` reports the device as online.
-        //  - POST /mqtt/publish -> 200, while capturing the request body's
-        //    `params` field into `captured_params`.
+        //  - POST /mqtt/publish -> 200, while appending the parsed envelope
+        //    (`{id, params}`) into `captured_messages`. BE-D02 publishes each
+        //    Pending row independently, so the buffer is a Vec (append-only)
+        //    and tests drain the full history via `take_published_messages`.
         let mut server = mockito::Server::new_async().await;
-        let captured: Arc<Mutex<Option<JsonValue>>> = Arc::new(Mutex::new(None));
+        let captured: Arc<Mutex<Vec<CapturedPublish>>> = Arc::new(Mutex::new(Vec::new()));
+
+        // NOT-SUBSCRIBED mock (registered FIRST so mockito matches it first for
+        // the gated-skip-drain scenario). Devices whose clientid carries the
+        // `gate-notsub` marker report ZERO subscriptions, exercising the
+        // subscription-readiness gate added to service_set_subscribe /
+        // device_connect (design offline-queued-delivery-drain-timing.md §4).
+        // The drain must be skipped and rows stay Pending.
+        server
+            .mock(
+                "GET",
+                mockito::Matcher::Regex(
+                    r"^/subscriptions\?.*clientid=[^&]*gate-notsub".to_string(),
+                ),
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body("[]")
+            .create_async()
+            .await;
 
         // Match any clientid; the query string carries it. Regex matches the
         // path prefix so the query value is irrelevant to the mock.
@@ -513,26 +549,34 @@ impl AsyncTestContext for MergeOrderTestContext {
             .with_status(200)
             .with_body("")
             .with_body_from_request(move |req| {
-                // Capture the published `params` object. The `/mqtt/publish`
+                // Capture each published spec envelope. The `/mqtt/publish`
                 // request body is a `PublishRequest` whose `payload` field is a
-                // STRINGIFIED `MqttPayload` JSON (`{ id, ack, params: { ids,
-                // data } }`), not a nested object. Parse the outer body, then
-                // parse the `payload` string, then extract `params`.
-                // On parse failure we store Null so the test fails loudly rather
-                // than silently seeing `None` (a None would be ambiguous with
-                // "no publish").
+                // STRINGIFIED `MqttPayload` JSON (`{ id, ack, params }`), not a
+                // nested object. Parse the outer body, then parse the `payload`
+                // string, then extract `id` + `params` and append a
+                // `CapturedPublish`. On parse failure we append a Null-params
+                // entry so the test fails loudly rather than silently
+                // under-counting publishes.
                 let body = req.body().map(|b| b.as_slice()).unwrap_or(&[]);
                 let outer: JsonValue = serde_json::from_slice(body).unwrap_or(JsonValue::Null);
                 let payload_str = outer.get("payload").and_then(|v| v.as_str()).unwrap_or("");
                 let payload: JsonValue =
                     serde_json::from_str(payload_str).unwrap_or(JsonValue::Null);
-                let params = payload.get("params").cloned().unwrap_or(JsonValue::Null);
-                // The mockito capture callback is sync and must be Send+Sync+'static,
-                // so it cannot await the async Mutex. try_lock avoids blocking the
-                // mock thread; we store only the latest publish (last-write-wins is
-                // exactly what these tests assert).
+                let entry = CapturedPublish {
+                    id: payload
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    params: payload.get("params").cloned().unwrap_or(JsonValue::Null),
+                };
+                // The mockito capture callback is sync and must be
+                // Send+Sync+'static, so it cannot await the async Mutex.
+                // try_lock avoids blocking the mock thread; on contention we
+                // drop the capture rather than block (each scenario uses a
+                // fresh context, so contention is absent in practice).
                 if let Ok(mut guard) = captured_for_publish.try_lock() {
-                    *guard = Some(params);
+                    guard.push(entry);
                 }
                 Vec::new()
             })
@@ -603,7 +647,7 @@ impl AsyncTestContext for MergeOrderTestContext {
 
         MergeOrderTestContext {
             service: router,
-            captured_params: captured,
+            captured_messages: captured,
             _admin_pool: admin_pool,
             schema_name,
             _app_state: app_state,
@@ -688,30 +732,46 @@ async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
         "command creation should return 201"
     );
 
-    // Assert the device-side published data is the LAST write (brightness=30).
-    let published = ctx
-        .take_published_params()
-        .await
-        .expect("create_property_command should have published a property-set command");
+    // BE-D02 single-row-ised property publishes: each Pending row is published
+    // independently with `id = "property:{db_id}"` and `params` = the bare
+    // business object (no legacy `{ids, data}` batch blob). The §5.3 sort fix
+    // (created_time ASC, id ASC) is now expressed as the ORDER in which the
+    // rows are claimed and published: 10, then 20, then 30.
+    let published = ctx.take_published_messages().await;
     assert_eq!(
-        published["data"]["brightness"], 30,
-        "merged value must be last-write-wins (brightness=30); a non-deterministic \
-         merge order would surface an earlier value (10 or 20)"
+        published.len(),
+        3,
+        "all three Pending commands must be drained (one publish per row, no batching)"
     );
-    // All three command ids should be drained into a single publish (ids has 3).
-    let id_count = published["ids"].as_array().map(|a| a.len()).unwrap_or(0);
+    // Each publish carries its own bare `params` object (single-row envelope).
+    let brightnesses: Vec<&JsonValue> = published.iter().map(|m| &m.params["brightness"]).collect();
     assert_eq!(
-        id_count, 3,
-        "all three Pending commands must be merged into one publish"
+        brightnesses,
+        vec![&json!(10), &json!(20), &json!(30)],
+        "rows must be drained in created_time ASC, id ASC order (10, 20, 30); \
+         a non-deterministic claim order would surface a different sequence"
+    );
+    // Each `id` is the platform correlation id `property:{db_id}` (string, not
+    // a `data:[id]` array). They must all be distinct.
+    let ids: Vec<&str> = published.iter().map(|m| m.id.as_str()).collect();
+    assert!(
+        ids.iter().all(|id| id.starts_with("property:")),
+        "every publish id must be 'property:{{db_id}}'; got {ids:?}"
+    );
+    assert_eq!(
+        ids.iter().collect::<std::collections::HashSet<_>>().len(),
+        3,
+        "the three correlation ids must be distinct"
     );
 }
 
 // ---------------------------------------------------------------------------
-// Regression: property_set_subscribe caller — last-write-wins merge order.
+// Regression: service_set_subscribe caller — last-write-wins merge order.
 //
 // Covers: design shadow-device-support.md §5.3 and §6.3.
-// Caller 2/3: POST /api/thing/property/set_subscribe (handlers.rs) — the
-//         US-DV-004/009 online-convergence hook. It calls
+// Caller 2/3: POST /api/thing/service/set_subscribe (handlers.rs) — the
+//         US-DV-004/009 online-convergence hook (BE-D02 unified the deleted
+//         property-private route into this single service hook). It calls
 //         send_property_command_to_device UNCONDITIONALLY (no subscription
 //         gate), making it the cleanest trigger for the merge-order regression.
 // WHY: the offline-convergence hook drains whatever is queued for the device
@@ -756,40 +816,48 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
         .await
         .unwrap();
 
-    // Trigger the caller: device subscribes to the property-set topic, which
-    // drains Pending and publishes the merged command. The webhook body carries
-    // clientid + topic (product/device encoded in the topic path).
-    let subscribe_topic = format!("/{product_id}/{device_id}/thing/service/property/set");
+    // Trigger the caller via the UNIFIED service_set_subscribe webhook
+    // (BE-D02 replaced the deleted `/property/set_subscribe` route with
+    // `/service/set_subscribe`, which drains both property and action pending).
+    // productId comes from the WebHook `username` (the device subscribes to the
+    // wildcard `+/{device}/thing/service/+/set`, so productId is not in the
+    // topic); the topic's second segment must equal the clientId.
     let subscribe_body = json!({
         "clientid": device_id,
-        "topic": subscribe_topic,
+        "username": product_id,
+        "topic": format!("+/{device_id}/thing/service/+/set"),
     });
     let (status, _) = request_json(
         &ctx.service,
         Method::POST,
-        "/api/thing/property/set_subscribe",
+        "/api/thing/service/set_subscribe",
         &subscribe_body,
     )
     .await;
     assert_eq!(
         status,
         StatusCode::NO_CONTENT,
-        "set_subscribe should return 204"
+        "service_set_subscribe should return 204"
     );
 
-    let published = ctx
-        .take_published_params()
-        .await
-        .expect("property_set_subscribe should have published a property-set command");
+    // BE-D02 single-row-ised publishes: three rows -> three independent
+    // spec envelopes, drained in created_time ASC, id ASC order.
+    let published = ctx.take_published_messages().await;
     assert_eq!(
-        published["data"]["brightness"], 30,
-        "merged value must be last-write-wins (brightness=30); the §5.3 sort fix \
-         must apply to the property_set_subscribe caller too"
+        published.len(),
+        3,
+        "all three Pending commands must be drained (one publish per row)"
     );
-    let id_count = published["ids"].as_array().map(|a| a.len()).unwrap_or(0);
+    let brightnesses: Vec<&JsonValue> = published.iter().map(|m| &m.params["brightness"]).collect();
     assert_eq!(
-        id_count, 3,
-        "all three Pending commands must be merged into one publish"
+        brightnesses,
+        vec![&json!(10), &json!(20), &json!(30)],
+        "rows must be drained in created_time ASC, id ASC order (10, 20, 30); \
+         the §5.3 sort fix must apply to the service_set_subscribe caller too"
+    );
+    assert!(
+        published.iter().all(|m| m.id.starts_with("property:")),
+        "every publish id must be 'property:{{db_id}}'"
     );
 }
 
@@ -860,18 +928,164 @@ async fn scenario_merge_order_set_desired(ctx: &mut MergeOrderTestContext) {
     );
     assert_eq!(resp["pushed"], true, "non-empty delta must enqueue+push");
 
-    let published = ctx
-        .take_published_params()
-        .await
-        .expect("set_property_desired should have published a property-set command");
+    // BE-D02 single-row-ised publishes: the three Pending deltas (two seeded
+    // + the one Set-Desired just enqueued) drain as three independent spec
+    // envelopes in created_time ASC, id ASC order: 10, 20, 30.
+    let published = ctx.take_published_messages().await;
     assert_eq!(
-        published["data"]["brightness"], 30,
-        "merged value must be last-write-wins (brightness=30); the §5.3 sort fix \
-         must apply to the set_property_desired caller too"
+        published.len(),
+        3,
+        "all three Pending deltas must be drained (one publish per row)"
     );
-    let id_count = published["ids"].as_array().map(|a| a.len()).unwrap_or(0);
+    let brightnesses: Vec<&JsonValue> = published.iter().map(|m| &m.params["brightness"]).collect();
     assert_eq!(
-        id_count, 3,
-        "all three Pending commands must be merged into one publish"
+        brightnesses,
+        vec![&json!(10), &json!(20), &json!(30)],
+        "rows must be drained in created_time ASC, id ASC order (10, 20, 30); \
+         the §5.3 sort fix must apply to the set_property_desired caller too"
+    );
+    assert!(
+        published.iter().all(|m| m.id.starts_with("property:")),
+        "every publish id must be 'property:{{db_id}}'"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Regression: subscription-readiness gate on the offline-queue drain.
+//
+// Covers: design offline-queued-delivery-drain-timing.md §4 方案 A / A.1.
+//
+// WHY (Rule 9): the `client_subscribe` webhook (auto-subscription) fires during
+// CONNECT, BEFORE the device's SUBACK is registered in the broker's
+// subscription table. Draining at that moment loses the message. The gate
+// (added to service_set_subscribe and device_connect) queries the broker's
+// live `/subscriptions` and skips the drain when the device is not yet
+// subscribed, leaving rows Pending for a later trigger. These two scenarios
+// pin that contract: (1) not-subscribed -> no publish, rows stay Pending;
+// (2) device_connect fallback drains when the device IS subscribed.
+//
+// The MergeOrderTestContext mockito server reports an EMPTY subscription list
+// for any clientid containing the `gate-notsub` marker (registered first so
+// mockito matches it first), and a wildcard subscription for everyone else.
+// ---------------------------------------------------------------------------
+
+#[test_context(MergeOrderTestContext)]
+#[tokio::test]
+async fn scenario_service_set_subscribe_skips_drain_when_not_subscribed(
+    ctx: &mut MergeOrderTestContext,
+) {
+    use crate::db::models::{CommandSource, CommandStatus};
+    let product_id = "gate_product";
+    // clientid carries the `gate-notsub` marker so the mockito /subscriptions
+    // mock returns [] (not subscribed), exercising the skip-drain gate.
+    let device_id = "gate-notsub-device";
+
+    ctx._admin_state
+        .db
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 99 }),
+            CommandSource::OneShot,
+        )
+        .await
+        .unwrap();
+
+    // Trigger the drain via the service_set_subscribe webhook. productId comes
+    // from the WebHook username (the subscribe topic's first segment is `+`).
+    let subscribe_body = json!({
+        "clientid": device_id,
+        "username": product_id,
+        "topic": format!("+/{device_id}/thing/service/+/set"),
+    });
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/thing/service/set_subscribe",
+        &subscribe_body,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // Gate must have skipped the drain: no publish, row stays Pending.
+    let published = ctx.take_published_messages().await;
+    assert!(
+        published.is_empty(),
+        "service_set_subscribe must NOT drain when the device is not yet subscribed at the broker"
+    );
+    let (_, pending_count) = ctx
+        ._app_state
+        .db
+        .query_property_commands(
+            product_id,
+            Some(device_id),
+            Some(CommandStatus::Pending),
+            1,
+            100,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        pending_count, 1,
+        "the Pending row must remain Pending (not flipped to Sent) when the gate skips the drain"
+    );
+}
+
+#[test_context(MergeOrderTestContext)]
+#[tokio::test]
+async fn scenario_device_connect_fallback_drains_when_subscribed(ctx: &mut MergeOrderTestContext) {
+    use crate::db::models::CommandSource;
+    let product_id = "gate_product";
+    // No `gate-notsub` marker -> mockito reports the wildcard subscription,
+    // so the device_connect fallback drain gate opens.
+    let device_id = "gate-sub-device";
+
+    ctx._admin_state
+        .db
+        .insert_property_command(
+            product_id,
+            device_id,
+            &json!({ "brightness": 7 }),
+            CommandSource::OneShot,
+        )
+        .await
+        .unwrap();
+
+    // Trigger the fallback drain via the client_connected webhook.
+    // ipaddress MUST contain a port (database.rs upsert_device_status_connect
+    // splits on ':'); mirror the real RMQTT webhook shape.
+    let connect_body = json!({
+        "node": 1,
+        "ipaddress": "127.0.0.1:12345",
+        "clientid": device_id,
+        "product_id": product_id,
+        "device_id": device_id,
+        "username": product_id,
+        "keepalive": 60,
+        "proto_ver": 4,
+        "clean_start": true,
+        "connected_at": 0,
+        "session_present": false,
+    });
+    let (status, _) = request_json(
+        &ctx.service,
+        Method::POST,
+        "/api/device/connect",
+        &connect_body,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+
+    // Fallback drain must have published the queued row.
+    let published = ctx.take_published_messages().await;
+    assert_eq!(
+        published.len(),
+        1,
+        "device_connect must drain the queued property command when the device is subscribed"
+    );
+    assert_eq!(published[0].params["brightness"], json!(7));
+    assert!(
+        published[0].id.starts_with("property:"),
+        "published id must be 'property:{{db_id}}'"
     );
 }
