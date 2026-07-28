@@ -7,6 +7,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::IntoResponse;
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use constant_time_eq::constant_time_eq;
 use hmac::{Hmac, Mac};
 use rand::distr::{Alphanumeric, SampleString};
 use reqwest::Url;
@@ -589,9 +590,14 @@ pub async fn acl(Json(payload): Json<AclPayload>) -> &'static str {
         return "deny";
     }
 
-    if let Some(username) = &payload.username
-        && p0 != username
-    {
+    // Spec §ACL rule 2: productId must equal username. A connected device always
+    // has a username (auth() denies otherwise), so a missing username here is
+    // treated as deny rather than silently allowed.
+    let username = match &payload.username {
+        Some(u) => u,
+        None => return "deny",
+    };
+    if p0 != username {
         return "deny";
     }
 
@@ -685,7 +691,9 @@ pub async fn auth(
     let result = mac.finalize();
     let expected_hash = hex::encode(result.into_bytes());
 
-    if expected_hash != hash {
+    // Constant-time compare to avoid timing side-channels on the signature,
+    // matching the factory API key comparison (factory_middleware.rs).
+    if !constant_time_eq(expected_hash.as_bytes(), hash.as_bytes()) {
         return "deny";
     }
 
@@ -844,6 +852,21 @@ mod tests {
             client_id: "demo-device".to_string(),
             ip: "127.0.0.1".to_string(),
             topic: "/demo_product/other-device/ota/upgrade".to_string(),
+            protocol: json!(4),
+        };
+        assert_eq!(acl(Json(payload)).await, "deny");
+    }
+
+    #[tokio::test]
+    async fn test_acl_denies_when_username_missing() {
+        // Spec §ACL rule 2: productId must equal username. A missing username
+        // is deny, not silently allowed.
+        let payload = AclPayload {
+            access: Access::Publish,
+            username: None,
+            client_id: "demo-device".to_string(),
+            ip: "127.0.0.1".to_string(),
+            topic: "demo_product/demo-device/thing/event/property/post".to_string(),
             protocol: json!(4),
         };
         assert_eq!(acl(Json(payload)).await, "deny");

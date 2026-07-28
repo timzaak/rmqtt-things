@@ -898,3 +898,51 @@ async fn scenario_property_without_active_schema_is_accepted(ctx: &mut TestConte
         "reported humidity must be snapshotted"
     );
 }
+
+// ===========================================================================
+// Scenario 5: event_post rejects non-object params.
+//
+// Covers: thing-model-spec.md §消息格式 ("事件上报 ... 必须是 object"). The
+// unified event_post webhook must reject any `params` that is not a JSON
+// object (array, scalar, null, omitted) with 400 "Invalid params format",
+// matching property_post's existing guard. The `property` event_type branch
+// delegates to property_post and is already guarded, so this targets a
+// custom event_type (`alarm`).
+// ===========================================================================
+#[test_context(SpecDeviationTestContext)]
+#[tokio::test]
+async fn scenario_event_post_rejects_non_object_params(ctx: &mut SpecDeviationTestContext) {
+    let product_id = "spec_dev_evt_prod";
+    let device_id = "spec_dev_evt_dev";
+    let topic = event_post_topic(product_id, device_id, "alarm");
+
+    for (label, params) in [
+        ("array", json!([{"event": "raised"}])),
+        ("scalar", json!(42)),
+        ("string", json!("raised")),
+        ("null", JsonValue::Null),
+    ] {
+        // `null` is what `params` deserializes to when omitted, so the omitted
+        // case is covered by the `null` variant without a separate request.
+        let payload = json!({ "id": format!("evt-{label}"), "ack": 0, "params": params });
+        let msg = mqtt_publish_message(device_id, &topic, &payload);
+        let (status, _) =
+            request_json(&ctx.service, Method::POST, route_for_topic(&topic), &msg).await;
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "event_post with {label} params should be rejected (400), got {status}"
+        );
+    }
+
+    // Sanity: an object params on the same topic is accepted (204), proving the
+    // 400s above come from the object check, not some other failure.
+    let payload = json!({ "id": "evt-ok", "ack": 0, "params": { "event": "raised" } });
+    let msg = mqtt_publish_message(device_id, &topic, &payload);
+    let (status, _) = request_json(&ctx.service, Method::POST, route_for_topic(&topic), &msg).await;
+    assert_eq!(
+        status,
+        StatusCode::NO_CONTENT,
+        "event_post with object params should be accepted (204)"
+    );
+}

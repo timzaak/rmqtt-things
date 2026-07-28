@@ -668,7 +668,8 @@ pub async fn factory_metadata_get_handler(
         })?;
     let device_metadata = device_metadata_row.map(map_row_to_device_metadata_view);
 
-    // None → data: null (device treats this as "no factory metadata yet").
+    // None → `data` key is OMITTED via skip_serializing_if on MqttResponse.data
+    // (device treats absence as "no factory metadata yet").
     let data: Option<JsonValue> = view.map(|rows| {
         let components: Vec<FactoryComponentView> =
             rows.into_iter().map(map_row_to_component_view).collect();

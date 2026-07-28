@@ -15,10 +15,11 @@ subscribes = [
     # property-only `thing/service/property/set` entry. The shadow reuses this
     # same rule (no separate entry needed).
     {topic_filter = "+/${clientid}/thing/service/+/set", qos = 2, no_local = true},
-    {topic_filter = "+/${clientid}/thing/event/property/post_reply", qos = 2, no_local = true},
+    {topic_filter = "+/${clientid}/thing/event/+/post_reply", qos = 2, no_local = true},
     # `file` is its own topic family (design §5.3), NOT under `event/`. The
     # previous `thing/event/file/upload_reply` filter never matched.
     {topic_filter = "+/${clientid}/thing/file/upload_reply", qos = 2, no_local = true},
+    {topic_filter = "+/${clientid}/thing/factory-metadata/get_reply", qos = 2, no_local = true},
     {topic_filter = "+/${clientid}/ota/upgrade", qos = 2, no_local = true},
     # 可能需要
     {topic_filter = "+/${clientid}/ota/version_reply" ,qos = 2, no_local = true},

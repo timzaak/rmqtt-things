@@ -203,7 +203,7 @@ hmac_sha1_hex(shared_key, "{clientId}.{nonce}.{timestamp}.{suffix}")
 
 1. topic 的第二段（deviceId）必须等于 clientId。设备只能操作自己的 topic
 2. topic 的第一段（productId）必须等于 username
-3. 只允许 `thing/event/*`、`thing/service/*`、`thing/file/*`、`thing/factory-metadata/*`、`ota/*` 这几类 topic
+3. 只允许 `thing/event/*`、`thing/service/*`、`thing/file/*`、`thing/factory-metadata/*`、`ota/upgrade`、`ota/version` 这几类 topic
 4. 其他全部 deny
 
 ### 自动订阅
@@ -245,7 +245,7 @@ mTLS 实现中有两个没有标准答案的问题：
 
 设备协议中的版本号是字符串，格式为 `主版本.次版本.修订版本`：主版本和次版本范围为 0–99，修订版本范围为 0–999。平台接收后将三段分别补齐为 2、2、3 位，再转换成整数用于内部存储和比较；整数表示不保留前导零。
 
-比如 `1.2.34` = `102034`，`12.5.100` = `125100`。
+比如 `1.2.34` = `102034`，`12.5.100` = `1205100`。
 
 整数编码方便比较大小：直接比数字就知道哪个版本更新。
 

@@ -214,6 +214,10 @@ pub async fn event_post(
     validate_identifier(device_id, "device_id")?;
     let timestamp = OffsetDateTime::now_utc();
     let events = payload.params.unwrap_or(JsonValue::Null);
+    // Spec §消息格式:事件上报的 params 必须是 object。
+    if !events.is_object() {
+        return Err(ApiError::bad_request("Invalid params format"));
+    }
 
     let product_id = extract_and_validate_product_id(&mqtt_msg.topic)?;
 
