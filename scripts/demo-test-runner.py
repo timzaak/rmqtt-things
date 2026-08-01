@@ -103,6 +103,20 @@ def ensure_environment(
     return demo_env.start_environment(logger=logger, timeout=120)
 
 
+def prepare_run_log_dir(demo_dir: Path, run_id: str) -> Path:
+    """只清理可重建产物和当前 run，保留其他 run 作为诊断证据。"""
+    for relative in ("test-results/artifacts", "playwright-report"):
+        path = demo_dir / relative
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
+
+    log_dir = demo_dir / "test-results" / "runs" / run_id
+    if log_dir.exists():
+        shutil.rmtree(log_dir, ignore_errors=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
 def run_tests(
     test_file: str,
     mode: str,
@@ -145,8 +159,9 @@ def run_tests(
 
     # 规范化测试文件路径
     # Playwright testDir is './e2e', so we need path relative to that
-    # Input can be: 'demo/e2e/regular-user/test.e2e.ts' or 'e2e/regular-user/test.e2e.ts'
-    # Output should be: 'regular-user/test.e2e.ts'
+    # Input can include demo/ and e2e/ prefixes; Playwright receives a path
+    # relative to demo/e2e/.
+    original_test_file = test_file
     test_file = test_file.replace("\\", "/")
 
     # Remove 'demo/' prefix if present
@@ -156,6 +171,13 @@ def run_tests(
     # Remove 'e2e/' prefix if present (since testDir is './e2e')
     if test_file.startswith("e2e/"):
         test_file = test_file[4:]  # Remove 'e2e/'
+
+    test_file_full = demo_dir / "e2e" / test_file
+    if not test_file_full.exists():
+        print(f"Error: Test file not found at: {test_file_full}")
+        print(f"Original input: {original_test_file}")
+        print(f"Transformed to: {test_file}")
+        return 1
 
     # 确定日志级别
     if verbose_log:
@@ -168,16 +190,9 @@ def run_tests(
     # 切换到 demo 目录
     os.chdir(demo_dir)
 
-    # 清理旧的测试结果
-    for old in ("test-results/artifacts", "test-results/runs", "playwright-report"):
-        path = Path(old)
-        if path.exists():
-            shutil.rmtree(path, ignore_errors=True)
-
-    # 创建日志目录
+    # runs/ 是诊断和批次报告的证据源；仅覆盖当前同名 run_id。
     run_id = run_id or f"run-{time.strftime('%Y%m%d-%H%M%S')}"
-    log_dir = Path("test-results/runs") / run_id
-    log_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = prepare_run_log_dir(demo_dir, run_id).relative_to(demo_dir)
     playwright_log = log_dir / "playwright-output.log"
 
     # 转换为绝对路径用于清晰输出
@@ -230,7 +245,23 @@ def run_tests(
                         line.encode("ascii", errors="replace").decode("ascii"), end=""
                     )
         exit_code = proc.wait()
+
+    # Playwright already prints the discovered tests and their total. The structured
+    # run summary below describes execution artifacts, so it is misleading noise for
+    # a discovery-only command.
+    if list_tests:
+        return exit_code
+
     duration = round(time.time() - start, 1)
+    all_skipped = False
+    if exit_code == 0:
+        log_content = playwright_log.read_text(encoding="utf-8", errors="replace")
+        has_passed = bool(re.search(r"\d+ passed", log_content))
+        has_failed = bool(re.search(r"\d+ failed", log_content))
+        has_skipped = bool(re.search(r"\d+ skipped", log_content))
+        if has_skipped and not has_passed and not has_failed:
+            all_skipped = True
+            exit_code = 2
 
     # 生成摘要
     summary = {
@@ -244,9 +275,13 @@ def run_tests(
         "runId": run_id,
         "grep": grep,
     }
+    if all_skipped:
+        summary["error"] = "All tests skipped"
 
     # 打印结果
-    if not list_tests and exit_code != 0:
+    if exit_code != 0:
+        if all_skipped:
+            print("[!] All tests were skipped; no tests actually executed")
         try:
             print(f"✗ Failed ({exit_code})")
         except UnicodeEncodeError:
