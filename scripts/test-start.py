@@ -312,7 +312,7 @@ max_row_limit = 10_000
         f"""http_timeout = "5s"
 http_headers.accept = "*/*"
 http_headers.Cache-Control = "no-cache"
-http_headers.User-Agent = "RMQTT/0.20.0"
+http_headers.User-Agent = "RMQTT/0.23.0"
 http_headers.Connection = "keep-alive"
 disconnect_if_pub_rejected = true
 disconnect_if_expiry = false
@@ -526,7 +526,7 @@ def _start_rmqtt() -> bool:
             f"{RMQTT_MQTT_PORT}:1883",
             "-p",
             f"{RMQTT_HTTP_PORT}:6060",
-            "rmqtt/rmqtt:0.22.0",
+            "rmqtt/rmqtt:0.23.0",
             "-f",
             "conf/rmqtt.toml",
         ]
