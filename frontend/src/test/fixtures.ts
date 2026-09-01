@@ -46,3 +46,69 @@ export const mockActiveValidTemplate: EventValidTemplate = {
   id: 2,
   status: 'Active',
 }
+
+// --- Property history chart fixtures (property-history-visualization) ---
+
+import type {
+  PropertyChartKeysResponse,
+  PropertySeriesListResponse,
+} from '@/lib/api-generated/types.gen'
+
+/** Six discovered numeric keys so tests can exercise the 5-key cap. */
+export const mockPropertyChartKeys: PropertyChartKeysResponse = {
+  data: [
+    { key: 'temperature', sampleCount: 231 },
+    { key: 'humidity', sampleCount: 87 },
+    { key: 'voltage', sampleCount: 40 },
+    { key: 'brightness', sampleCount: 12 },
+    { key: 'pressure', sampleCount: 5 },
+    { key: 'extra', sampleCount: 1 },
+  ],
+}
+
+export const mockPropertyChartKeysEmpty: PropertyChartKeysResponse = { data: [] }
+
+/** One populated series plus one empty series (chip "无数据" badge case). */
+export const mockPropertySeries: PropertySeriesListResponse = {
+  data: [
+    {
+      key: 'temperature',
+      totalPoints: 3,
+      downsampled: false,
+      stride: 1,
+      points: [
+        { time: '2026-09-01T08:00:00Z', value: 20 },
+        { time: '2026-09-01T09:00:00Z', value: 21.5 },
+        { time: '2026-09-01T10:00:00Z', value: 23 },
+      ],
+    },
+    {
+      key: 'humidity',
+      totalPoints: 0,
+      downsampled: false,
+      stride: 1,
+      points: [],
+    },
+  ],
+}
+
+/** Every series empty in range: the chart-area empty state (not an error). */
+export const mockPropertySeriesAllEmpty: PropertySeriesListResponse = {
+  data: [{ key: 'temperature', totalPoints: 0, downsampled: false, stride: 1, points: [] }],
+}
+
+/** Downsampled series: the visible sampling note must be rendered. */
+export const mockPropertySeriesDownsampled: PropertySeriesListResponse = {
+  data: [
+    {
+      key: 'temperature',
+      totalPoints: 2500,
+      downsampled: true,
+      stride: 3,
+      points: [
+        { time: '2026-09-01T00:00:00Z', value: 20 },
+        { time: '2026-09-01T03:00:00Z', value: 22 },
+      ],
+    },
+  ],
+}

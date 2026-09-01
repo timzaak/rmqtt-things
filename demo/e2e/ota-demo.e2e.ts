@@ -160,11 +160,11 @@ test.describe('OTA MQTT flow demo', () => {
         // （ota_handlers 在 min_version 匹配时无条件 publish upgrade）。
         // 因此 Scen1 的 if/else 两个分支对 upgrade 投递的断言必须一致：upgrade
         // 到达、ack===0、file_url===file_key、version==='2.0.0'。原 else 分支
-        // 误断言 upgradeResult 为 null（DE-D05 缺陷 D，预存在腐烂）。
+        // 误断言 upgradeResult 为 null（预存在腐烂缺陷）。
         const upgrade = await device.waitForOtaUpgrade(POLL_TIMEOUT)
         expect(upgrade.params.length).toBeGreaterThan(0)
         expect(upgrade.params[0].key).toBe('firmware')
-        // Spec contract (design §5.3 / ota_handlers.rs:159-164):
+        // Spec contract (ota_handlers.rs:159-164):
         // - ack is present and 0 (no OTA upgrade reply topic)
         // - file_url is the S3 object key (ota_versions.file_key), NOT a URL
         // - version is the "major.minor.patch" semver string on the wire

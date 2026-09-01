@@ -21,6 +21,12 @@ const UNIX_TIMESTAMP_MS_THRESHOLD: i64 = 9_999_999_999;
 /// Referenced from the API handler to avoid fragile string matching.
 pub const ACTIVE_TEMPLATE_SCHEMA_ERR: &str = "Cannot update schema of active template";
 
+/// 图表时间轴的"有效上报时间"表达式。与
+/// migrations/20260831000001_add_property_history_effective_time_idx.sql
+/// 的表达式索引同义：谓词与索引表达式不一致时索引会被放弃、查询退化为
+/// 全量扫描，改动语义时两处必须同步。
+const EFFECTIVE_TIME_EXPR: &str = "COALESCE(reported_time, created_time)";
+
 fn timestamp_to_datetime(ts: i64) -> OffsetDateTime {
     let seconds = if ts > UNIX_TIMESTAMP_MS_THRESHOLD {
         ts / 1000
@@ -281,7 +287,7 @@ impl DatabaseService {
         // PostgreSQL `UPDATE ... RETURNING` returns rows in arbitrary order.
         // Sort deterministically by `created_time ASC, id ASC` so the publish
         // order in `send_property_command_to_device` matches the action-side
-        // `claim_next_pending_action` contract (design §5.3 last-write-wins).
+        // `claim_next_pending_action` contract (last-write-wins).
         // All matched rows are flipped to Sent regardless of order; this only
         // fixes the published Vec ordering.
         let mut result: Vec<(i64, JsonValue, OffsetDateTime)> = commands
@@ -519,6 +525,123 @@ impl DatabaseService {
         Ok(properties)
     }
 
+    // Series predicate shared by count and data queries so both always filter
+    // on the exact same effective-time range and numeric-key condition.
+    fn push_series_filter<'a>(
+        builder: &mut QueryBuilder<'a, Postgres>,
+        product_id: &'a str,
+        device_id: &'a str,
+        key: &'a str,
+        start: &'a OffsetDateTime,
+        end: &'a OffsetDateTime,
+    ) {
+        builder.push(" WHERE product_id = ");
+        builder.push_bind(product_id);
+        builder.push(" AND device_id = ");
+        builder.push_bind(device_id);
+        builder.push(" AND ");
+        builder.push(EFFECTIVE_TIME_EXPR);
+        builder.push(" >= ");
+        builder.push_bind(start);
+        builder.push(" AND ");
+        builder.push(EFFECTIVE_TIME_EXPR);
+        builder.push(" <= ");
+        builder.push_bind(end);
+        // A missing key yields SQL NULL and `NULL = 'number'` is not true, so
+        // rows without the key are filtered out naturally.
+        builder.push(" AND jsonb_typeof(properties -> ");
+        builder.push_bind(key);
+        builder.push(") = 'number'");
+    }
+
+    // 数值属性发现：窗口内全部样本均为 JSON number 的 key
+    pub async fn query_property_chart_keys(
+        &self,
+        product_id: &str,
+        device_id: &str,
+        lookback_days: i32,
+    ) -> anyhow::Result<Vec<PropertyChartKey>> {
+        let sql = format!(
+            r#"
+            SELECT kv.key AS key, count(*) AS sample_count
+            FROM property_history ph
+            CROSS JOIN LATERAL jsonb_each(ph.properties) AS kv(key, value)
+            WHERE ph.product_id = $1 AND ph.device_id = $2
+              AND jsonb_typeof(ph.properties) = 'object'
+              AND {EFFECTIVE_TIME_EXPR}
+                  >= now() - make_interval(days => $3::int)
+            GROUP BY kv.key
+            HAVING count(*) FILTER (WHERE jsonb_typeof(kv.value) = 'number') = count(*)
+            ORDER BY sample_count DESC
+            "#
+        );
+        let keys = sqlx::query_as::<_, PropertyChartKey>(&sql)
+            .bind(product_id)
+            .bind(device_id)
+            .bind(lookback_days)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(keys)
+    }
+
+    // 序列 count：与 query_property_series_points 谓词完全一致
+    pub async fn count_property_series_points(
+        &self,
+        product_id: &str,
+        device_id: &str,
+        key: &str,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+    ) -> anyhow::Result<i64> {
+        let mut query_builder = QueryBuilder::new("SELECT count(*) FROM property_history");
+        Self::push_series_filter(&mut query_builder, product_id, device_id, key, &start, &end);
+
+        let count: i64 = query_builder
+            .build_query_scalar()
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(count)
+    }
+
+    // 序列数据点：每 stride 条真实记录取第 1 条，时间升序，LIMIT limit。
+    // OVER (ORDER BY t, id) 保证同一时刻多条上报时抽样结果确定。
+    pub async fn query_property_series_points(
+        &self,
+        product_id: &str,
+        device_id: &str,
+        key: &str,
+        start: OffsetDateTime,
+        end: OffsetDateTime,
+        stride: i64,
+        limit: i64,
+    ) -> anyhow::Result<Vec<PropertySeriesPoint>> {
+        let mut query_builder = QueryBuilder::new("WITH matched AS (SELECT id, ");
+        query_builder.push(EFFECTIVE_TIME_EXPR);
+        query_builder.push(" AS t, properties -> ");
+        query_builder.push_bind(key);
+        query_builder.push(" AS v FROM property_history");
+        Self::push_series_filter(&mut query_builder, product_id, device_id, key, &start, &end);
+        query_builder.push(
+            "), numbered AS (
+                 SELECT t, v, row_number() OVER (ORDER BY t, id) AS rn FROM matched
+               )
+               SELECT t AS time, v AS value FROM numbered
+               WHERE (rn - 1) % ",
+        );
+        query_builder.push_bind(stride);
+        query_builder.push(" = 0 ORDER BY t LIMIT ");
+        query_builder.push_bind(limit);
+
+        let points = query_builder
+            .build_query_as::<PropertySeriesPoint>()
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(points)
+    }
+
     // 查询事件历史
     pub async fn query_event_history(
         &self,
@@ -587,12 +710,12 @@ impl DatabaseService {
         Ok(result.rows_affected() as i64)
     }
 
-    // --- Action invocation data layer (thing-model-extension, design §4.3.2/§5.2) ---
+    // --- Action invocation data layer (thing-model-extension) ---
     // Mirrors the property_command family. Action invocations are physically
     // isolated from property_command per design A2 but reuse CommandStatus.
 
     // Insert an action invocation. Returns the new row id. Admin entry point
-    // (BE-D03 create_service_command); rows start at Pending and are claimed
+    // (create_service_command); rows start at Pending and are claimed
     // later by `claim_next_pending_action` when the device is subscribed.
     pub async fn insert_action_invocation(
         &self,
@@ -621,8 +744,8 @@ impl DatabaseService {
     // Atomically claim the next Pending action for a device and flip it to Sent.
     //
     // `FOR UPDATE SKIP LOCKED LIMIT 1` inside the subselect guarantees that
-    // concurrent callers never claim the same row (design §5.1 step 2 / failure
-    // attribution): SKIP LOCKED skips rows already locked by another backend
+    // concurrent callers never claim the same row
+    // (failure attribution): SKIP LOCKED skips rows already locked by another backend
     // instance, so each Pending row is published at most once. Ordering by
     // (created_time ASC, id ASC) preserves submission order across mixed
     // service_types on the same device.

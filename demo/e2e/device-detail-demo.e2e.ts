@@ -6,7 +6,7 @@
  * 验证管理员可以查看设备详情页面的各区域，且每个区域都有数据展示。
  * 前置条件：系统中已有产品和设备连接记录（通过 seed_demo_data 初始化）。
  *
- * DE-D02 适配（device-detail-experience 七区信息架构）：旧的单页分区
+ * device-detail-experience 七区信息架构适配：旧的单页分区
  * （Device Info / Latest Properties / Property History / Event History /
  * Property Commands / Connection History）被重组为七区 Tab 结构
  * （show.$id.tsx TABS）：
@@ -27,7 +27,7 @@ const DEVICE_ID = 'demo-device'
  * 导航到设备详情页。
  *
  * waitUntil:'commit' 在收到响应头即返回（最早可靠点），避免 Vite dev server 下
- * 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现：业务状态已
+ * 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（业务状态已
  * 就绪但页面 load 卡死）。后续 toBeVisible 断言自带重试，足以保证 DOM 就绪。
  */
 async function gotoDeviceDetail(page: import('@playwright/test').Page): Promise<void> {
@@ -84,7 +84,7 @@ test.describe('Device detail page (US-PA-020)', () => {
     await expect(page.getByText('demo_product')).toBeVisible()
 
     // Status 字段应渲染（Online / Offline）。
-    // DE-TR01 修复：seed demo-device 的在线状态由 demo 启动时的 MQTT 心跳决定，
+    // seed demo-device 的在线状态由 demo 启动时的 MQTT 心跳决定，
     // demo-stop/restart 后心跳断开即变 Offline，是运行时瞬态而非 seeded 数据。
     // 本用例的意图是"Device Info 字段以 seeded 数据渲染"，因此断言 Status
     // 字段存在而非具体取值；连接态由专门的连接场景覆盖。
@@ -119,6 +119,10 @@ test.describe('Device detail page (US-PA-020)', () => {
     await page.locator(SELECTORS.deviceTabs.reportedDataTab).click()
     await expect(page.getByRole('heading', { name: 'Property History' })).toBeVisible()
 
+    // 图表为默认视图（property-history-visualization）；既有表格经视图切换
+    // 进入，行为与断言不变（加法式双视图的表格回归锚点）
+    await page.locator(SELECTORS.propertyHistoryChart.viewTableButton).click()
+
     await expect(page.getByText('No property history')).not.toBeVisible()
   })
 
@@ -135,7 +139,7 @@ test.describe('Device detail page (US-PA-020)', () => {
   test('shows property command via unified Operations region', async ({ page }) => {
     await gotoDeviceDetail(page)
 
-    // DE-D02：旧的 Property Commands 分区已被统一 Operations 表接管
+    // 旧的 Property Commands 分区已被统一 Operations 表接管
     // （DeviceOperationsSection.tsx）。seeded property_command 行（status=0
     // = Pending）汇入 device-operations-table，以 Pending 状态展示。
     await page.locator(SELECTORS.deviceTabs.operationsTab).click()
@@ -148,7 +152,7 @@ test.describe('Device detail page (US-PA-020)', () => {
     await expect(page.locator(SELECTORS.operations.table).getByText('Pending')).toBeVisible()
 
     // The Direct property write entry exists via More menu
-    // （operations.region 的入口按设计 §4.4.2 收敛到 More ▾ 下拉）
+    // （operations.region 的入口收敛到 More ▾ 下拉）
     await page.locator(SELECTORS.operations.moreActionsButton).click()
     await expect(page.locator(SELECTORS.operations.directPropertyWriteButton)).toBeVisible()
   })

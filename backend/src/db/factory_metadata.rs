@@ -1,4 +1,4 @@
-//! Factory metadata repository (support-multiple-device feature, design §5.1).
+//! Factory metadata repository (support-multiple-device feature).
 //!
 //! Backs the production-line write path and the admin/device read path for
 //! factory metadata. Four tables back this module; see migration
@@ -64,7 +64,7 @@ pub struct FactoryDeviceViewRow {
     pub updated_at: Option<time::OffsetDateTime>,
 }
 
-/// Read row for `get_device_metadata` (design §5.1). Defined locally rather than
+/// Read row for `get_device_metadata`. Defined locally rather than
 /// reusing the `FactoryDeviceMetadata` model: the model's `metadata`/
 /// `file_attachments` are non-`Option` `JsonValue` (matching the table's NOT NULL
 /// columns), but the handler-side normalisation from `Option<JsonValue>` →
@@ -93,7 +93,7 @@ impl FactoryMetadataRepo {
     /// `INSERT ... ON CONFLICT DO UPDATE`, and — only when a before-snapshot
     /// existed (i.e. an overwrite happened) — append a
     /// `factory_metadata_change_log` row carrying the before/after JSONB
-    /// snapshots (design §5.1, R5).
+    /// snapshots.
     pub async fn upsert_component(
         &self,
         component_sn: &str,
@@ -146,7 +146,7 @@ impl FactoryMetadataRepo {
             Some(before_row) => {
                 // Write the change log row with before/after JSONB snapshots.
                 // `after` snapshot includes component_type/metadata/file_attachments/
-                // updated_at per design §4.3.2.
+                // updated_at.
                 let before_json = json!({
                     "component_type":   before_row.component_type,
                     "metadata":         &before_row.metadata,
@@ -170,7 +170,7 @@ impl FactoryMetadataRepo {
         Ok(outcome)
     }
 
-    /// Upsert a device's device-level metadata (design §5.1, symmetric to
+    /// Upsert a device's device-level metadata (symmetric to
     /// `upsert_component`).
     ///
     /// Same transactional shape as `upsert_component` — read before-snapshot,
@@ -178,7 +178,7 @@ impl FactoryMetadataRepo {
     /// `factory_metadata_change_log` row carrying the before/after JSONB
     /// snapshots. The device-level snapshots deliberately contain **no
     /// `component_type`** (devices have no component type); this is the key
-    /// difference from the component-level snapshots (design §1.4, §4.2.1).
+    /// difference from the component-level snapshots.
     pub async fn upsert_device_metadata(
         &self,
         device_sn: &str,
@@ -226,8 +226,8 @@ impl FactoryMetadataRepo {
             None => UpsertOutcome::Created,
             Some(before_row) => {
                 // Write the change log row with before/after JSONB snapshots.
-                // Device-level snapshots have NO component_type (design §1.4 —
-                // devices have no component type), unlike the component-level
+                // Device-level snapshots have NO component_type (devices have
+                // no component type), unlike the component-level
                 // snapshots in `upsert_component`.
                 let before_json = json!({
                     "metadata":         &before_row.metadata,
@@ -371,10 +371,10 @@ impl FactoryMetadataRepo {
     }
 
     /// Read a device's device-level metadata row, or `None` when no row exists
-    /// (design §5.1). The handler maps this into `FactoryDeviceMetadataView`;
+    /// The handler maps this into `FactoryDeviceMetadataView`;
     /// `None` here does NOT by itself drive a 404 — the 404 decision is made by
     /// `get_device_view` (associations + device-metadata existence), this method
-    /// only reads the content (design §6.3).
+    /// only reads the content.
     pub async fn get_device_metadata(
         &self,
         device_sn: &str,
@@ -394,7 +394,7 @@ impl FactoryMetadataRepo {
 
     /// Time-descending paginated query of an SN's change log (device SN or
     /// sub-component SN — the table is sn-neutral after the `component_sn` →
-    /// `sn` generalization, design §4.1/§6.3).
+    /// `sn` generalization).
     ///
     /// `page` is 1-based. Returns `(rows, total)`; `total` is the row count
     /// matching `sn` (used by handlers to populate a `PaginatedResponse`).

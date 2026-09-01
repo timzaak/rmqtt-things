@@ -17,10 +17,10 @@ use axum::http::StatusCode;
 use axum_extra::extract::Query;
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 // GET /api/admin/file/download-url - Get a presigned S3 download URL for a file
-// attachment (design §4.2.2 F / §5.5). The frontend uses this to render
+// attachment. The frontend uses this to render
 // `FileAttachment.fileKey` values as clickable direct links.
 #[derive(Debug, serde::Deserialize, utoipa::IntoParams, utoipa::ToSchema)]
 #[into_params(parameter_in = Query)]
@@ -38,8 +38,8 @@ pub struct FileDownloadUrlResponse {
     pub expires_in_seconds: u64,
 }
 
-/// Validate an admin file download `file_key` against the path-traversal rules
-/// in design §4.5. Extracted as a pure function so the validation matrix
+/// Validate an admin file download `file_key` against the path-traversal rules.
+/// Extracted as a pure function so the validation matrix
 /// (empty / overlong / `..` segment / absolute path / valid) is unit-testable
 /// without spinning up a full router.
 fn validate_file_key(file_key: &str) -> Result<(), ApiError> {
@@ -69,7 +69,7 @@ pub async fn admin_file_download_url_handler(
     State(state): State<Arc<ApiState>>,
     Query(query): Query<FileDownloadUrlQuery>,
 ) -> Result<Json<FileDownloadUrlResponse>, ApiError> {
-    // §4.5 path-traversal protection. `validate_identifier` cannot be reused
+    // Path-traversal protection. `validate_identifier` cannot be reused
     // because a file key legitimately contains `/` (directory segments).
     validate_file_key(&query.file_key)?;
 
@@ -88,7 +88,7 @@ pub async fn admin_file_download_url_handler(
         .as_ref()
         .ok_or_else(|| ApiError::service_unavailable("S3 client not configured"))?;
 
-    // §4.5 directory whitelist — prevents reading outside the configured S3
+    // Directory whitelist — prevents reading outside the configured S3
     // prefixes. Admin context has no product/device variables, matching
     // `admin_file_upload_handler`.
     if !is_file_upload_directory_allowed(&s3_client.config.directories, "", "", directory) {
@@ -104,7 +104,7 @@ pub async fn admin_file_download_url_handler(
         })?;
 
     // `S3Config.expired_seconds` is `u32`; the API contract exposes `u64`
-    // (design §4.2.2 F) so widen here.
+    // so widen here.
     Ok(Json(FileDownloadUrlResponse {
         url,
         expires_in_seconds: u64::from(s3_client.config.expired_seconds),
@@ -659,7 +659,7 @@ pub async fn create_property_command(
 }
 
 // PUT /admin/property/shadow/desired - Set-Desired：upsert desired，计算 delta，
-// 非空则借命令通道投递（设计 shadow-device-support.md §5.2）。
+// 非空则借命令通道投递。
 #[utoipa::path(
     put,
     path = "/api/admin/property/shadow/desired",
@@ -778,8 +778,7 @@ pub async fn set_property_desired(
     }))
 }
 
-// GET /admin/property/shadow - Get-Delta：返回 desired / reported / delta
-// （设计 shadow-device-support.md §5.2）。
+// GET /admin/property/shadow - Get-Delta：返回 desired / reported / delta。
 #[utoipa::path(
     get,
     path = "/api/admin/property/shadow",
@@ -869,12 +868,12 @@ pub async fn delete_property_commands(
     Ok(StatusCode::OK)
 }
 
-// ---- Action / service invocation admin handlers (thing-model-extension §4.2.2) ----
+// ---- Action / service invocation admin handlers (thing-model-extension) ----
 // Mirrors the property command family above (create/get/delete). Each handler is
 // a thin DTO → repository → drain passthrough; behavioural correctness is
 // covered by the scenario tests listed in the test-slot handoff.
 
-/// Validate a `service_type` against design §4.5: `[a-zA-Z0-9_-]{1,32}`.
+/// Validate a `service_type`: `[a-zA-Z0-9_-]{1,32}`.
 /// Extracted as a pure function so the validation matrix (empty / overlong /
 /// illegal character) is unit-testable without spinning up a router. Mirrors
 /// `validate_file_key`'s style.
@@ -890,7 +889,7 @@ fn validate_service_type(service_type: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-// POST /api/admin/service/command - 发起一次动作 / 服务调用（设计 §4.2.2）。
+// POST /api/admin/service/command - 发起一次动作 / 服务调用。
 //
 // 入队流程：校验 → insert_action_invocation（Pending）→ 若设备已订阅
 // `thing/service/{service_type}/set` 则立即 drain（drain 内部原子 claim 并发
@@ -916,7 +915,7 @@ pub async fn create_service_command(
     validate_service_type(&request.service_type)?;
 
     // `params` 缺省 `{}`（serde default），null 也按 `{}` 兜底，避免向设备下发
-    // 不合法的 `params: null`（设计 §4.2.2 "空对象允许"，未提及 null）。
+    // 不合法的 `params: null`：契约允许空对象、未提及 null，按非法值拒绝。
     let params = if request.params.is_null() {
         serde_json::Value::Object(serde_json::Map::new())
     } else {
@@ -1001,7 +1000,7 @@ pub async fn create_service_command(
     ))
 }
 
-// GET /api/admin/service/command - 查询动作调用历史（设计 §4.2.2）。
+// GET /api/admin/service/command - 查询动作调用历史。
 #[utoipa::path(
     get,
     path = "/api/admin/service/command",
@@ -1054,7 +1053,7 @@ pub async fn get_service_commands(
     Ok(Json(response))
 }
 
-// DELETE /api/admin/service/command - 软删动作调用记录（设计 §4.2.2）。
+// DELETE /api/admin/service/command - 软删动作调用记录。
 //
 // 仅 Pending 行可被软删（Sent 行已发出，避免与设备 reply 竞争）。与
 // `delete_property_commands` 一致：DB 层 `delete_action_invocations` 通过
@@ -1258,6 +1257,163 @@ pub async fn get_property_history(
     };
 
     Ok(Json(response))
+}
+
+/// 抽样步长：每 stride 条真实记录取第 1 条。total 为 0 或未超上限时为 1。
+pub(crate) fn series_stride(total: i64) -> i64 {
+    let cap = MAX_SERIES_POINTS;
+    let stride = (total + cap - 1) / cap;
+    stride.max(1)
+}
+
+/// 校验并去重（保序）序列查询的 keys：1..=5 个、非空、单键 ≤128 字符。
+pub(crate) fn normalize_series_keys(keys: &[String]) -> Result<Vec<String>, ApiError> {
+    let mut normalized: Vec<String> = Vec::with_capacity(keys.len());
+    for key in keys {
+        if key.is_empty() || key.len() > MAX_SERIES_KEY_LENGTH {
+            return Err(ApiError::bad_request(
+                "keys must contain 1 to 5 non-empty property keys",
+            ));
+        }
+        if !normalized.contains(key) {
+            normalized.push(key.clone());
+        }
+    }
+    if normalized.is_empty() || normalized.len() > MAX_SERIES_KEYS {
+        return Err(ApiError::bad_request(
+            "keys must contain 1 to 5 non-empty property keys",
+        ));
+    }
+    Ok(normalized)
+}
+
+/// 解析序列查询时间范围为 RFC3339 闭区间；格式非法或 start >= end 时拒绝。
+pub(crate) fn parse_series_range(
+    start_time: &str,
+    end_time: &str,
+) -> Result<(time::OffsetDateTime, time::OffsetDateTime), ApiError> {
+    let start =
+        time::OffsetDateTime::parse(start_time, &time::format_description::well_known::Rfc3339)
+            .map_err(|_| ApiError::bad_request("invalid start_time or end_time"))?;
+    let end = time::OffsetDateTime::parse(end_time, &time::format_description::well_known::Rfc3339)
+        .map_err(|_| ApiError::bad_request("invalid start_time or end_time"))?;
+    if start >= end {
+        return Err(ApiError::bad_request("invalid start_time or end_time"));
+    }
+    Ok((start, end))
+}
+
+// GET api/admin/property/history/keys - 数值属性发现
+#[utoipa::path(
+    get,
+    path = "/api/admin/property/history/keys",
+    tag = "admin",
+    params(PropertyChartKeysQuery),
+    responses((status = 200, description = "Numeric property keys", body = PropertyChartKeysResponse))
+)]
+pub async fn get_property_history_keys(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<PropertyChartKeysQuery>,
+) -> Result<Json<PropertyChartKeysResponse>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&query.product_id, "product_id")?;
+    validate_identifier(&query.device_id, "device_id")?;
+    let lookback_days = query.lookback_days.unwrap_or(DEFAULT_KEY_LOOKBACK_DAYS);
+    if !(1..=366).contains(&lookback_days) {
+        return Err(ApiError::bad_request(
+            "lookback_days must be between 1 and 366",
+        ));
+    }
+
+    let keys = state
+        .db
+        .query_property_chart_keys(&query.product_id, &query.device_id, lookback_days)
+        .await
+        .map_err(|e| {
+            error!("Database error: {}", e);
+            ApiError::internal("Database operation failed")
+        })?;
+
+    debug!(
+        product_id = %query.product_id,
+        device_id = %query.device_id,
+        lookback_days,
+        keys = keys.len(),
+        "property chart keys discovered"
+    );
+
+    Ok(Json(PropertyChartKeysResponse { data: keys }))
+}
+
+// GET api/admin/property/history/series - 图表序列查询
+#[utoipa::path(
+    get,
+    path = "/api/admin/property/history/series",
+    tag = "admin",
+    params(PropertySeriesQuery),
+    responses((status = 200, description = "Property series", body = PropertySeriesListResponse))
+)]
+pub async fn get_property_history_series(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<PropertySeriesQuery>,
+) -> Result<Json<PropertySeriesListResponse>, ApiError> {
+    let state = &state.admin;
+    validate_identifier(&query.product_id, "product_id")?;
+    validate_identifier(&query.device_id, "device_id")?;
+    let keys = normalize_series_keys(&query.keys)?;
+    let (start, end) = parse_series_range(&query.start_time, &query.end_time)?;
+
+    let mut series = Vec::with_capacity(keys.len());
+    for key in keys {
+        let total = state
+            .db
+            .count_property_series_points(&query.product_id, &query.device_id, &key, start, end)
+            .await
+            .map_err(|e| {
+                error!("Database error: {}", e);
+                ApiError::internal("Database operation failed")
+            })?;
+        // stride 是唯一事实来源：downsampled 由它推导，二者不可能漂移。
+        let stride = series_stride(total);
+        let downsampled = stride > 1;
+        // LIMIT 硬上限兜底 count 与 data 两查询间新上报导致的计数漂移
+        let points = state
+            .db
+            .query_property_series_points(
+                &query.product_id,
+                &query.device_id,
+                &key,
+                start,
+                end,
+                stride,
+                MAX_SERIES_POINTS,
+            )
+            .await
+            .map_err(|e| {
+                error!("Database error: {}", e);
+                ApiError::internal("Database operation failed")
+            })?;
+
+        debug!(
+            product_id = %query.product_id,
+            device_id = %query.device_id,
+            key = %key,
+            total_points = total,
+            stride,
+            returned = points.len(),
+            "property series queried"
+        );
+
+        series.push(PropertySeriesView {
+            key,
+            total_points: total,
+            downsampled,
+            stride,
+            points,
+        });
+    }
+
+    Ok(Json(PropertySeriesListResponse { data: series }))
 }
 
 // GET api/admin/event - 查询事件历史
@@ -1467,7 +1623,7 @@ mod tests {
 
     // Asserts the validator rejects with a 400 BAD_REQUEST rather than another
     // status — `admin_file_download_url_handler` relies on this mapping for the
-    // §4.2.2 F 400 response contract.
+    // 400 response contract.
     fn assert_bad_request(result: Result<(), ApiError>) {
         match result {
             Err(e) => assert_eq!(
@@ -1514,7 +1670,7 @@ mod tests {
         assert!(validate_file_key(&max).is_ok());
     }
 
-    // serviceType validation matrix (design §4.5: `[a-zA-Z0-9_-]{1,32}`).
+    // serviceType validation matrix (`[a-zA-Z0-9_-]{1,32}`).
     // Reuses `assert_bad_request` since `create_service_command` returns 400
     // for invalid serviceType via the same `ApiError::bad_request` mapping.
     #[test]

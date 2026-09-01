@@ -1,7 +1,8 @@
 use crate::db::models::{
     ActionInvocation, CertIssue, CommandSource, CommandStatus, DeviceConnectionStatus,
     DeviceStatusHistory, DeviceStatusWithSource, EventHistory, EventValidTemplate,
-    EventValidTemplateStatus, PropertyCommand, PropertyHistory, PropertyLatest, RegistrationSource,
+    EventValidTemplateStatus, PropertyChartKey, PropertyCommand, PropertyHistory, PropertyLatest,
+    PropertySeriesPoint, RegistrationSource,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -144,12 +145,12 @@ pub struct CreatePropertyCommandRequest {
     pub command: JsonValue,
 }
 
-// ---- Action / service invocation admin DTOs (thing-model-extension §4.2.2) ----
-// Field naming follows design §4.2.2 (camelCase: productId / deviceId /
+// ---- Action / service invocation admin DTOs (thing-model-extension) ----
+// Field naming follows the action API convention (camelCase: productId / deviceId /
 // serviceType / params) and mirrors the existing `CreatePropertyCommandRequest`
-// pattern. `params` defaults to `{}` when omitted (design §4.2.2 "空对象允许").
+// pattern. `params` defaults to `{}` when omitted（空对象允许）.
 
-/// 管理端发起动作 / 服务调用的请求体（设计 §4.2.2）。
+/// 管理端发起动作 / 服务调用的请求体。
 /// camelCase 与前端 `ActionInvokeDialog` 表单字段一致。
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -165,7 +166,7 @@ pub struct CreateActionCommandRequest {
     pub params: JsonValue,
 }
 
-/// `create_service_command` 的响应（设计 §4.2.2 / §5.2）。
+/// `create_service_command` 的响应。
 /// `status` 反映入队后的瞬时状态：`pending`（设备未订阅/离线）或 `sent`（在线
 /// 且已订阅，drain 已立即投递）。
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -199,7 +200,7 @@ pub struct ActionCommandQuery {
     pub page_size: i64,
 }
 
-/// 动作调用视图。字段对齐设计 §4.2.2 GET 响应
+/// 动作调用视图。字段对齐 GET /api/admin/service/command 响应
 /// （`id / serviceType / params / status / createdTime / updatedTime`），
 /// camelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪
 /// 不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。
@@ -346,7 +347,7 @@ pub struct OtaVersionQuery {
 }
 
 /// Query parameters for `GET /api/admin/factory/sn/{sn}/changes`
-/// (design §4.2.2 D). The repo has no shared `PaginationQuery`; each paginated
+/// (paginated, time-descending). The repo has no shared `PaginationQuery`; each paginated
 /// endpoint carries its own query struct following the existing convention
 /// (`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.
 #[derive(Debug, Deserialize, ToSchema, IntoParams)]
@@ -387,7 +388,7 @@ pub struct UpdateOtaVersionRequest {
 
 pub type OtaVersionListResponse = PaginatedResponse<crate::db::models::OtaVersion>;
 
-// ---- Shadow (desired state) DTOs (design shadow-device-support.md §5.2) ----
+// ---- Shadow (desired state) DTOs ----
 
 /// Set-Desired request body: a partial patch over desired state.
 ///
@@ -445,4 +446,74 @@ pub struct ShadowQuery {
     pub product_id: String,
     /// 设备ID
     pub device_id: String,
+}
+
+// ---- Property history chart DTOs ----
+
+/// 单序列单查询返回点数上限；超限时按真实记录步长抽样并置 `downsampled=true`
+pub const MAX_SERIES_POINTS: i64 = 1000;
+/// 单次序列查询的属性键上限
+pub const MAX_SERIES_KEYS: usize = 5;
+/// 数值属性发现默认回看窗口（天），覆盖最长预设时间档
+pub const DEFAULT_KEY_LOOKBACK_DAYS: i32 = 30;
+/// 单个属性键的最大长度
+pub const MAX_SERIES_KEY_LENGTH: usize = 128;
+
+/// 数值属性发现查询入参（`GET /api/admin/property/history/keys`）。
+/// 图表固定单设备，故 `device_id` 必填（区别于表格端点的可选 `device_id`）。
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PropertyChartKeysQuery {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID
+    pub device_id: String,
+    /// 发现窗口天数，默认 30，允许 1..=366
+    pub lookback_days: Option<i32>,
+}
+
+/// 数值属性发现响应。设备从未上报时 `data` 为空数组（200），由前端渲染引导空态。
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PropertyChartKeysResponse {
+    /// 数值属性列表，按 sampleCount 降序
+    pub data: Vec<PropertyChartKey>,
+}
+
+/// 图表序列查询入参（`GET /api/admin/property/history/series`）。
+/// `keys` 以重复 query 参数传递（`keys=a&keys=b`）；`start_time` / `end_time`
+/// 为 RFC3339，闭区间且 `end_time > start_time`。
+#[derive(Debug, Deserialize, ToSchema, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct PropertySeriesQuery {
+    /// 产品ID
+    pub product_id: String,
+    /// 设备ID
+    pub device_id: String,
+    /// 属性键列表，1..=5 个
+    pub keys: Vec<String>,
+    /// 起始时间（含），RFC3339
+    pub start_time: String,
+    /// 结束时间（含），RFC3339，必须晚于 start_time
+    pub end_time: String,
+}
+
+/// 单个属性键的图表序列视图。
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertySeriesView {
+    pub key: String,
+    /// 范围内数值型匹配记录总数（count 查询结果）
+    pub total_points: i64,
+    /// `total_points > MAX_SERIES_POINTS` 时为 true
+    pub downsampled: bool,
+    /// 抽样步长（每 stride 条真实记录取第 1 条），未降精度时为 1
+    pub stride: i64,
+    /// 数据点，时间升序；每个点都来自真实上报记录
+    pub points: Vec<PropertySeriesPoint>,
+}
+
+/// 图表序列查询响应。序列顺序与请求 `keys` 一致。
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PropertySeriesListResponse {
+    pub data: Vec<PropertySeriesView>,
 }

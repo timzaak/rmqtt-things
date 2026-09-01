@@ -272,6 +272,33 @@ SET properties = EXCLUDED.properties,
 INSERT INTO property_history (product_id, device_id, properties, reported_time)
 VALUES ('demo_product', 'demo-device', '{"temperature":23.5,"humidity":48,"power":true}'::jsonb, NOW());
 
+-- Property-history chart seed (property-history-visualization): 2000 rows of
+-- numeric keys every 5 minutes across the last ~7 days (newest row at NOW) so
+-- every preset range has data: 1h ≈ 12 points, 24h ≈ 288 points (below the
+-- 1000-point cap, no downsample note), 7d = 2000 points (crosses the cap and
+-- renders the visible downsample note). `mode` (string) and `power` (boolean)
+-- ride along in every payload: they stay non-numeric so they never qualify
+-- for the chart selector, but remain auditable in the table view. The delete
+-- + insert pair keeps the seed idempotent and self-healing across demo
+-- restarts (the original single-row seed above predates the 'mode' marker).
+DELETE FROM property_history
+WHERE product_id = 'demo_product'
+  AND device_id = 'demo-device'
+  AND properties ? 'mode';
+
+INSERT INTO property_history (product_id, device_id, properties, reported_time)
+SELECT
+    'demo_product',
+    'demo-device',
+    jsonb_build_object(
+        'temperature', round((20 + 5 * sin(gs / 25.0))::numeric, 1),
+        'humidity', 40 + (gs % 30),
+        'mode', 'eco',
+        'power', true
+    ),
+    NOW() - make_interval(mins => ((2000 - gs) * 5)::int)
+FROM generate_series(1, 2000) AS gs;
+
 INSERT INTO event_history (product_id, device_id, events, reported_time)
 VALUES ('demo_product', 'demo-device', '{"event":"boot","reason":"demo-seed"}'::jsonb, NOW());
 

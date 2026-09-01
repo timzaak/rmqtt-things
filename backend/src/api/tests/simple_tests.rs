@@ -140,7 +140,7 @@ pub fn test_s3_endpoint() -> String {
 
 /// Build a `FactoryAuthState` with an empty API-key list. Used by tests that
 /// don't exercise the factory write path; an empty list means every factory
-/// request is 401 (design §5.4). Tests that need a valid factory API key
+/// request is 401. Tests that need a valid factory API key
 /// should build their own `FactoryAuthState` with the key(s) inlined.
 pub fn empty_factory_auth_state() -> Arc<crate::api::factory_middleware::FactoryAuthState> {
     let keys: Arc<[Box<str>]> = Vec::<Box<str>>::new().into();

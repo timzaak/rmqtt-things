@@ -120,8 +120,8 @@ pub fn create_router(
                 .post(admin_handlers::create_property_command)
                 .delete(admin_handlers::delete_property_commands),
         )
-        // Action / service invocation admin endpoints (thing-model-extension
-        // design §4.2.2). Compound route mirrors `/admin/property/command`:
+        // Action / service invocation admin endpoints (thing-model-extension).
+        // Compound route mirrors `/admin/property/command`:
         // GET → history query, POST → create, DELETE → soft delete.
         // `extract_permission` maps `/admin/service/*` to the `device` resource.
         .route(
@@ -141,6 +141,14 @@ pub fn create_router(
         .route(
             "/admin/property/history",
             get(admin_handlers::get_property_history),
+        )
+        .route(
+            "/admin/property/history/keys",
+            get(admin_handlers::get_property_history_keys),
+        )
+        .route(
+            "/admin/property/history/series",
+            get(admin_handlers::get_property_history_series),
         )
         .route("/admin/event", get(admin_handlers::get_event_history))
         .route(
@@ -205,7 +213,7 @@ pub fn create_router(
             post(admin_handlers::admin_file_upload_handler),
         )
         // GET /admin/file/download-url — presigned S3 download URL for file
-        // attachments (design §4.2.2 F / §5.5). Shares the existing
+        // attachments. Shares the existing
         // `admin_routes` group and Herald middleware; `extract_permission`
         // already maps `/admin/file/*` to the `product` resource, so Herald
         // `product:read` governs this GET (single-tenant deployments pass
@@ -234,7 +242,7 @@ pub fn create_router(
             "/admin/alarm/{id}/clear",
             patch(alarm_handlers::clear_alarm),
         )
-        // Factory admin read routes (design §4.2.2 C/D + §5.4). These share the
+        // Factory admin read routes. These share the
         // existing admin_routes group — Herald `device:read` applies once
         // `extract_permission` maps `/admin/factory/*` to the `device` resource
         // (middleware/mod.rs). Single-tenant (no Herald) deployments pass through.
@@ -260,7 +268,7 @@ pub fn create_router(
         (_, _) => admin_routes,
     };
 
-    // Independent factory routes behind `factory_auth_middleware` (design §5.4).
+    // Independent factory routes behind `factory_auth_middleware`.
     // Shares `Arc<ApiState>` state type with the other route groups (axum 0.8
     // `Router::merge` requires a single shared state type). Path params use the
     // 0.8 `{name}` syntax — `:name` would be treated as a literal segment.

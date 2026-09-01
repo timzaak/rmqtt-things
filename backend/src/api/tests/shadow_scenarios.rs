@@ -1,15 +1,15 @@
 //! Scenario tests for shadow device support (desired state / delta).
 //!
 //! Covers US-PA-042 (Set-Desired) and US-PA-043 (Get-Delta) against the
-//! dev-delivered production code from BE-D02 (property_desired repository) and
-//! BE-D03 (Set-Desired / Get-Delta handlers, `compute_delta`, OpenAPI + routing).
+//! dev-delivered production code (property_desired repository, Set-Desired /
+//! Get-Delta handlers, `compute_delta`, OpenAPI + routing).
 //!
 //! Test style mirrors `mqtt_device_flow_scenarios.rs::scenario_property_command_lifecycle`:
 //! in-process axum `#[test_context(TestContext)]` + `#[tokio::test]`, reusing
 //! `super::simple_tests::{request, request_json, TestContext}`. HTTP calls go
 //! through `ctx.service`; direct DB assertions go through `ctx._admin_state.db`.
 //!
-//! Business rules encoded (design shadow-device-support.md §4.1):
+//! Business rules encoded:
 //! - R1 desired write single-source: only Set-Desired writes desired; one-shot
 //!   commands and device reports never pollute it.
 //! - R2 passive convergence: the platform never auto-re-pushes; a command that
@@ -85,8 +85,7 @@ async fn put_desired(
 }
 
 /// GET /api/admin/property/shadow?product_id=&device_id= — Get-Delta.
-/// Query keys are snake_case (matching `ShadowQuery`, not the camelCase shown
-/// in design §4.2.2).
+/// Query keys are snake_case (matching `ShadowQuery`, not camelCase).
 async fn get_shadow(
     ctx: &TestContext,
     product_id: &str,
@@ -129,8 +128,8 @@ async fn list_commands(ctx: &TestContext, product_id: &str, device_id: &str) -> 
 // reported converges -> delta empty.
 //
 // User Story: US-PA-042 (设置设备期望状态)
-// Covers: design §4.1 R1 (desired write single-source), §4.2.1 Set-Desired,
-//         §6.1 scenario_set_desired_online_converges. R3 delta convergence path.
+// Covers: desired write single-source (R1), Set-Desired,
+//         Online Set-Desired convergence. R3 delta convergence path.
 // ---------------------------------------------------------------------------
 #[test_context(TestContext)]
 #[tokio::test]
@@ -215,7 +214,7 @@ async fn scenario_shadow_set_desired_online_converges(ctx: &mut TestContext) {
     assert_eq!(status, StatusCode::NO_CONTENT);
 
     // 7. Acknowledge the delivered command via the unified service_set_reply
-    //    webhook (BE-D02): reply code 200 with the top-level string correlation
+    //    webhook: reply code 200 with the top-level string correlation
     //    id -> Success. The old property-private `/property/set_reply` route
     //    and `{data:[id]}` batch payload were deleted.
     let reply_msg = mqtt_publish_message(
@@ -249,8 +248,8 @@ async fn scenario_shadow_set_desired_online_converges(ctx: &mut TestContext) {
 // Scenario 2: Set-Desired (offline) -> delta enqueued and stays Pending.
 //
 // User Story: US-PA-042 (设置设备期望状态) — offline queue path.
-// Covers: design §4.2.1 Set-Desired (离线留队), §6.1
-//         scenario_set_desired_offline_queues; reuses US-DV-009 queue+online-delivery.
+// Covers: Set-Desired 离线留队;
+//         reuses US-DV-009 queue+online-delivery.
 // ---------------------------------------------------------------------------
 #[test_context(TestContext)]
 #[tokio::test]
@@ -296,8 +295,8 @@ async fn scenario_shadow_set_desired_offline_queues(ctx: &mut TestContext) {
 // Scenario 3: a one-shot property command must NOT pollute the desired view.
 //
 // User Story: US-PA-042 (设置设备期望状态) — desired not polluted by one-shot command.
-// Covers: design §4.1 R1 (desired write single-source), §6.1
-//         scenario_desired_not_polluted_by_one_shot_command.
+// Covers: desired write single-source (R1);
+//         one-shot command must not pollute desired.
 // WHY encoded: a one-shot command is a transient action, not a persistent
 // intent; desired must reflect only what Set-Desired wrote.
 // ---------------------------------------------------------------------------
@@ -361,8 +360,8 @@ async fn scenario_shadow_desired_not_polluted_by_one_shot_command(ctx: &mut Test
 // Scenario 4: an empty desired patch `{}` must be rejected with 400.
 //
 // User Story: US-PA-042 (设置设备期望状态) — scenario 4 (空期望被拒).
-// Covers: design §4.2.2 / §5.2 (patch 空对象返回 400), §6.1
-//         scenario_empty_desired_rejected.
+// Covers: patch 空对象返回 400;
+//         empty desired patch rejected.
 // WHY encoded: an empty patch is a no-op and must be rejected at the handler
 // boundary (no desired write, no command enqueued).
 // ---------------------------------------------------------------------------
@@ -397,9 +396,9 @@ async fn scenario_shadow_empty_desired_rejected(ctx: &mut TestContext) {
 // Scenario 5: a `null` value in the desired patch deletes that desired key.
 //
 // User Story: US-PA-043 (查看设备期望状态与差异) — null deletion + delta change.
-// Covers: design §4.2 (RFC 7396 subset: null=delete), §5.1 merge_desired, §5.2
-//         备注 (patch 只含 null 合法, 不返回 400), §6.1
-//         scenario_null_deletes_desired_property.
+// Covers: RFC 7396 subset (null=delete), merge_desired,
+//         备注 (patch 只含 null 合法, 不返回 400);
+//         null deletes the desired property.
 // WHY encoded: `null` is the RFC 7396 delete sentinel, not a stored value; the
 // key must actually be removed from the desired document and the delta must
 // reflect the removal. A patch containing only null keys is a valid operation
@@ -430,7 +429,7 @@ async fn scenario_shadow_null_deletes_desired_property(ctx: &mut TestContext) {
 
     // 3. Patch {"brightness": null} -> delete the brightness key from desired.
     //    A patch that contains only a null entry is a valid delete operation and
-    //    must NOT be treated as the empty-patch 400 case (design §5.2 备注).
+    //    must NOT be treated as the empty-patch 400 case.
     let (status, body) =
         put_desired(ctx, product_id, device_id, json!({ "brightness": null })).await;
     assert_eq!(
@@ -473,8 +472,8 @@ async fn scenario_shadow_null_deletes_desired_property(ctx: &mut TestContext) {
 // Scenario 6: a command that Failed leaves desired intact (passive convergence).
 //
 // User Story: US-PA-043 (查看设备期望状态与差异) — failed delivery keeps desired.
-// Covers: design §4.1 R2 (passive convergence), §6.1
-//         scenario_command_failed_desired_kept.
+// Covers: passive convergence (R2);
+//         command failure keeps desired.
 // WHY encoded: the platform never auto-re-pushes on failure; desired is a
 // persistent intent and stays observable as a delta until the admin explicitly
 // acts again. The desired document is independent of command ack results.

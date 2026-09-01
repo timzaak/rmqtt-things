@@ -5,7 +5,7 @@ import { toast } from '@/components/ui/sonner'
 import { extractErrorMessage, formatDatetime } from '@/lib/utils'
 import { useDeviceOperations } from '@/hooks/useDeviceOperations'
 import { useCreateActionInvocation } from '@/hooks/useActionInvocations'
-import { sectionHeading } from './styles'
+import { sectionHeading, selectControlStyle } from './styles'
 import { StatusBadge } from './StatusBadge'
 import { ActionInvokeDialog } from './ActionInvokeDialog'
 import { DirectPropertyWriteDialog } from './DirectPropertyWriteDialog'
@@ -24,17 +24,6 @@ const TYPE_LABELS = Object.fromEntries(TYPE_OPTIONS.map((opt) => [opt.value, opt
 >
 
 const STATUS_OPTIONS: CommandStatus[] = ['Pending', 'Sent', 'Success', 'Failed', 'Deleted']
-
-const filterStyle: React.CSSProperties = {
-  height: '30px',
-  borderRadius: '8px',
-  border: '1px solid var(--color-border)',
-  background: 'var(--color-surface-1)',
-  color: 'var(--color-text-primary)',
-  padding: '0 10px',
-  fontSize: '13px',
-  outline: 'none',
-}
 
 export function DeviceOperationsSection({
   productId,
@@ -111,7 +100,7 @@ export function DeviceOperationsSection({
               setTypeFilter((e.target.value || null) as DeviceOperationType | null)
               setPage(1)
             }}
-            style={filterStyle}
+            style={selectControlStyle}
           >
             <option value="">All types</option>
             {TYPE_OPTIONS.map((opt) => (
@@ -128,7 +117,7 @@ export function DeviceOperationsSection({
               setStatusFilter((e.target.value || null) as CommandStatus | null)
               setPage(1)
             }}
-            style={filterStyle}
+            style={selectControlStyle}
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((status) => (

@@ -1,8 +1,7 @@
 /**
  * Device Detail Experience Demo 测试
  *
- * 对应用户故事（已发布来源；设计文档引用的 draft
- * `.ai/user-stories/core/device-detail-experience.md` 当前不存在，以已发布基线为准）：
+ * 对应用户故事（docs/user-stories/01-platform-admin-user-stories.md）：
  * - US-PA-050 按业务意图理解设备详情
  *   （docs/user-stories/01-platform-admin-user-stories.md:1651）
  * - US-PA-051 区分目标同步、直接属性写入和动作调用
@@ -10,7 +9,7 @@
  *
  * 覆盖映射：
  * - Scenario 1 -> US-PA-050 场景 1/2：七区导航可见 + State & Configuration 的
- *   Current/Target/Sync 对照（In sync / Out of sync / Target not set，设计 §4.4.3）
+ *   Current/Target/Sync 对照（In sync / Out of sync / Target not set）
  * - Scenario 2 -> US-PA-051 场景 2：Set Desired 产生 Target sync 记录，
  *   Direct property write 与 Action invocation 记录可区分，类型筛选生效
  * - Scenario 3 -> US-PA-051 场景 4（核心）：设备回复成功（Operations 中 Success）
@@ -53,7 +52,7 @@ interface ShadowView {
   delta?: Record<string, unknown>
 }
 
-/** 统一操作视图行（设计 §5.1 DeviceOperationView，camelCase）。 */
+/** 统一操作视图行（DeviceOperationView，camelCase）。 */
 interface DeviceOperationRow {
   operationId?: string
   operationType?: string
@@ -67,7 +66,7 @@ async function openStateConfigurationTab(
   deviceId: string,
 ): Promise<void> {
   // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
-  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时。
   await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
     waitUntil: 'commit',
   })
@@ -116,7 +115,7 @@ test.describe('Device Detail Experience (US-PA-050/051)', () => {
       await updateProduct(request, productId, { auto_provisioning: true })
       await device.connect()
 
-      // 造数（覆盖设计 §4.4.3 三种 Sync 映射）：
+      // 造数（覆盖三种 Sync 映射）：
       // power       -> desired=reported       -> In sync
       // brightness  -> desired 存在但设备未上报 -> Out of sync
       // temperature -> 仅 reported            -> Target not set
@@ -174,7 +173,7 @@ test.describe('Device Detail Experience (US-PA-050/051)', () => {
       await expect(page.getByRole('tab', { name: SELECTORS.deviceTabs.metadataTab })).toBeVisible()
 
       // US-PA-050 场景 1/2：State & Configuration 逐属性展示 Current/Target/Sync，
-      // 并说明区域用途（设计 §4.4.2 副标题）
+      // 并说明区域用途（副标题）
       await page.locator(SELECTORS.deviceTabs.stateConfigurationTab).click()
       await expect(page.getByRole('heading', { name: 'State & Configuration' })).toBeVisible()
       await expect(
@@ -240,7 +239,7 @@ test.describe('Device Detail Experience (US-PA-050/051)', () => {
 
       // 2) 经 UI Direct property write 产生 directPropertyWrite 记录。
       // 已在设备详情页（上一步 openStateConfigurationTab），不再整页 reload；
-      // 直接切 Operations tab（DE-TR01 修复：连续 page.goto 在同一用例内偶发卡死）。
+      // 直接切 Operations tab（连续 page.goto 在同一用例内偶发卡死）。
       await page.locator(SELECTORS.deviceTabs.operationsTab).click()
       await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible()
       await page.locator(SELECTORS.operations.moreActionsButton).click()

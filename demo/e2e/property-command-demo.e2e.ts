@@ -8,7 +8,7 @@
  * 2. 设备离线时通过 API 创建属性命令 -> 命令状态为 Pending，前端可见
  * 3. 删除 Pending 状态的命令 -> 命令从列表中移除
  *
- * DE-D02 适配（device-detail-experience 七区信息架构）：旧 PropertyCommandsSection
+ * device-detail-experience 七区信息架构适配：旧 PropertyCommandsSection
  * 已删除，一次性属性命令历史汇入统一 Operations 表（DeviceOperationsSection.tsx），
  * 下发入口收敛到 Operations tab 的 More ▾ → Direct property write
  * （DirectPropertyWriteDialog.tsx）。变化点：
@@ -50,14 +50,14 @@ interface PropertyCommandRow {
 /**
  * 导航到设备详情页并切换到 Operations tab。
  *
- * DE-D02：设备详情页默认 activeTab='overview'，DeviceOperationsSection 仅在
+ * 设备详情页默认 activeTab='overview'，DeviceOperationsSection 仅在
  * activeTab==='operations' 时渲染（show.$id.tsx:126-128）。Tab 由 data-testid
  * `device-tab-operations` 定位（优先用 testid），分区 heading "Operations" 为
  * 持久锚点。Tab 选择器集中在 SELECTORS.deviceTabs.operationsTab。
  */
 async function openOperationsTab(page: Page, deviceId: string): Promise<void> {
   // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
-  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时。
   await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
     waitUntil: 'commit',
   })
@@ -84,11 +84,11 @@ test.describe('Property Command (US-PA-016)', () => {
       await updateProduct(request, productId, { auto_provisioning: true })
       await device.connect()
 
-      // 导航到设备详情页并切换到 Operations tab（DE-D02：属性命令入口收敛到
+      // 导航到设备详情页并切换到 Operations tab（属性命令入口收敛到
       // Operations.region 的 More ▾ → Direct property write）。
       await openOperationsTab(page, deviceId)
 
-      // DE-D02：下发入口为 More ▾ → Direct property write（SELECTORS.operations.*，
+      // 下发入口为 More ▾ → Direct property write（SELECTORS.operations.*，
       // 禁止硬编码 testid）。
       await page.locator(SELECTORS.operations.moreActionsButton).click()
       await page.locator(SELECTORS.operations.directPropertyWriteButton).click()
@@ -115,7 +115,7 @@ test.describe('Property Command (US-PA-016)', () => {
       // Reply to complete the command
       await device.replyCommand(command)
 
-      // DE-D02：命令状态在统一 Operations 表中显示（device-operations-table）。
+      // 命令状态在统一 Operations 表中显示（device-operations-table）。
       // StatusBadge 渲染 CommandStatus 枚举字符串（StatusBadge.tsx），Success 行可见。
       const operationsTable = page.locator(SELECTORS.operations.table)
       await expect(operationsTable.getByText('Success', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
@@ -192,13 +192,13 @@ test.describe('Property Command (US-PA-016)', () => {
       })
       expect(createResponse.status()).toBe(201)
 
-      // 导航到设备详情页并切换到 Operations tab（DE-D02：Pending 行在统一表中）。
+      // 导航到设备详情页并切换到 Operations tab（Pending 行在统一表中）。
       await openOperationsTab(page, deviceId)
       const operationsTable = page.locator(SELECTORS.operations.table)
       await expect(operationsTable.getByText('Pending', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
 
-      // DE-D02：统一 Operations 表第一阶段不暴露行内 Delete 入口（设计 §5.3：
-      // "第一阶段可不展示统一取消按钮，以减少误操作"；DeviceOperationsSection 列定义
+      // 统一 Operations 表第一阶段不暴露行内 Delete 入口（"第一阶段可
+      // 不展示统一取消按钮，以减少误操作"；DeviceOperationsSection 列定义
       // 无 Action/Delete 列）。Pending 命令的取消入口在原 DELETE /admin/property/command
       // 端点（ids 查询参数；仅 status=Pending 的行可被软删）。先从 GET 列表提取命令 id，
       // 再调用 DELETE，与前端基线 UI 不可达的取消路径等价。
@@ -218,9 +218,9 @@ test.describe('Property Command (US-PA-016)', () => {
       })
       expect(deleteResponse.status()).toBeLessThan(300)
 
-      // DE-D02：统一操作表反映状态变更。重新加载页面触发 useDeviceOperations 重新查询
+      // 统一操作表反映状态变更。重新加载页面触发 useDeviceOperations 重新查询
       // （前端不会主动失效），Deleted 行可见。用 page.reload() 而非再次 page.goto，
-      // 避免 Vite dev server 下连续同 URL goto 偶发卡死（DE-TR01 修复）。
+      // 避免 Vite dev server 下连续同 URL goto 偶发卡死。
       await page.reload({ waitUntil: 'commit' })
       await page.locator(SELECTORS.deviceTabs.operationsTab).click()
       await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible()

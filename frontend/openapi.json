@@ -107,6 +107,15 @@
             }
           },
           {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by status: active / acknowledged / cleared",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "description": "Page number, default 1",
@@ -469,6 +478,50 @@
         ]
       }
     },
+    "/api/admin/alarm/{id}/clear": {
+      "patch": {
+        "tags": ["admin"],
+        "operationId": "clear_alarm",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Alarm record id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Alarm cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlarmRecordResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Alarm not found"
+          },
+          "409": {
+            "description": "Alarm already cleared"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
     "/api/admin/ca/cert": {
       "get": {
         "tags": ["admin"],
@@ -636,6 +689,90 @@
           },
           "500": {
             "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/device/operation": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_device_operations",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "operation_type",
+            "in": "query",
+            "description": "操作类型：targetSync / directPropertyWrite / actionInvocation，可选",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/DeviceOperationType"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device operations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid identifier, enum or pagination"
           }
         },
         "security": [
@@ -843,6 +980,152 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/factory/devices/{deviceSn}": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_factory_device_view_handler",
+        "parameters": [
+          {
+            "name": "deviceSn",
+            "in": "path",
+            "description": "Device SN (same namespace as MQTT client_id)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Merged factory view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactoryDeviceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid deviceSn"
+          },
+          "404": {
+            "description": "Device has no associations and no device-level metadata"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/factory/sn/{sn}/changes": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "query_component_changes_handler",
+        "parameters": [
+          {
+            "name": "sn",
+            "in": "path",
+            "description": "SN (device SN or sub-component SN)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated change log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_FactoryMetadataChangeLog"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid sn"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/file/download-url": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "admin_file_download_url_handler",
+        "parameters": [
+          {
+            "name": "fileKey",
+            "in": "query",
+            "description": "S3 object key (same value as `FileAttachment.fileKey`). Non-empty, ≤ 1024 chars,\nmust not start with `/` and must not contain a `..` path segment.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presigned download URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileDownloadUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fileKey"
+          },
+          "403": {
+            "description": "Directory not allowed"
+          },
+          "503": {
+            "description": "S3 client not configured"
           }
         },
         "security": [
@@ -1334,6 +1617,15 @@
             }
           },
           {
+            "name": "source",
+            "in": "query",
+            "description": "命令来源：0=OneShot（一次性写入）, 1=DesiredDelta（Target 同步）；缺省返回全部",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandSource"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "description": "页码，默认为1",
@@ -1488,6 +1780,351 @@
         ]
       }
     },
+    "/api/admin/property/history/keys": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_property_history_keys",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lookback_days",
+            "in": "query",
+            "description": "发现窗口天数，默认 30，允许 1..=366",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Numeric property keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyChartKeysResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/history/series": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_property_history_series",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keys",
+            "in": "query",
+            "description": "属性键列表，1..=5 个",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "起始时间（含），RFC3339",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "结束时间（含），RFC3339，必须晚于 start_time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Property series",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertySeriesListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/shadow": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_property_shadow",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shadow view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShadowView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/shadow/desired": {
+      "put": {
+        "tags": ["admin"],
+        "operationId": "set_property_desired",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetDesiredRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Desired state updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetDesiredResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/service/command": {
+      "get": {
+        "tags": ["admin"],
+        "operationId": "get_service_commands",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "service_type",
+            "in": "query",
+            "description": "服务类型，可选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CommandStatus"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "每页大小，默认为10",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action invocations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["admin"],
+        "operationId": "create_service_command",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateActionCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Action invocation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateActionCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid productId / deviceId / serviceType"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": ["admin"],
+        "operationId": "delete_service_commands",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action invocations deleted"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
     "/api/admin/valid/event": {
       "get": {
         "tags": ["admin"],
@@ -1605,6 +2242,35 @@
           }
         ]
       },
+      "delete": {
+        "tags": ["admin"],
+        "operationId": "delete_event_valid_template",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Template id",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validation template deleted"
+          },
+          "404": {
+            "description": "Template not found"
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      },
       "patch": {
         "tags": ["admin"],
         "operationId": "update_event_valid_template",
@@ -1698,6 +2364,95 @@
         }
       }
     },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["system"],
+        "summary": "Log out: revoke the Herald token family, then clear both auth cookies.",
+        "description": "Revocation is best-effort — if Herald is unreachable we still clear the\ncookies so the user's session ends locally; the orphaned family dies on its\nown when the refresh absolute TTL expires.",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Logged out; cookies cleared"
+          }
+        }
+      }
+    },
+    "/api/auth/oauth/callback": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "oauth_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "description": "OAuth authorization code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "OAuth state",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Set app auth cookie and redirect to original app path"
+          }
+        }
+      }
+    },
+    "/api/auth/oauth/start": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "oauth_start",
+        "parameters": [
+          {
+            "name": "redirect",
+            "in": "query",
+            "description": "Original app URL",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to Herald OAuth authorize endpoint"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": ["system"],
+        "summary": "Refresh the browser access token using the `X-Auth-Refresh` cookie.",
+        "description": "Herald 0.3.3 issues short-lived (900s) access tokens alongside a long-lived\nrefresh token. Both tokens rotate on every refresh, and **reusing a rotated\nrefresh token revokes the whole token family** — so the web console must\nproactively call this endpoint before `X-Auth` lapses (single in-flight\nrefresh), never retry concurrently after a 401.",
+        "operationId": "refresh_token",
+        "responses": {
+          "200": {
+            "description": "Rotated access token; cookies refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token missing or rejected by Herald"
+          }
+        }
+      }
+    },
     "/api/device/connect": {
       "post": {
         "tags": ["device"],
@@ -1744,6 +2499,170 @@
             "description": "Server error"
           }
         }
+      }
+    },
+    "/api/factory/components/{componentSn}": {
+      "put": {
+        "tags": ["factory"],
+        "operationId": "upsert_component_handler",
+        "parameters": [
+          {
+            "name": "componentSn",
+            "in": "path",
+            "description": "Sub-component SN (same charset as a device SN)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertComponentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Component metadata upserted"
+          },
+          "400": {
+            "description": "Invalid componentSn or fileAttachments"
+          },
+          "401": {
+            "description": "Invalid or missing factory API key"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [{}]
+      }
+    },
+    "/api/factory/devices/{deviceSn}": {
+      "put": {
+        "tags": ["factory"],
+        "operationId": "upsert_device_metadata_handler",
+        "parameters": [
+          {
+            "name": "deviceSn",
+            "in": "path",
+            "description": "Device SN (same namespace as MQTT client_id)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertDeviceMetadataRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Device metadata upserted"
+          },
+          "400": {
+            "description": "Invalid deviceSn or fileAttachments"
+          },
+          "401": {
+            "description": "Invalid or missing factory API key"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [{}]
+      }
+    },
+    "/api/factory/devices/{deviceSn}/components": {
+      "put": {
+        "tags": ["factory"],
+        "operationId": "replace_associations_handler",
+        "parameters": [
+          {
+            "name": "deviceSn",
+            "in": "path",
+            "description": "Device SN (same namespace as MQTT client_id)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertAssociationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Associations replaced"
+          },
+          "400": {
+            "description": "Invalid deviceSn or componentSns"
+          },
+          "401": {
+            "description": "Invalid or missing factory API key"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [{}]
+      }
+    },
+    "/api/factory/file/upload": {
+      "post": {
+        "tags": ["factory"],
+        "operationId": "factory_file_upload_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Upload policy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Directory not allowed or invalid params"
+          },
+          "401": {
+            "description": "Invalid or missing factory API key"
+          },
+          "503": {
+            "description": "S3 client not configured"
+          }
+        },
+        "security": [{}]
       }
     },
     "/api/health": {
@@ -1811,6 +2730,34 @@
         }
       }
     },
+    "/api/thing/factory-metadata/get": {
+      "post": {
+        "tags": ["thing"],
+        "operationId": "factory_metadata_get_handler",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RMqttPublishMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Reply published to {topic}_reply"
+          },
+          "400": {
+            "description": "Invalid payload or topic"
+          },
+          "500": {
+            "description": "Server error"
+          }
+        },
+        "security": [{}]
+      }
+    },
     "/api/thing/file/upload": {
       "post": {
         "tags": ["thing"],
@@ -1865,10 +2812,10 @@
         }
       }
     },
-    "/api/thing/property/set_reply": {
+    "/api/thing/service/set_reply": {
       "post": {
         "tags": ["thing"],
-        "operationId": "property_set_reply",
+        "operationId": "service_set_reply",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1892,10 +2839,10 @@
         }
       }
     },
-    "/api/thing/property/set_subscribe": {
+    "/api/thing/service/set_subscribe": {
       "post": {
         "tags": ["thing"],
-        "operationId": "property_set_subscribe",
+        "operationId": "service_set_subscribe",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1952,6 +2899,119 @@
           }
         }
       },
+      "ActionCommandQuery": {
+        "type": "object",
+        "description": "动作调用历史查询入参。对齐 `PropertyCommandQuery`，额外携带可选\n`service_type` 过滤（动作侧的\"类型\"维度）。分页沿用既有默认值\n（`page` 默认 1、`page_size` 默认 10）。",
+        "required": ["product_id"],
+        "properties": {
+          "device_id": {
+            "type": ["string", "null"],
+            "description": "设备ID，可选"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "service_type": {
+            "type": ["string", "null"],
+            "description": "服务类型，可选"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandStatus",
+                "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted"
+              }
+            ]
+          }
+        }
+      },
+      "ActionInvocation": {
+        "type": "object",
+        "description": "Persisted one-shot action/service invocation (thing-model-extension).\nPhysically isolated from `PropertyCommand` per A2 — one-shot actions (reboot / unlock / buzzer) live in their own table\nand reuse the `CommandStatus` enum for state semantics. `params` is the\naction input document (free-form JSONB), and `service_type` is the\nfree-form service identifier routed via the MQTT topic segment.",
+        "required": [
+          "id",
+          "product_id",
+          "device_id",
+          "service_type",
+          "params",
+          "status",
+          "created_time",
+          "updated_time"
+        ],
+        "properties": {
+          "created_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "params": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "service_type": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "updated_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ActionInvocationView": {
+        "type": "object",
+        "description": "动作调用视图。字段对齐 GET /api/admin/service/command 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
+        "required": ["id", "serviceType", "params", "status", "createdTime", "updatedTime"],
+        "properties": {
+          "createdTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间（action 入队）"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "params": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "serviceType": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "updatedTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最后状态变更时间"
+          }
+        }
+      },
       "AlarmQuery": {
         "type": "object",
         "description": "Query parameters for listing alarm records",
@@ -1981,6 +3041,10 @@
           "product_id": {
             "type": ["string", "null"],
             "description": "Filter by product ID"
+          },
+          "status": {
+            "type": ["string", "null"],
+            "description": "Filter by status: active / acknowledged / cleared"
           }
         }
       },
@@ -2006,12 +3070,23 @@
           "actions",
           "enabled",
           "throttle_minutes",
+          "duration_minutes",
           "created_at",
           "updated_at"
         ],
         "properties": {
           "actions": {
             "$ref": "#/components/schemas/Value"
+          },
+          "clear_condition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
           },
           "condition": {
             "$ref": "#/components/schemas/Value"
@@ -2022,6 +3097,10 @@
           },
           "description": {
             "type": ["string", "null"]
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "format": "int32"
           },
           "enabled": {
             "type": "boolean"
@@ -2097,11 +3176,16 @@
           "device_id",
           "level",
           "acknowledged",
+          "status",
           "created_at"
         ],
         "properties": {
           "acknowledged": {
             "type": "boolean"
+          },
+          "cleared_at": {
+            "type": ["string", "null"],
+            "description": "RFC3339 timestamp when alarm was cleared"
           },
           "created_at": {
             "type": "string",
@@ -2131,6 +3215,10 @@
           "rule_name": {
             "type": "string"
           },
+          "status": {
+            "type": "string",
+            "description": "Alarm status: \"active\" / \"acknowledged\" / \"cleared\""
+          },
           "trigger_value": {
             "oneOf": [
               {
@@ -2143,7 +3231,7 @@
           },
           "webhook_status": {
             "type": ["string", "null"],
-            "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
+            "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")\n/ Some(\"final_failed\"). `failed` means a delivery is still pending\nretry; `final_failed` means all retry attempts have been exhausted\n(terminal failure, PRD alarm-rule-engine.md §6)."
           }
         }
       },
@@ -2246,6 +3334,11 @@
         "type": "string",
         "enum": ["Normal", "InValid", "Revoked"]
       },
+      "CommandSource": {
+        "type": "string",
+        "description": "Origin of a `property_command` row. Lets the frontend correlate a desired\ndelta with its delivery status without inspecting command contents.\nMirrors the `CommandStatus` derive pattern.",
+        "enum": ["OneShot", "DesiredDelta"]
+      },
       "CommandStatus": {
         "type": "string",
         "enum": ["Pending", "Sent", "Success", "Failed", "Deleted"]
@@ -2319,6 +3412,60 @@
           }
         }
       },
+      "ComponentAssociationItem": {
+        "type": "object",
+        "description": "Single item of `UpsertAssociationsRequest.components`.",
+        "required": ["componentSn"],
+        "properties": {
+          "componentSn": {
+            "type": "string",
+            "description": "Sub-component SN. Same charset as a device SN (`validate_identifier`)."
+          },
+          "componentType": {
+            "type": ["string", "null"],
+            "description": "Optional type hint. The metadata table's value takes precedence in the\nmerged view."
+          }
+        }
+      },
+      "CreateActionCommandRequest": {
+        "type": "object",
+        "description": "管理端发起动作 / 服务调用的请求体。\ncamelCase 与前端 `ActionInvokeDialog` 表单字段一致。",
+        "required": ["productId", "deviceId", "serviceType"],
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "params": {
+            "$ref": "#/components/schemas/Value",
+            "description": "动作入参，透传给设备；缺省为 `{}`，空对象允许"
+          },
+          "productId": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "serviceType": {
+            "type": "string",
+            "description": "服务类型标识，如 `reboot` / `unlock`；协议层不枚举（A4）"
+          }
+        }
+      },
+      "CreateActionCommandResponse": {
+        "type": "object",
+        "description": "`create_service_command` 的响应。\n`status` 反映入队后的瞬时状态：`pending`（设备未订阅/离线）或 `sent`（在线\n且已订阅，drain 已立即投递）。",
+        "required": ["id", "status"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "新建 action_invocation.id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus",
+            "description": "初始 `pending`（设备在线且订阅时可能直接 `sent`）"
+          }
+        }
+      },
       "CreateAlarmRuleRequest": {
         "type": "object",
         "description": "Request body for creating an alarm rule",
@@ -2328,6 +3475,17 @@
             "$ref": "#/components/schemas/Value",
             "description": "Action list (must contain at least one alarm action)"
           },
+          "clear_condition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value",
+                "description": "Clear condition, same format as condition, only for property trigger type"
+              }
+            ]
+          },
           "condition": {
             "$ref": "#/components/schemas/Value",
             "description": "Condition expression"
@@ -2335,6 +3493,11 @@
           "description": {
             "type": ["string", "null"],
             "description": "Rule description"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Duration condition in minutes, 0 = instant trigger, only for property trigger type"
           },
           "name": {
             "type": "string",
@@ -2465,6 +3628,20 @@
           }
         }
       },
+      "DeleteActionCommandsQuery": {
+        "type": "object",
+        "description": "DELETE /api/admin/service/command 的 query 入参。对齐\n`DeletePropertyCommandsQuery`（软删 Pending 行）。",
+        "required": ["ids"],
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
       "DeletePropertyCommandsQuery": {
         "type": "object",
         "required": ["ids"],
@@ -2563,6 +3740,101 @@
           },
           "username": {
             "type": "string"
+          }
+        }
+      },
+      "DeviceOperationQuery": {
+        "type": "object",
+        "description": "统一设备操作查询入参。",
+        "required": ["product_id"],
+        "properties": {
+          "device_id": {
+            "type": ["string", "null"],
+            "description": "设备ID，可选"
+          },
+          "operation_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DeviceOperationType",
+                "description": "操作类型：targetSync / directPropertyWrite / actionInvocation，可选"
+              }
+            ]
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandStatus",
+                "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted"
+              }
+            ]
+          }
+        }
+      },
+      "DeviceOperationType": {
+        "type": "string",
+        "description": "统一操作类型。camelCase 字面值与 SQL 投影常量一致：\n`targetSync`（property_command.source=1）/ `directPropertyWrite`（source=0）/\n`actionInvocation`（action_invocation）。",
+        "enum": ["targetSync", "directPropertyWrite", "actionInvocation"]
+      },
+      "DeviceOperationView": {
+        "type": "object",
+        "description": "统一设备操作视图。`operation_id` 为稳定组合 ID（`property:{id}` /\n`action:{id}`），`name` 对属性命令固定为 `Set properties` / `Sync target`，\n对动作取 `service_type`（前端摘要规则依赖这些字面值）。",
+        "required": [
+          "operationId",
+          "operationType",
+          "name",
+          "payload",
+          "status",
+          "createdTime",
+          "updatedTime"
+        ],
+        "properties": {
+          "createdTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "创建时间"
+          },
+          "name": {
+            "type": "string",
+            "description": "`Set properties` / `Sync target` / action 的 serviceType"
+          },
+          "operationId": {
+            "type": "string",
+            "description": "稳定组合 ID：`property:{id}` 或 `action:{id}`"
+          },
+          "operationType": {
+            "$ref": "#/components/schemas/DeviceOperationType"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/Value",
+            "description": "属性 command 或动作 params"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CommandStatus"
+          },
+          "updatedTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最近状态变更时间"
           }
         }
       },
@@ -2731,9 +4003,248 @@
         "type": "string",
         "enum": ["Draft", "Active", "Inactive"]
       },
+      "FactoryChangeLogQuery": {
+        "type": "object",
+        "description": "Query parameters for `GET /api/admin/factory/sn/{sn}/changes`\n(paginated, time-descending). The repo has no shared `PaginationQuery`; each paginated\nendpoint carries its own query struct following the existing convention\n(`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "页码，默认为1"
+          },
+          "page_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "每页大小，默认为10"
+          }
+        }
+      },
+      "FactoryComponentAssociation": {
+        "type": "object",
+        "description": "Device ↔ component association. `component_type` is a hint carried at\nassociation time; the metadata table's value takes precedence in views.",
+        "required": ["device_sn", "component_sn", "updated_at"],
+        "properties": {
+          "component_sn": {
+            "type": "string"
+          },
+          "component_type": {
+            "type": ["string", "null"]
+          },
+          "device_sn": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FactoryComponentMetadata": {
+        "type": "object",
+        "description": "Component-level factory metadata. `component_type` is free TEXT (default\n'camera'); the DB column constrains the default, not the value set.",
+        "required": [
+          "component_sn",
+          "component_type",
+          "metadata",
+          "file_attachments",
+          "updated_at",
+          "created_at"
+        ],
+        "properties": {
+          "component_sn": {
+            "type": "string"
+          },
+          "component_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "file_attachments": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FactoryComponentView": {
+        "type": "object",
+        "description": "Single component in a `FactoryDeviceView`.\n\n`component_type` prefers the metadata table's value and falls back to the\nassociation table's hint; both absent → `None`. `file_attachments` is an\narray (defaults to `[]` when metadata has not arrived).",
+        "required": ["componentSn", "fileAttachments"],
+        "properties": {
+          "componentSn": {
+            "type": "string"
+          },
+          "componentType": {
+            "type": ["string", "null"]
+          },
+          "fileAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Value"
+            }
+          },
+          "metadata": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        }
+      },
+      "FactoryDeviceMetadataView": {
+        "type": "object",
+        "description": "Device-level factory metadata view. Symmetric to\n`FactoryComponentView` minus `componentType`/`componentSn` — devices have no\ncomponent type or sub-component SN at this level. `file_attachments` is\nnormalised from the raw JSONB to an array (Array passthrough, Null → empty,\nscalar → wrapped), matching `map_row_to_component_view`.",
+        "required": ["fileAttachments"],
+        "properties": {
+          "fileAttachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Value"
+            }
+          },
+          "metadata": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        }
+      },
+      "FactoryDeviceView": {
+        "type": "object",
+        "description": "Admin merged-view response for a device.\n\n`device_metadata` carries the device-level factory metadata row when present\n(written via `PUT /api/factory/devices/{deviceSn}`), or `null` when no\ndevice-level metadata has been reported yet. `components` is the left-join of\nassociations with component metadata; components whose metadata has not\narrived yet surface with `metadata: null` and `file_attachments: []` (R3).",
+        "required": ["deviceSn", "components"],
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactoryComponentView"
+            }
+          },
+          "deviceMetadata": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FactoryDeviceMetadataView",
+                "description": "Device-level factory metadata (symmetric to `FactoryComponentView` minus\ncomponentType/componentSn). `null` when no device-level metadata has been\nreported yet."
+              }
+            ]
+          },
+          "deviceSn": {
+            "type": "string"
+          }
+        }
+      },
+      "FactoryMetadataChangeLog": {
+        "type": "object",
+        "description": "Component metadata overwrite log. `before` is NULL on the first report.",
+        "required": ["id", "sn", "after", "actor", "created_at"],
+        "properties": {
+          "actor": {
+            "type": "string"
+          },
+          "after": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "before": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sn": {
+            "type": "string"
+          }
+        }
+      },
+      "FileAttachment": {
+        "type": "object",
+        "description": "Reference to a file attachment uploaded via\n`POST /api/factory/file/upload`.",
+        "required": ["fileKey", "fileName"],
+        "properties": {
+          "contentType": {
+            "type": ["string", "null"],
+            "description": "Optional content type hint."
+          },
+          "fileKey": {
+            "type": "string",
+            "description": "S3 object key returned by the presigned POST. Non-empty, ≤ 1024 chars."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name (display/download hint)."
+          },
+          "sizeBytes": {
+            "type": ["integer", "null"],
+            "format": "int64",
+            "description": "Optional size hint in bytes."
+          }
+        }
+      },
+      "FileDownloadUrlQuery": {
+        "type": "object",
+        "required": ["fileKey"],
+        "properties": {
+          "fileKey": {
+            "type": "string",
+            "description": "S3 object key (same value as `FileAttachment.fileKey`). Non-empty, ≤ 1024 chars,\nmust not start with `/` and must not contain a `..` path segment."
+          }
+        }
+      },
+      "FileDownloadUrlResponse": {
+        "type": "object",
+        "required": ["url", "expiresInSeconds"],
+        "properties": {
+          "expiresInSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "FileUploadRequest": {
         "type": "object",
-        "required": ["fileName", "directory", "useOriginName", "fileType"],
+        "required": ["fileName", "directory", "useOriginName"],
         "properties": {
           "directory": {
             "type": "string"
@@ -2742,7 +4253,8 @@
             "type": "string"
           },
           "fileType": {
-            "type": "string"
+            "type": ["string", "null"],
+            "description": "客户端可携带的文件类型提示。当前后端不消费此字段（保留），可选。"
           },
           "useOriginName": {
             "type": "boolean"
@@ -2853,14 +4365,14 @@
       },
       "OtaReport": {
         "type": "object",
+        "description": "Device OTA version report.\n\n`version` is received as a spec `\"major.minor.patch\"` **string**\n(e.g. `\"1.2.3\"`) — the internal packed-integer storage is produced by\n`ota_handlers::ota_version_post` via `parse_version_to_int`. The DB\n`device_versions.version` column stays `i32`; only the handler/API layer\ntranslates between the wire string and the packed int.",
         "required": ["key", "version"],
         "properties": {
           "key": {
             "type": "string"
           },
           "version": {
-            "type": "integer",
-            "format": "int32"
+            "type": "string"
           }
         }
       },
@@ -2873,12 +4385,21 @@
           "version",
           "min_version",
           "file_key",
+          "bin_length",
+          "bin_md5",
           "released_at",
           "status",
           "created_at",
           "updated_at"
         ],
         "properties": {
+          "bin_length": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bin_md5": {
+            "type": "string"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
@@ -2971,6 +4492,50 @@
           }
         }
       },
+      "PaginatedResponse_ActionInvocationView": {
+        "type": "object",
+        "required": ["data", "pagination"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "动作调用视图。字段对齐 GET /api/admin/service/command 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
+              "required": ["id", "serviceType", "params", "status", "createdTime", "updatedTime"],
+              "properties": {
+                "createdTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "创建时间（action 入队）"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "params": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "serviceType": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CommandStatus"
+                },
+                "updatedTime": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "最后状态变更时间"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
       "PaginatedResponse_AlarmRule": {
         "type": "object",
         "required": ["data", "pagination"],
@@ -2989,12 +4554,23 @@
                 "actions",
                 "enabled",
                 "throttle_minutes",
+                "duration_minutes",
                 "created_at",
                 "updated_at"
               ],
               "properties": {
                 "actions": {
                   "$ref": "#/components/schemas/Value"
+                },
+                "clear_condition": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Value"
+                    }
+                  ]
                 },
                 "condition": {
                   "$ref": "#/components/schemas/Value"
@@ -3005,6 +4581,10 @@
                 },
                 "description": {
                   "type": ["string", "null"]
+                },
+                "duration_minutes": {
+                  "type": "integer",
+                  "format": "int32"
                 },
                 "enabled": {
                   "type": "boolean"
@@ -3060,11 +4640,16 @@
                 "device_id",
                 "level",
                 "acknowledged",
+                "status",
                 "created_at"
               ],
               "properties": {
                 "acknowledged": {
                   "type": "boolean"
+                },
+                "cleared_at": {
+                  "type": ["string", "null"],
+                  "description": "RFC3339 timestamp when alarm was cleared"
                 },
                 "created_at": {
                   "type": "string",
@@ -3094,6 +4679,10 @@
                 "rule_name": {
                   "type": "string"
                 },
+                "status": {
+                  "type": "string",
+                  "description": "Alarm status: \"active\" / \"acknowledged\" / \"cleared\""
+                },
                 "trigger_value": {
                   "oneOf": [
                     {
@@ -3106,7 +4695,7 @@
                 },
                 "webhook_status": {
                   "type": ["string", "null"],
-                  "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")"
+                  "description": "Webhook status: None = not configured, Some(\"success\") / Some(\"failed\")\n/ Some(\"final_failed\"). `failed` means a delivery is still pending\nretry; `final_failed` means all retry attempts have been exhausted\n(terminal failure, PRD alarm-rule-engine.md §6)."
                 }
               }
             },
@@ -3238,6 +4827,54 @@
           }
         }
       },
+      "PaginatedResponse_FactoryMetadataChangeLog": {
+        "type": "object",
+        "required": ["data", "pagination"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Component metadata overwrite log. `before` is NULL on the first report.",
+              "required": ["id", "sn", "after", "actor", "created_at"],
+              "properties": {
+                "actor": {
+                  "type": "string"
+                },
+                "after": {
+                  "$ref": "#/components/schemas/Value"
+                },
+                "before": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Value"
+                    }
+                  ]
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "sn": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "数据列表"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationInfo",
+            "description": "分页信息"
+          }
+        }
+      },
       "PaginatedResponse_OtaVersion": {
         "type": "object",
         "required": ["data", "pagination"],
@@ -3253,12 +4890,21 @@
                 "version",
                 "min_version",
                 "file_key",
+                "bin_length",
+                "bin_md5",
                 "released_at",
                 "status",
                 "created_at",
                 "updated_at"
               ],
               "properties": {
+                "bin_length": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "bin_md5": {
+                  "type": "string"
+                },
                 "created_at": {
                   "type": "string",
                   "format": "date-time"
@@ -3395,6 +5041,7 @@
                 "device_id",
                 "command",
                 "status",
+                "source",
                 "created_time",
                 "updated_time"
               ],
@@ -3415,6 +5062,10 @@
                 },
                 "product_id": {
                   "type": "string"
+                },
+                "source": {
+                  "$ref": "#/components/schemas/CommandSource",
+                  "description": "Command origin: `OneShot` (POST /admin/property/command) or\n`DesiredDelta` (PUT /admin/property/shadow/desired)."
                 },
                 "status": {
                   "$ref": "#/components/schemas/CommandStatus"
@@ -3518,6 +5169,54 @@
         "type": "string",
         "enum": ["Online", "Offline"]
       },
+      "PropertyChartKey": {
+        "type": "object",
+        "description": "Numeric property key discovered from reported data. A key qualifies only\nwhen every sample in the lookback window is a JSON number; keys with any\nstring/bool/object/array/null sample are excluded so mixed-semantics data\nnever reaches the chart.",
+        "required": ["key", "sampleCount"],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "sampleCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PropertyChartKeysQuery": {
+        "type": "object",
+        "description": "数值属性发现查询入参（`GET /api/admin/property/history/keys`）。\n图表固定单设备，故 `device_id` 必填（区别于表格端点的可选 `device_id`）。",
+        "required": ["product_id", "device_id"],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "lookback_days": {
+            "type": ["integer", "null"],
+            "format": "int32",
+            "description": "发现窗口天数，默认 30，允许 1..=366"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "PropertyChartKeysResponse": {
+        "type": "object",
+        "description": "数值属性发现响应。设备从未上报时 `data` 为空数组（200），由前端渲染引导空态。",
+        "required": ["data"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyChartKey"
+            },
+            "description": "数值属性列表，按 sampleCount 降序"
+          }
+        }
+      },
       "PropertyCommand": {
         "type": "object",
         "required": [
@@ -3526,6 +5225,7 @@
           "device_id",
           "command",
           "status",
+          "source",
           "created_time",
           "updated_time"
         ],
@@ -3546,6 +5246,10 @@
           },
           "product_id": {
             "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CommandSource",
+            "description": "Command origin: `OneShot` (POST /admin/property/command) or\n`DesiredDelta` (PUT /admin/property/shadow/desired)."
           },
           "status": {
             "$ref": "#/components/schemas/CommandStatus"
@@ -3578,6 +5282,17 @@
             "type": "string",
             "description": "产品ID"
           },
+          "source": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommandSource",
+                "description": "命令来源：0=OneShot（一次性写入）, 1=DesiredDelta（Target 同步）；缺省返回全部"
+              }
+            ]
+          },
           "status": {
             "oneOf": [
               {
@@ -3588,6 +5303,26 @@
                 "description": "命令状态：0=pending, 1=sent, 2=success, 3=failed, 4=deleted"
               }
             ]
+          }
+        }
+      },
+      "PropertyDesired": {
+        "type": "object",
+        "description": "Persisted desired state per device. Stores bare desired property values\n(no `{value, time}` wrapping, unlike `PropertyLatest`). Upsert follows the\nRFC 7396 subset merge (null = delete key) implemented in the repository.",
+        "required": ["product_id", "device_id", "desired", "updated_time"],
+        "properties": {
+          "desired": {
+            "$ref": "#/components/schemas/Value"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "product_id": {
+            "type": "string"
+          },
+          "updated_time": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -3637,24 +5372,91 @@
           }
         }
       },
-      "PropertySetReplyPayload": {
+      "PropertySeriesListResponse": {
         "type": "object",
-        "required": ["data", "id", "code"],
+        "description": "图表序列查询响应。序列顺序与请求 `keys` 一致。",
+        "required": ["data"],
         "properties": {
-          "code": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
           "data": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "format": "int64"
+              "$ref": "#/components/schemas/PropertySeriesView"
             }
+          }
+        }
+      },
+      "PropertySeriesPoint": {
+        "type": "object",
+        "description": "One chart data point. `time` is the effective report time\n(`COALESCE(reported_time, created_time)`); `value` is the raw reported JSON\nnumber passed through unchanged (original precision, no cast).",
+        "required": ["time", "value"],
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
           },
-          "id": {
+          "value": {
+            "$ref": "#/components/schemas/Value"
+          }
+        }
+      },
+      "PropertySeriesQuery": {
+        "type": "object",
+        "description": "图表序列查询入参（`GET /api/admin/property/history/series`）。\n`keys` 以重复 query 参数传递（`keys=a&keys=b`）；`start_time` / `end_time`\n为 RFC3339，闭区间且 `end_time > start_time`。",
+        "required": ["product_id", "device_id", "keys", "start_time", "end_time"],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "end_time": {
+            "type": "string",
+            "description": "结束时间（含），RFC3339，必须晚于 start_time"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "属性键列表，1..=5 个"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "start_time": {
+            "type": "string",
+            "description": "起始时间（含），RFC3339"
+          }
+        }
+      },
+      "PropertySeriesView": {
+        "type": "object",
+        "description": "单个属性键的图表序列视图。",
+        "required": ["key", "totalPoints", "downsampled", "stride", "points"],
+        "properties": {
+          "downsampled": {
+            "type": "boolean",
+            "description": "`total_points > MAX_SERIES_POINTS` 时为 true"
+          },
+          "key": {
             "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertySeriesPoint"
+            },
+            "description": "数据点，时间升序；每个点都来自真实上报记录"
+          },
+          "stride": {
+            "type": "integer",
+            "format": "int64",
+            "description": "抽样步长（每 stride 条真实记录取第 1 条），未降精度时为 1"
+          },
+          "totalPoints": {
+            "type": "integer",
+            "format": "int64",
+            "description": "范围内数值型匹配记录总数（count 查询结果）"
           }
         }
       },
@@ -3759,9 +5561,108 @@
           }
         }
       },
+      "RefreshResponse": {
+        "type": "object",
+        "description": "Response body of our `/api/auth/refresh` endpoint. The web console schedules\nits next proactive refresh from `expires_in` (well before the 15-minute\naccess-token boundary so we never race the token expiry).",
+        "required": ["expiresIn"],
+        "properties": {
+          "expiresIn": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "RegistrationSource": {
         "type": "string",
         "enum": ["Auto", "Manual"]
+      },
+      "SetDesiredRequest": {
+        "type": "object",
+        "description": "Set-Desired request body: a partial patch over desired state.\n\n`desired` follows the RFC 7396 subset: non-null values set/overwrite the\ndesired key, `null` values delete it. An empty object `{}` is rejected by\nthe handler (US-PA-042 scenario 4) before reaching the repository.",
+        "required": ["product_id", "device_id", "desired"],
+        "properties": {
+          "desired": {
+            "type": "object",
+            "description": "期望属性 patch（RFC 7396 子集：非 null 覆盖、null 删除）",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Value"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "SetDesiredResponse": {
+        "type": "object",
+        "description": "Set-Desired response: the merged desired document, the delta computed for\nthis write, and whether a delta command was enqueued for delivery.",
+        "required": ["desired", "delta", "pushed"],
+        "properties": {
+          "delta": {
+            "$ref": "#/components/schemas/Value",
+            "description": "本次 Set-Desired 触发的 delta（待收敛属性，裸期望值）"
+          },
+          "desired": {
+            "$ref": "#/components/schemas/Value",
+            "description": "合并后的完整 desired 文档（裸值）"
+          },
+          "pushed": {
+            "type": "boolean",
+            "description": "是否插入了 delta 命令（delta 非空为 true；在线即时/离线排队均为 true）"
+          }
+        }
+      },
+      "ShadowQuery": {
+        "type": "object",
+        "description": "Get-Delta query parameters. Field naming follows the existing\n`PropertyCommandQuery` convention (snake_case query keys).",
+        "required": ["product_id", "device_id"],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "ShadowView": {
+        "type": "object",
+        "description": "Get-Delta response: the current desired document, the reported snapshot\n(kept in the `{value, time}` shape for frontend consistency), and the\nper-property delta. Document-level timestamps let the frontend show when\ndesired / reported were last updated without a per-key metadata layer.",
+        "required": ["desired", "reported", "delta"],
+        "properties": {
+          "delta": {
+            "$ref": "#/components/schemas/Value",
+            "description": "逐属性 delta（裸期望值）；空表示已收敛"
+          },
+          "desired": {
+            "$ref": "#/components/schemas/Value",
+            "description": "当前 desired 文档（裸值）；无则 `{}`"
+          },
+          "desired_updated_time": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "desired 文档最后更新时间；无 desired 行则 null"
+          },
+          "reported": {
+            "$ref": "#/components/schemas/Value",
+            "description": "当前 reported 快照（沿用 `{value, time}` 结构）；无则 `{}`"
+          },
+          "reported_updated_time": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "reported 快照最后更新时间；无 reported 行则 null"
+          }
+        }
       },
       "SimplePaginatedResponse": {
         "type": "object",
@@ -4034,6 +5935,17 @@
               }
             ]
           },
+          "clear_condition": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Value",
+                "description": "Clear condition, same format as condition. Some(None) = clear to null, None = do not update."
+              }
+            ]
+          },
           "condition": {
             "oneOf": [
               {
@@ -4048,6 +5960,11 @@
           "description": {
             "type": ["string", "null"],
             "description": "Rule description"
+          },
+          "duration_minutes": {
+            "type": ["integer", "null"],
+            "format": "int32",
+            "description": "Duration condition in minutes, 0 = instant trigger, only for property trigger type"
           },
           "name": {
             "type": ["string", "null"],
@@ -4181,6 +6098,70 @@
           }
         }
       },
+      "UpsertAssociationsRequest": {
+        "type": "object",
+        "description": "Request body for `PUT /api/factory/devices/{deviceSn}/components`.",
+        "required": ["components"],
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentAssociationItem"
+            },
+            "description": "Component list — **full replace** semantics. Items not in this list are\nremoved; identical-content re-submissions are idempotent."
+          }
+        }
+      },
+      "UpsertComponentRequest": {
+        "type": "object",
+        "description": "Request body for `PUT /api/factory/components/{componentSn}`.\n\nAll fields are optional: `componentType` defaults to `\"camera\"` (the DB\ncolumn default is `\"camera\"`; the handler substitutes `None` explicitly to\nkeep the behaviour visible at the API surface rather than relying on the\ncaller noticing the DB default). `metadata` and `fileAttachments` default to\n`{}` and `[]` respectively. A request with every field omitted creates an\nempty placeholder row (intentional — callers may upsert associations first).",
+        "properties": {
+          "componentType": {
+            "type": ["string", "null"],
+            "description": "Free-text component type (defaults to `\"camera\"` when omitted). The\nschema deliberately does not enumerate values so radar/sensor/etc. can\nbe added without a migration."
+          },
+          "fileAttachments": {
+            "type": ["array", "null"],
+            "items": {
+              "$ref": "#/components/schemas/FileAttachment"
+            },
+            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication, NOT the admin/thing upload paths)."
+          },
+          "metadata": {
+            "type": ["object", "null"],
+            "description": "Structured metadata (calibration values, etc.). Defaults to `{}`.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Value"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpsertDeviceMetadataRequest": {
+        "type": "object",
+        "description": "Request body for `PUT /api/factory/devices/{deviceSn}` —\ndevice-level write, symmetric to `UpsertComponentRequest` but **without\n`componentType`**, since devices have no component type).\n\n`metadata` and `fileAttachments` default to `{}` and `[]` respectively. A\nrequest with every field omitted creates an empty placeholder row\n(intentional — callers may upsert associations first).",
+        "properties": {
+          "fileAttachments": {
+            "type": ["array", "null"],
+            "items": {
+              "$ref": "#/components/schemas/FileAttachment"
+            },
+            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication)."
+          },
+          "metadata": {
+            "type": ["object", "null"],
+            "description": "Structured device-level metadata (serial-number label, QC report\nreference, firmware version, etc.). Defaults to `{}`.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Value"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "Value": {}
     },
     "securitySchemes": {
@@ -4207,6 +6188,10 @@
     {
       "name": "admin",
       "description": "Administrative APIs"
+    },
+    {
+      "name": "factory",
+      "description": "Production-line (factory) write APIs"
     },
     {
       "name": "system",

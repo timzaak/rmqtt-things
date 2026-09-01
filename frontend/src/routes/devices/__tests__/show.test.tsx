@@ -54,6 +54,8 @@ vi.mock('@/hooks/useDevices', () => ({
 
 const mockUsePropertyLatest = vi.fn()
 const mockUsePropertyHistory = vi.fn()
+const mockUsePropertyHistoryKeys = vi.fn()
+const mockUsePropertyHistorySeries = vi.fn()
 const mockUseCreatePropertyCommand = vi.fn()
 const mockUsePropertyShadow = vi.fn()
 const mockUseSetDesired = vi.fn()
@@ -61,9 +63,17 @@ const mockUseSetDesired = vi.fn()
 vi.mock('@/hooks/useProperties', () => ({
   usePropertyLatest: (...args: unknown[]) => mockUsePropertyLatest(...args),
   usePropertyHistory: (...args: unknown[]) => mockUsePropertyHistory(...args),
+  usePropertyHistoryKeys: (...args: unknown[]) => mockUsePropertyHistoryKeys(...args),
+  usePropertyHistorySeries: (...args: unknown[]) => mockUsePropertyHistorySeries(...args),
   useCreatePropertyCommand: () => mockUseCreatePropertyCommand(),
   usePropertyShadow: (...args: unknown[]) => mockUsePropertyShadow(...args),
   useSetDesired: () => mockUseSetDesired(),
+}))
+
+// jsdom has no canvas 2d context; the chart canvas is covered by the
+// Playwright demo, so the presentation component is stubbed here.
+vi.mock('@/components/device-detail/PropertyChart', () => ({
+  PropertyChart: () => <div data-testid="property-chart-container" />,
 }))
 
 const mockUseEventHistory = vi.fn()
@@ -120,6 +130,20 @@ function setupMocks(deviceData = mockDevice) {
   mockUsePropertyHistory.mockReturnValue({
     data: { data: [], pagination: undefined },
     isLoading: false,
+  })
+  mockUsePropertyHistoryKeys.mockReturnValue({
+    data: { data: [] },
+    isLoading: false,
+    isSuccess: true,
+    isError: false,
+    refetch: vi.fn(),
+  })
+  mockUsePropertyHistorySeries.mockReturnValue({
+    data: { data: [] },
+    isLoading: false,
+    isSuccess: true,
+    isError: false,
+    refetch: vi.fn(),
   })
   mockUseEventHistory.mockReturnValue({
     data: { data: [], pagination: undefined },
@@ -320,7 +344,44 @@ describe('tab navigation', () => {
 describe('Reported Data section', () => {
   const Page = (globalThis as Record<string, unknown>).__devicesShowComponent as React.ComponentType
 
-  test('renders property history table with mock data', async () => {
+  test('defaults to the chart view with view-switch buttons', async () => {
+    const user = userEvent.setup()
+    setupMocks()
+    mockUsePropertyHistoryKeys.mockReturnValue({
+      data: {
+        data: [
+          { key: 'temperature', sampleCount: 3 },
+          { key: 'humidity', sampleCount: 1 },
+        ],
+      },
+      isLoading: false,
+      isSuccess: true,
+      isError: false,
+      refetch: vi.fn(),
+    })
+    mockUsePropertyHistorySeries.mockReturnValue({
+      data: {
+        data: [{ key: 'temperature', totalPoints: 1, downsampled: false, stride: 1, points: [] }],
+      },
+      isLoading: false,
+      isSuccess: true,
+      isError: false,
+      refetch: vi.fn(),
+    })
+
+    renderWithProviders(<Page />)
+    await openTab(user, 'Reported Data')
+
+    // The chart is the default view; the history table stays one click away.
+    // (A table IS present in this tab — Latest Properties — so the assertion
+    // targets the history table's distinctive column header.)
+    expect(screen.getByTestId('property-history-view-chart')).toBeInTheDocument()
+    expect(screen.getByTestId('property-history-view-table')).toBeInTheDocument()
+    expect(screen.getByTestId('property-chart-key-toggle-temperature')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Reported Time' })).not.toBeInTheDocument()
+  })
+
+  test('renders property history table with mock data after switching views', async () => {
     const user = userEvent.setup()
     setupMocks()
     mockUsePropertyHistory.mockReturnValue({
@@ -341,9 +402,14 @@ describe('Reported Data section', () => {
     renderWithProviders(<Page />)
     await openTab(user, 'Reported Data')
 
+    // Table view must stay reachable and behave exactly as before (the chart
+    // is an additive view; the legacy table contract is pinned).
+    await user.click(screen.getByTestId('property-history-view-table'))
+
     expect(screen.getByText('1')).toBeInTheDocument()
     // Check that property data is rendered (inside a <pre> block)
     expect(screen.getByText(/temperature/)).toBeInTheDocument()
+    expect(screen.queryByTestId('property-chart-key-toggle-temperature')).not.toBeInTheDocument()
   })
 })
 

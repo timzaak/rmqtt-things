@@ -1,10 +1,10 @@
 //! Scenario tests for the factory metadata feature (support-multiple-device).
 //!
-//! Covers the 8 business scenarios from design §6.1 + the ACL regression risk
-//! point from §6.3, all built on top of the dev-delivered production code:
-//! - BE-D01: `FactoryMetadataRepo` + 4-table migration.
-//! - BE-D02: `factory_auth_middleware` + factory write handlers + factory DTOs.
-//! - BE-D03: admin read handlers + device pull webhook + ACL allow-list
+//! Covers the 8 business scenarios + the ACL regression risk point, all built
+//! on top of the dev-delivered production code:
+//! - `FactoryMetadataRepo` + 4-table migration.
+//! - `factory_auth_middleware` + factory write handlers + factory DTOs.
+//! - admin read handlers + device pull webhook + ACL allow-list
 //!   extension for `thing/factory-metadata`.
 //!
 //! Test style mirrors `shadow_scenarios.rs` / `mqtt_device_flow_scenarios.rs`:
@@ -208,7 +208,7 @@ impl AsyncTestContext for FactoryNoS3Context {
         let rmqtt_client = RmqttHttpClient::new(config.mqtt.clone());
         let schema_cache = SchemaCache::InMemory(Arc::new(InMemorySchemaCache::new()));
         // s3_client is intentionally None: that's the whole point of this
-        // context (file-upload 503 sub-case, design §4.2.2 A0).
+        // context (file-upload 503 sub-case).
         let app_state = Arc::new(AppState {
             db: db_service.clone(),
             rmqtt_client: rmqtt_client.clone(),
@@ -394,8 +394,7 @@ impl AsyncTestContext for FactoryWebhookContext {
 // Scenario 1 — factory API key authentication (401 tri-state).
 //
 // User Story: US-PA-045 (sub-component metadata report).
-// Covers: design §4.5 (factory API key auth), §6.1 scenario
-//         `factory_auth_rejects_missing_or_invalid_api_key`, §4.2.2 A.
+// Covers: factory API key auth (missing/invalid key rejected).
 //
 // Asserts the three 401 states on `PUT /api/factory/components/{component_sn}`
 // against the default `TestContext` (empty `api_keys`):
@@ -461,7 +460,7 @@ async fn scenario_factory_auth_rejects_missing_or_invalid_api_key(ctx: &mut Test
 // Scenario 2 — factory file upload: 401 (no/invalid key) + 503 (s3 unconfigured).
 //
 // User Story: US-PA-045 (file-attachment upload prerequisite).
-// Covers: design §4.2.2 A0, §4.5.
+// Covers: S3-unconfigured 503 mapping.
 //
 // `POST /api/factory/file/upload` is gated by `factory_auth_middleware`
 // (NOT Herald and NOT internal_ip). On `FactoryNoS3Context`:
@@ -540,8 +539,7 @@ async fn scenario_factory_file_upload_requires_factory_api_key(ctx: &mut Factory
 // before=old-snapshot on overwrite, actor="factory").
 //
 // User Story: US-PA-045 (same-SN re-report is idempotent overwrite + log, R5).
-// Covers: design §4.2.2 A, §5.1 (change_log before/after snapshots), §6.1
-//         scenario `upsert_component_then_overwrite_writes_change_log`.
+// Covers: change_log before/after snapshots on idempotent overwrite.
 //
 // Uses `FactoryAuthTestContext` because the default TestContext's empty
 // api_keys would 401 the PUT and never reach the change_log path.
@@ -628,8 +626,7 @@ async fn scenario_factory_upsert_component_then_overwrite_writes_change_log(
 // Scenario 4 — association full-replace is idempotent; trimming deletes old.
 //
 // User Story: US-PA-046 (device↔component association upsert).
-// Covers: design §4.2.2 B (full-replace semantics), §6.1 scenario
-//         `replace_associations_full_replace_is_idempotent`.
+// Covers: full-replace semantics; identical re-submission is idempotent.
 //
 // Uses `FactoryAuthTestContext`. Asserts:
 //   - Same list PUT twice → second PUT introduces no DB diff (associations
@@ -777,8 +774,7 @@ async fn scenario_factory_replace_associations_full_replace_is_idempotent(
 // for the not-yet-arrived metadata fields (R3 partial-data semantics).
 //
 // User Story: US-PA-046 scenario 1 (associations + metadata async, independent).
-// Covers: design §4.2.2 C, §4.3.2 (left join), §6.1 scenario
-//         `association_arrives_before_metadata_left_join_returns_null`.
+// Covers: left join — association arriving before metadata returns null.
 //
 // Uses `FactoryAuthTestContext`. Asserts that during the gap (associations
 // reported, metadata not yet), `GET /api/admin/factory/devices/{deviceSn}`
@@ -810,7 +806,7 @@ async fn scenario_factory_association_arrives_before_metadata_left_join_returns_
     assert_eq!(status_assoc, StatusCode::NO_CONTENT);
 
     // Step 2: admin GET during the gap — must be 200 + null metadata fields,
-    // NOT 404 (design §4.2.2 C: partial data still returns 200 + null fields).
+    // NOT 404 (partial data still returns 200 + null fields).
     let (status_get, body_get) = request(
         &ctx.service,
         Method::GET,
@@ -827,7 +823,7 @@ async fn scenario_factory_association_arrives_before_metadata_left_join_returns_
     assert_eq!(view["deviceSn"], device_sn);
     assert!(
         view["deviceMetadata"].is_null(),
-        "deviceMetadata is null because no device-level metadata has been reported for this device yet (BE-D02 reads real device-level metadata; none seeded here)"
+        "deviceMetadata is null because no device-level metadata has been reported for this device yet (reads real device-level metadata; none seeded here)"
     );
     let components = view["components"]
         .as_array()
@@ -861,8 +857,7 @@ async fn scenario_factory_association_arrives_before_metadata_left_join_returns_
 //
 // User Story: US-PA-047 (admin read; distinguish "not reported" from "device
 // does not exist").
-// Covers: design §4.2.2 C error response, §6.1 scenario
-//         `admin_query_returns_404_when_no_data_at_all`.
+// Covers: strict 404 when nothing was reported at all.
 //
 // Uses the default `TestContext`: admin GET does NOT require a factory API
 // key, so the empty api_keys config is fine. Asserts a strict 404 (mutually
@@ -891,9 +886,7 @@ async fn scenario_factory_admin_query_returns_404_when_no_data_at_all(ctx: &mut 
 // Scenario 7 — device pull webhook publishes reply with merged view.
 //
 // User Story: US-DV-011 (device reads own factory metadata via new topic).
-// Covers: design §4.2.2 E, §5.3 (device pull webhook + publish_response to
-//         {topic}_reply), §6.1 scenario
-//         `device_get_publishes_reply_with_merged_view`.
+// Covers: device pull webhook publishes the merged view to {topic}_reply.
 //
 // Uses the mockito-backed `FactoryWebhookContext`:
 //   - Pre-seed an association + metadata via the factory writer path (valid
@@ -953,7 +946,7 @@ async fn scenario_factory_device_get_publishes_reply_with_merged_view(
     assert_eq!(status_meta, StatusCode::NO_CONTENT);
 
     // --- Trigger the device-pull webhook. ---
-    // ack: 1 (BE-D04 ack gating): factory-metadata publishes `_reply` ONLY
+    // ack: 1 (ack gating): factory-metadata publishes `_reply` ONLY
     // when `payload.ack == AckStatus::Yes`. ack: 0 would no longer publish,
     // and `take_published_body()` below would return None.
     let topic = factory_metadata_get_topic(product_id, device_sn);
@@ -1013,7 +1006,7 @@ async fn scenario_factory_device_get_publishes_reply_with_merged_view(
     assert_eq!(data["deviceSn"], device_sn);
     assert!(
         data["deviceMetadata"].is_null(),
-        "deviceMetadata is null because no device-level metadata has been reported for this device yet (BE-D02 reads real device-level metadata; only association + component metadata seeded here)"
+        "deviceMetadata is null because no device-level metadata has been reported for this device yet (reads real device-level metadata; only association + component metadata seeded here)"
     );
     let components = data["components"]
         .as_array()
@@ -1044,16 +1037,15 @@ async fn scenario_factory_device_get_publishes_reply_with_merged_view(
 // ===========================================================================
 // Scenario 8 — ACL allows factory-metadata topic only for the device itself.
 //
-// User Story: §6.3 ACL regression risk point.
-// Covers: design §4.2.2 ACL extension (allow-list grew by
-//         `thing/factory-metadata`), §4.5, §6.1 scenario
-//         `device_acl_allows_factory_metadata_topic_only_for_self`.
+// ACL regression risk point.
+// Covers: ACL extension — the allow-list grew by `thing/factory-metadata`,
+//         self-only.
 //
 // Calls `acl(...)` directly (mirrors `auth_handlers.rs::tests` style) so the
 // scenario is independent of the routing layers. Asserts:
 //   - self topic `{product}/{client_id}/thing/factory-metadata/get` → allow.
 //   - cross-device topic `{product}/{other_client}/thing/factory-metadata/get`
-//     → deny (p1 != client_id is the load-bearing guard; design §6.3).
+//     → deny (p1 != client_id is the load-bearing guard).
 // ===========================================================================
 #[tokio::test]
 async fn scenario_factory_device_acl_allows_factory_metadata_topic_only_for_self() {
@@ -1062,7 +1054,7 @@ async fn scenario_factory_device_acl_allows_factory_metadata_topic_only_for_self
     let client_id = "dev_acl_self";
     let other_client_id = "dev_acl_other";
 
-    // self topic — allowed (the §4.2.2 ACL extension to the allow-list).
+    // self topic — allowed (ACL extension to the allow-list).
     let self_payload = AclPayload {
         access: Access::Publish,
         username: Some(product_id.to_string()),
@@ -1077,7 +1069,7 @@ async fn scenario_factory_device_acl_allows_factory_metadata_topic_only_for_self
         "self factory-metadata topic must be allowed"
     );
 
-    // cross-device topic — denied by `p1 != client_id` (§6.3 regression guard).
+    // cross-device topic — denied by `p1 != client_id` (regression guard).
     let cross_payload = AclPayload {
         access: Access::Publish,
         username: Some(product_id.to_string()),
@@ -1098,11 +1090,10 @@ async fn scenario_factory_device_acl_allows_factory_metadata_topic_only_for_self
 // change_log row (before=null on first, before=first-snapshot on overwrite,
 // actor="factory"). Symmetric to scenario 3 but on the device-level write path.
 //
-// User Story: US-PA-045 (device-level metadata closed loop, design §6.1).
-// Covers: design §4.2.1 PUT /api/factory/devices/{deviceSn}, §5.1
-//         `upsert_device_metadata`, §4.2.2 device-level snapshots (NO
-//         componentType — the key difference from component-level snapshots),
-//         §6.1 scenario `device_metadata_upsert_creates_and_overwrites`.
+// User Story: US-PA-045 (device-level metadata closed loop).
+// Covers: PUT /api/factory/devices/{deviceSn} upsert semantics and device-level
+//         snapshots (NO componentType — the key difference from
+//         component-level snapshots).
 //
 // Uses `FactoryAuthTestContext`. Asserts the device-level write path produces
 // 204 on both the Created and Overwritten reports, writes no change_log row on
@@ -1167,8 +1158,8 @@ async fn scenario_factory_device_metadata_upsert_creates_and_overwrites(
 
     // Query change_log (time-descending): exactly one row, sn = device_sn,
     // actor = "factory", before = the S1 snapshot, after = the S2 snapshot.
-    // Device-level snapshots have NO componentType (design §4.2.2 / §5.1 —
-    // devices have no component type), the key difference from scenario 3.
+    // Device-level snapshots have NO componentType (devices have no
+    // component type), the key difference from scenario 3.
     let (rows, total_after) = ctx
         .admin_state
         .db
@@ -1201,25 +1192,24 @@ async fn scenario_factory_device_metadata_upsert_creates_and_overwrites(
     );
 
     // Device-level snapshots have NO componentType (the key difference from
-    // component-level snapshots — design §4.2.2 / §5.1). Asserting absence
+    // component-level snapshots). Asserting absence
     // guards against accidentally reusing the component-level snapshot shape.
     assert!(
         before.get("componentType").is_none(),
-        "device-level before snapshot must NOT carry componentType (design §4.2.2)"
+        "device-level before snapshot must NOT carry componentType)"
     );
     assert!(
         log.after.get("componentType").is_none(),
-        "device-level after snapshot must NOT carry componentType (design §4.2.2)"
+        "device-level after snapshot must NOT carry componentType)"
     );
 }
 
 // ===========================================================================
 // Scenario 10 — device-level metadata appears in the admin merged view.
 //
-// User Story: US-PA-047 (admin reads device-level factory metadata, design §6.1).
-// Covers: design §4.2.1 GET /api/admin/factory/devices/{deviceSn} response,
-//         §5.1 `FactoryDeviceMetadataView`, §6.1 scenario
-//         `device_metadata_appears_in_admin_view`.
+// User Story: US-PA-047 (admin reads device-level factory metadata).
+// Covers: GET /api/admin/factory/devices/{deviceSn} response carries the
+//         `FactoryDeviceMetadataView`.
 //
 // Uses `FactoryAuthTestContext`. Complementary to scenario 5: scenario 5 seeds
 // only an association (no device-level metadata) → `deviceMetadata` is null;
@@ -1267,7 +1257,7 @@ async fn scenario_factory_device_metadata_appears_in_admin_view(ctx: &mut Factor
     assert_eq!(view["deviceSn"], device_sn);
 
     // deviceMetadata is a NON-null object (complementary to scenario 5's null
-    // state — design §4.2.1 / §5.1 FactoryDeviceMetadataView).
+    // state — carries the FactoryDeviceMetadataView).
     assert!(
         view["deviceMetadata"].is_object(),
         "deviceMetadata must be a non-null object when device-level metadata has been reported"
@@ -1309,11 +1299,9 @@ async fn scenario_factory_device_metadata_appears_in_admin_view(ctx: &mut Factor
 // Scenario 11 — device pull webhook reply carries real device-level metadata.
 //
 // User Story: US-DV-011 (device reads own device-level factory metadata via the
-// pull topic, design §6.1).
-// Covers: design §4.2.1 POST /api/thing/factory-metadata/get, §5.1 webhook
-//         handler (reads `get_device_metadata`), §5.3 publish_response to
-//         {topic}_reply, §6.1 scenario
-//         `device_metadata_in_device_webhook`.
+// pull topic).
+// Covers: POST /api/thing/factory-metadata/get webhook handler (reads
+//         `get_device_metadata`) publishes the merged view to {topic}_reply.
 //
 // Uses the mockito-backed `FactoryWebhookContext`. Complementary to scenario 7:
 // scenario 7 seeds only association + component metadata (no device-level
@@ -1346,7 +1334,7 @@ async fn scenario_factory_device_metadata_in_device_webhook(ctx: &mut FactoryWeb
     assert_eq!(status_meta, StatusCode::NO_CONTENT);
 
     // --- Trigger the device-pull webhook. ---
-    // ack: 1 (BE-D04 ack gating): factory-metadata publishes `_reply` ONLY
+    // ack: 1 (ack gating): factory-metadata publishes `_reply` ONLY
     // when `payload.ack == AckStatus::Yes`. ack: 0 would no longer publish,
     // and `take_published_body()` below would return None.
     let topic = factory_metadata_get_topic(product_id, device_sn);
@@ -1405,7 +1393,7 @@ async fn scenario_factory_device_metadata_in_device_webhook(ctx: &mut FactoryWeb
     assert_eq!(data["deviceSn"], device_sn);
 
     // deviceMetadata is a NON-null object (complementary to scenario 7's null
-    // state — design §4.2.1 / §5.1 webhook handler reads get_device_metadata).
+    // state — webhook handler reads get_device_metadata).
     assert!(
         data["deviceMetadata"].is_object(),
         "data.deviceMetadata must be a non-null object when device-level metadata has been reported"
@@ -1439,14 +1427,13 @@ async fn scenario_factory_device_metadata_in_device_webhook(ctx: &mut FactoryWeb
 
 // ===========================================================================
 // Scenario 12 — neutralized change-log query path works for BOTH component SN
-// and device SN (design §6.3 regression point for the component_sn → sn
-// generalization).
+// and device SN (component_sn → sn
+// generalization regression).
 //
-// User Story: design §6.3 sn-neutralization regression (no new US id; covers
-// the BE-D01 path-neutralization contract).
-// Covers: design §4.2.1 GET /api/admin/factory/sn/{sn}/changes (neutralized
-//         path — was /components/{componentSn}/changes), §4.1 sn generalization
-//         (one table, both SN kinds), §6.3 regression point.
+// sn-neutralization regression (no dedicated US id).
+// Covers: GET /api/admin/factory/sn/{sn}/changes (neutralized
+//         path — was /components/{componentSn}/changes). One table carries
+//         both SN kinds.
 //
 // Uses `FactoryAuthTestContext`. Writes both a component-level metadata
 // overwrite (→ component change_log) and a device-level metadata overwrite
@@ -1532,7 +1519,7 @@ async fn scenario_factory_change_log_query_by_sn_works_for_both(ctx: &mut Factor
     for item in comp_items {
         assert_eq!(
             item["sn"], component_sn,
-            "every component change-log row must carry sn == the component SN (sn generalization, design §4.1)"
+            "every component change-log row must carry sn == the component SN (sn generalization)"
         );
     }
 
@@ -1560,7 +1547,7 @@ async fn scenario_factory_change_log_query_by_sn_works_for_both(ctx: &mut Factor
     for item in dev_items {
         assert_eq!(
             item["sn"], device_sn,
-            "every device change-log row must carry sn == the device SN (sn generalization, design §4.1)"
+            "every device change-log row must carry sn == the device SN (sn generalization)"
         );
     }
 }

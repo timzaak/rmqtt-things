@@ -15,6 +15,7 @@ mod mqtt_integration;
 mod mqtt_test_context;
 mod ota_tests;
 mod product_tests;
+mod property_chart_scenarios;
 mod redis_rule_state_scenarios;
 mod s3_tests;
 mod shadow_scenarios;

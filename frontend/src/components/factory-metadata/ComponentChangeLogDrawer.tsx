@@ -30,8 +30,8 @@ function toRow(entry: FactoryMetadataChangeLog): ChangeLogRow {
 }
 
 /**
- * Right-side drawer showing a single component's metadata change log
- * (design §4.4.3). Renders the most recent changes first (backend already
+ * Right-side drawer showing a single component's metadata change log.
+ * Renders the most recent changes first (backend already
  * returns DESC by `created_at`) with paginated `before`/`after` JSONB snapshots.
  *
  * `before` is null on the initial report — rendered as "Initial report".

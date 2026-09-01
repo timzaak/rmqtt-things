@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { CreateActionCommandRequest } from '@/lib/api-generated/types.gen'
 
 // serviceType is free text (PRD A4), but the backend enforces
-// `[a-zA-Z0-9_-]{1,32}` (design §4.2.2). Mirror that contract client-side so
+// `[a-zA-Z0-9_-]{1,32}`. Mirror that contract client-side so
 // invalid input never reaches the network.
 const SERVICE_TYPE_PATTERN = /^[a-zA-Z0-9_-]{1,32}$/
 

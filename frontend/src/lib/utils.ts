@@ -17,6 +17,23 @@ export function toDatetimeLocal(d: Date): string {
 }
 
 /**
+ * Convert a property key to kebab-case for dynamic data-testid attributes.
+ * e.g. `colorTemp` -> `color-temp`, `brightness` -> `brightness`.
+ *
+ * The e2e mirror in demo/e2e/selectors.ts must stay aligned with this rule.
+ * StateConfigurationSection.tsx still carries an equivalent private copy that
+ * predates this shared home and should migrate to it on its next edit.
+ */
+export function toKebabKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+/**
  * Extract a human-readable message from an unknown error value (e.g. a React
  * Query mutation `onError` payload). Falls back to String(error) when no
  * `message` field is available.

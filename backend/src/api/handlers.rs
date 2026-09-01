@@ -110,8 +110,7 @@ pub async fn property_post(
                         Some(validator)
                     }
                     None => {
-                        // 无 Active 模板时放行（thing-model-extension 设计 §8 /
-                        // §414）：总开关只控制是否启用校验流程，无模板时不拒绝，
+                        // 无 Active 模板时放行：总开关只控制是否启用校验流程，无模板时不拒绝，
                         // 与 event_post 的"无 schema 即放行"语义一致。
                         debug!(
                             "No property schema template for product_id={}, accepting",
@@ -192,7 +191,7 @@ pub async fn event_post(
     State(state): State<Arc<ApiState>>,
     Json(mqtt_msg): Json<RMqttPublishMessage>,
 ) -> Result<StatusCode, ApiError> {
-    // Unified event dispatch (thing-model-extension design §5.2): the single
+    // Unified event dispatch: the single
     // wildcard rule `+/+/thing/event/+/post` routes every event publish here.
     // When the `event_type` topic segment is `property`, delegate to
     // `property_post` so its full side-effects are preserved (thing schema
@@ -415,7 +414,7 @@ pub async fn file_upload_handler(
             ApiError::internal("Failed to serialize response")
         })?;
 
-        // Ack gating (design §5.3 / §1.5): only publish the `_reply` when the
+        // Ack gating: only publish the `_reply` when the
         // device asked for one (`ack == AckStatus::Yes`). Matches the pattern
         // in ota_handlers.rs and event_post.
         if payload.ack == AckStatus::Yes
@@ -430,7 +429,7 @@ pub async fn file_upload_handler(
         Ok(StatusCode::NO_CONTENT)
     } else {
         warn!("does not support file upload");
-        // Object-data contract (design §5.3 / §1.5): error responses carry a
+        // Object-data contract: error responses carry a
         // `{message}` object, NOT a bare string. The previous `json!("…")`
         // emitted a JSON string and violated spec.
         let response = MqttResponse {
@@ -476,7 +475,7 @@ pub fn is_file_upload_directory_allowed(
     })
 }
 
-// 统一服务下发结果上报接口（thing-model-extension 设计 §5.2）
+// 统一服务下发结果上报接口
 //
 // Replaces the deleted `property_set_reply` private-batch handler. The Broker
 // forwards every `thing/service/{service_type}/set_reply` publish here via a
@@ -486,7 +485,7 @@ pub fn is_file_upload_directory_allowed(
 //   - `property:{db_id}` -> `property_command` (prev_status = Sent)
 //   - `action:{db_id}`   -> `action_invocation` (prev_status = Sent)
 // Any 2xx `code` is treated as Success; everything else is Failed (HTTP
-// semantics, design §5.2). Duplicate / unknown / non-Sent rows return 204 +
+// semantics). Duplicate / unknown / non-Sent rows return 204 +
 // warn so the Broker does not retry.
 #[utoipa::path(
     post,
@@ -524,7 +523,7 @@ pub async fn service_set_reply(
         ApiError::bad_request("Invalid payload format")
     })?;
 
-    // HTTP-style 2xx success boundary (design §5.2). Not `== 200`.
+    // HTTP-style 2xx success boundary. Not `== 200`.
     let status = if (200..=299).contains(&payload.code) {
         CommandStatus::Success
     } else {
@@ -551,8 +550,8 @@ pub async fn service_set_reply(
         "property" => {
             // Note: the existing `update_property_command_status` takes
             // `&Vec<i64>` (database.rs). The single-id form for action is the
-            // BE-D01 asymmetry; we wrap the single id rather than touch the
-            // property signature (BE-D02 scope).
+            // deliberate asymmetry; we wrap the single id rather than touch the
+            // property signature.
             app_state
                 .db
                 .update_property_command_status(
@@ -615,7 +614,7 @@ pub async fn service_set_reply(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// 统一服务订阅触发投递接口（thing-model-extension 设计 §5.2 / §4.2.2）
+// 统一服务订阅触发投递接口
 //
 // Replaces the deleted `property_set_subscribe` handler. The Broker fires this
 // once when a device subscribes to the wildcard `thing/service/+/set` filter.
@@ -699,7 +698,7 @@ pub async fn service_set_subscribe(
     }
 
     // Drain property pending first, then action pending. Each helper publishes
-    // its own per-row spec envelope (BE-D02 property single-row + BE-D01 action).
+    // its own per-row spec envelope (property single-row + per-action rows).
     if let Err(e) = send_property_command_to_device(
         &app_state.db,
         &app_state.rmqtt_client,

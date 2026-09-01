@@ -603,9 +603,9 @@ pub async fn acl(Json(payload): Json<AclPayload>) -> &'static str {
 
     // Allow thing topics: {product}/{device}/thing/{event|service|file|factory-metadata}/...
     //
-    // `factory-metadata` (design §4.2.2 E note + §5.3) is the device pull
+    // `factory-metadata` is the device pull
     // topic; `p1 == client_id` above already prevents cross-device reads
-    // (design §6.3), and `p0 == username(product_id)` prevents cross-product.
+    // (self-scoped), and `p0 == username(product_id)` prevents cross-product.
     if p2 == "thing"
         && (p3 == "event" || p3 == "service" || p3 == "file" || p3 == "factory-metadata")
     {

@@ -217,7 +217,7 @@ async fn scenario_property_command_lifecycle(ctx: &mut TestContext) {
         .unwrap();
 
     // 4. Device replies via the unified service_set_reply webhook with code 200.
-    // BE-D02 deleted the property-private `/property/set_reply` route and its
+    // The property-private `/property/set_reply` route was deleted along with its
     // batch reply DTO (the old `{data: Vec<i64>}` shape); the reply now
     // correlates by the top-level string `id` ("property:{db_id}") and routes
     // through `POST /api/thing/service/set_reply`.
@@ -428,7 +428,7 @@ fn rand_float() -> f64 {
 }
 
 // ===========================================================================
-// Pending merge-order regression (design shadow-device-support.md §5.3 / §6.3)
+// Pending merge-order regression (last-write-wins, all callers)
 //
 // WHY this block exists: `update_pending_commands_to_sent`'s `RETURNING` is
 // unordered; `send_property_command_to_device` (utils.rs) must sort the returned
@@ -450,7 +450,7 @@ fn rand_float() -> f64 {
 // `POST /mqtt/publish` while appending the parsed `{id, params}` envelope into
 // an `Arc<Mutex<Vec<CapturedPublish>>>` cloned between the mock (which needs a
 // `Send + Sync + 'static` capture callback) and the test context. The Vec is
-// required because BE-D02 publishes each Pending row independently.
+// required because each Pending row is published independently.
 // ===========================================================================
 
 /// Test context for merge-order regression. Mirrors `simple_tests::TestContext`
@@ -459,7 +459,7 @@ fn rand_float() -> f64 {
 struct MergeOrderTestContext {
     service: Router,
     /// Every captured `POST /mqtt/publish` body, parsed into the spec envelope
-    /// fields (`{id, params}`). BE-D02 single-row-ised property publishes: each
+    /// fields (`{id, params}`). Property publishes are single-row: each
     /// Pending row is now published independently with `id = "property:{db_id}"`
     /// and `params` = the bare business object (no legacy `{ids, data}` batch
     /// blob), so the regression assertions need the full publish history rather
@@ -502,7 +502,7 @@ impl AsyncTestContext for MergeOrderTestContext {
         //    topic matches `{product}/{device}/thing/service/property/set`,
         //    so `is_subscribed_to_properties` reports the device as online.
         //  - POST /mqtt/publish -> 200, while appending the parsed envelope
-        //    (`{id, params}`) into `captured_messages`. BE-D02 publishes each
+        //    (`{id, params}`) into `captured_messages`. Each
         //    Pending row independently, so the buffer is a Vec (append-only)
         //    and tests drain the full history via `take_published_messages`.
         let mut server = mockito::Server::new_async().await;
@@ -665,8 +665,8 @@ impl AsyncTestContext for MergeOrderTestContext {
 // ---------------------------------------------------------------------------
 // Regression: create_property_command caller — last-write-wins merge order.
 //
-// Covers: design shadow-device-support.md §5.3 (sort_by created_time ASC, id ASC
-//         before shallow merge) and §6.3 (fix must affect ALL callers).
+// Covers: sort_by created_time ASC, id ASC before shallow merge; the fix
+//         must affect ALL callers.
 // Caller 1/3: POST /api/admin/property/command -> create_property_command,
 //         which calls send_property_command_to_device when the device is
 //         reported as subscribed (simulated via the mockito /subscriptions
@@ -732,9 +732,9 @@ async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
         "command creation should return 201"
     );
 
-    // BE-D02 single-row-ised property publishes: each Pending row is published
+    // Property publishes are single-row: each Pending row is published
     // independently with `id = "property:{db_id}"` and `params` = the bare
-    // business object (no legacy `{ids, data}` batch blob). The §5.3 sort fix
+    // business object (no legacy `{ids, data}` batch blob). The sort fix
     // (created_time ASC, id ASC) is now expressed as the ORDER in which the
     // rows are claimed and published: 10, then 20, then 30.
     let published = ctx.take_published_messages().await;
@@ -768,10 +768,10 @@ async fn scenario_merge_order_create_command(ctx: &mut MergeOrderTestContext) {
 // ---------------------------------------------------------------------------
 // Regression: service_set_subscribe caller — last-write-wins merge order.
 //
-// Covers: design shadow-device-support.md §5.3 and §6.3.
+// Covers: last-write-wins merge order, all callers.
 // Caller 2/3: POST /api/thing/service/set_subscribe (handlers.rs) — the
-//         US-DV-004/009 online-convergence hook (BE-D02 unified the deleted
-//         property-private route into this single service hook). It calls
+//         US-DV-004/009 online-convergence hook (the deleted property-private
+//         route was unified into this single service hook). It calls
 //         send_property_command_to_device UNCONDITIONALLY (no subscription
 //         gate), making it the cleanest trigger for the merge-order regression.
 // WHY: the offline-convergence hook drains whatever is queued for the device
@@ -817,7 +817,7 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
         .unwrap();
 
     // Trigger the caller via the UNIFIED service_set_subscribe webhook
-    // (BE-D02 replaced the deleted `/property/set_subscribe` route with
+    // (the deleted `/property/set_subscribe` route was replaced with
     // `/service/set_subscribe`, which drains both property and action pending).
     // productId comes from the WebHook `username` (the device subscribes to the
     // wildcard `+/{device}/thing/service/+/set`, so productId is not in the
@@ -840,7 +840,7 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
         "service_set_subscribe should return 204"
     );
 
-    // BE-D02 single-row-ised publishes: three rows -> three independent
+    // Publishes are single-row: three rows -> three independent
     // spec envelopes, drained in created_time ASC, id ASC order.
     let published = ctx.take_published_messages().await;
     assert_eq!(
@@ -853,7 +853,7 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
         brightnesses,
         vec![&json!(10), &json!(20), &json!(30)],
         "rows must be drained in created_time ASC, id ASC order (10, 20, 30); \
-         the §5.3 sort fix must apply to the service_set_subscribe caller too"
+         the sort fix must apply to the service_set_subscribe caller too"
     );
     assert!(
         published.iter().all(|m| m.id.starts_with("property:")),
@@ -864,12 +864,12 @@ async fn scenario_merge_order_property_set_subscribe(ctx: &mut MergeOrderTestCon
 // ---------------------------------------------------------------------------
 // Regression: set_property_desired caller — last-write-wins merge order.
 //
-// Covers: design shadow-device-support.md §5.3 and §6.3.
+// Covers: last-write-wins merge order, all callers.
 // Caller 3/3: PUT /api/admin/property/shadow/desired -> set_property_desired
-//         (BE-D03). It inserts the delta as a Pending command and, when the
+//         It inserts the delta as a Pending command and, when the
 //         device is subscribed, calls send_property_command_to_device.
 // WHY: Set-Desired is the newest caller added on top of the shared send path;
-//      the §5.3 sort fix must keep last-write-wins semantics here as well.
+//      the sort fix must keep last-write-wins semantics here as well.
 //      We pre-seed two older Pending deltas on the same key, then trigger the
 //      third via the real Set-Desired endpoint so the drain goes through the
 //      set_property_desired caller.
@@ -928,7 +928,7 @@ async fn scenario_merge_order_set_desired(ctx: &mut MergeOrderTestContext) {
     );
     assert_eq!(resp["pushed"], true, "non-empty delta must enqueue+push");
 
-    // BE-D02 single-row-ised publishes: the three Pending deltas (two seeded
+    // Publishes are single-row: the three Pending deltas (two seeded
     // + the one Set-Desired just enqueued) drain as three independent spec
     // envelopes in created_time ASC, id ASC order: 10, 20, 30.
     let published = ctx.take_published_messages().await;
@@ -942,7 +942,7 @@ async fn scenario_merge_order_set_desired(ctx: &mut MergeOrderTestContext) {
         brightnesses,
         vec![&json!(10), &json!(20), &json!(30)],
         "rows must be drained in created_time ASC, id ASC order (10, 20, 30); \
-         the §5.3 sort fix must apply to the set_property_desired caller too"
+         the sort fix must apply to the set_property_desired caller too"
     );
     assert!(
         published.iter().all(|m| m.id.starts_with("property:")),

@@ -256,7 +256,7 @@ async function getJson<T>(request: APIRequestContext, path: string): Promise<T> 
  * Parse the spec envelope command id (`property:{db_id}`) back to the DB row id
  * so the e2e test can correlate the MQTT message with the admin list response.
  * Per spec the id is an opaque string to the device, but the platform-generated
- * `property:{db_id}` format is deterministic and documented in design §5.2.
+ * `property:{db_id}` format is deterministic.
  */
 function parsePropertyCommandId(id: string): number {
   const match = /^property:(\d+)$/.exec(id)

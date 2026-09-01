@@ -143,7 +143,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Construct FactoryAuthState from `[factory] api_keys`. An empty list (the
     // default when `[factory]` is absent) means the middleware rejects every
-    // request with 401 — see design §5.4. Built here, not inside `create_router`,
+    // request with 401. Built here, not inside `create_router`,
     // so the router stays free of config concerns (mirrors `HeraldAuthState`
     // injection).
     let factory_api_keys: Arc<[Box<str>]> = config

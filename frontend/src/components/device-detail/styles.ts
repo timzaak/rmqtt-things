@@ -28,3 +28,23 @@ export const cardStyle: CSSProperties = {
   borderRadius: '12px',
   padding: '16px',
 }
+
+// Shared shell for the small controls across device-detail sections (selects,
+// inputs, toggle buttons).
+export const controlBaseStyle: CSSProperties = {
+  height: '30px',
+  borderRadius: '8px',
+  border: '1px solid var(--color-border)',
+  color: 'var(--color-text-primary)',
+  fontSize: '13px',
+}
+
+// Form controls (filters/selects) on top of the shell. Buttons deliberately
+// keep only the base: they need their own padding/background/cursor and must
+// not take `outline: 'none'`, which would drop the keyboard focus ring.
+export const selectControlStyle: CSSProperties = {
+  ...controlBaseStyle,
+  background: 'var(--color-surface-1)',
+  padding: '0 10px',
+  outline: 'none',
+}

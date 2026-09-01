@@ -73,14 +73,14 @@ pub fn extract_permission(path: &str, method: &Method) -> Option<Rule> {
         || path.starts_with("/admin/alarm")
         || path.starts_with("/admin/factory")
     {
-        // `/admin/factory/*` (design §4.5) maps to the `device` resource so
+        // `/admin/factory/*` maps to the `device` resource so
         // that Herald `device:read`/`device:write` governs the factory admin read
         // endpoints. Without this, `extract_permission` returns `None` and
         // `herald_auth_middleware` forbids every `/admin/factory/*` request in
         // Herald-configured deployments (single-tenant deployments don't mount
         // the middleware, so they're unaffected).
         //
-        // `/admin/service/*` (thing-model-extension design §4.5) maps to the
+        // `/admin/service/*` (thing-model-extension) maps to the
         // same `device` resource with the same action mapping as `/admin/property`
         // (GET → `device:read`, POST/PUT/PATCH/DELETE → `device:write`). Without
         // this entry `extract_permission` returns `None` and every
@@ -226,7 +226,7 @@ mod tests {
                 "write",
             ),
             // Action / service invocation admin endpoints map to the `device`
-            // resource (thing-model-extension design §4.5), mirroring the
+            // resource (thing-model-extension), mirroring the
             // property command assertions above. Without the whitelist entry
             // `extract_permission` returns None → Herald-configured deployments
             // forbid every `/api/admin/service/*` request with 403.
@@ -256,7 +256,7 @@ mod tests {
             ),
             ("/api/admin/alarm", Method::GET, "device", "read"),
             ("/api/admin/alarm/1/ack", Method::PATCH, "device", "write"),
-            // Factory admin read endpoints map to device resource (design §4.5).
+            // Factory admin read endpoints map to device resource.
             (
                 "/api/admin/factory/devices/sn-1",
                 Method::GET,

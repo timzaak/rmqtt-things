@@ -43,7 +43,7 @@ impl ApiError {
     }
 
     /// Like `unauthorized()` but with a custom message. Symmetric with
-    /// `forbidden_with`; used by `factory_auth_middleware` (design §5.2) to
+    /// `forbidden_with`; used by `factory_auth_middleware` to
     /// surface "Invalid factory API key" instead of the generic "unauthorized".
     pub fn unauthorized_with(message: impl Into<String>) -> Self {
         Self::new(StatusCode::UNAUTHORIZED, message)

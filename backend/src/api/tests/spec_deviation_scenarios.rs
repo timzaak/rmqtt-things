@@ -1,19 +1,18 @@
-//! Scenario tests for the BE-D04 spec-deviation fixes (thing-model-extension
-//! design §5.3 / §6.1).
+//! Scenario tests for the thing-model-extension spec-deviation fixes.
 //!
-//! Covers (G7 spec 修正):
+//! Covers (spec 修正):
 //! - OTA device-side report now accepts a spec `"major.minor.patch"` semver
 //!   **string** (`OtaReport.version: String`), and the OTA upgrade push carries
 //!   the S3 **object key** under `file_url` (NOT a presigned URL) plus the
 //!   mandatory `ack: 0` (no OTA upgrade reply topic in spec).
 //! - Ack gating: property post / event post / file upload / factory-metadata
 //!   requests with `ack: 0` MUST NOT trigger a `_reply` publish; only
-//!   `ack: 1` does (design §1.5 decision table / §5.3).
+//!   `ack: 1` does.
 //! - Response `data` contract: success-with-data → object, error → `{message}`
 //!   object (NOT a bare string), no-data → `data` field omitted entirely
 //!   (`#[serde(skip_serializing_if = "Option::is_none")]`, NOT `"data": null`).
 //! - Property report must be accepted when the product has no Active thing
-//!   schema template (design §1.5 / §5.3 「无 Active 模板时放行」).
+//!   schema template (无 Active 模板时放行).
 //!
 //! Test style mirrors `action_invocation_scenarios.rs` and
 //! `factory_metadata_scenarios.rs`:
@@ -24,7 +23,7 @@
 //!   `config.mqtt.url` at a mockito server capturing every `POST /mqtt/publish`
 //!   body into an append-only `Arc<Mutex<Vec<JsonValue>>>`.
 //!
-//! Business rules encoded (design thing-model-extension.md §5.3 / §1.5):
+//! Business rules encoded:
 //! - G7 OTA: semver string in, object key + `ack:0` out.
 //! - G7 ack gating: `ack:0` → no `_reply`.
 //! - G7 object data: error = `{message}`, no-data = field omitted.
@@ -91,7 +90,7 @@ fn factory_metadata_get_topic(product_id: &str, device_id: &str) -> String {
 /// Build a CreateOtaVersionRequest that targets `min_version <= 1.2.3 <
 /// max_version`, so a device reporting `"1.2.3"` is eligible for the upgrade
 /// push. `file_key` is pinned so the scenario can assert it round-trips into
-/// the upgrade payload's `file_url` verbatim (object-key contract, design §5.3).
+/// the upgrade payload's `file_url` verbatim (object-key contract).
 fn ota_version_request(product_id: &str, key: &str, file_key: &str) -> CreateOtaVersionRequest {
     CreateOtaVersionRequest {
         product_id: product_id.to_string(),
@@ -262,16 +261,14 @@ impl AsyncTestContext for SpecDeviationTestContext {
 // Scenario 1: OTA accepts a semver string and the upgrade push carries the
 // S3 object key (not a presigned URL) plus `ack: 0`.
 //
-// Covers: G7 spec 修正 / 设计 §5.3 OTA 上报+下发 / §6.1
-//         `ota_accepts_semver_and_emits_object_key`. Asserts the BE-D04
-//         contract end-to-end: device-side `OtaReport.version` arrives as a
+// Covers: spec 修正 — OTA 上报+下发. Asserts the contract
+//         end-to-end: device-side `OtaReport.version` arrives as a
 //         `"major.minor.patch"` string, is parsed via
 //         `parse_semver_to_int`, and the resulting upgrade publish carries
 //         `file_url == ota_versions.file_key` (object key) and `ack: 0`
 //         (spec defines no OTA upgrade reply topic).
 // ===========================================================================
-/// Covers: G7 spec 修正 / 设计 §5.3 OTA 上报 semver + 下发 object key / §6.1
-/// `ota_accepts_semver_and_emits_object_key`.
+/// Covers: spec 修正 — OTA 上报 semver + 下发 object key.
 #[test_context(SpecDeviationTestContext)]
 #[tokio::test]
 async fn scenario_ota_accepts_semver_and_emits_object_key(ctx: &mut SpecDeviationTestContext) {
@@ -367,7 +364,7 @@ async fn scenario_ota_accepts_semver_and_emits_object_key(ctx: &mut SpecDeviatio
         "version round-trips the admin-side published semver string"
     );
     // Core object-key contract: `file_url` is the S3 object key verbatim, NOT a
-    // presigned URL (design §5.3). A presigned URL would contain "?" / signature
+    // presigned URL. A presigned URL would contain "?" / signature
     // params / the S3 endpoint host; the object key is the bare path.
     assert_eq!(
         entry["file_url"], file_key,
@@ -389,18 +386,16 @@ async fn scenario_ota_accepts_semver_and_emits_object_key(ctx: &mut SpecDeviatio
 // ===========================================================================
 // Scenario 2: ack: 0 requests never publish a `_reply`.
 //
-// Covers: G7 spec 修正 / 设计 §5.3 ack 门控 / §1.5 决策表 / §6.1
-//         `ack_zero_never_publishes_reply`. For each request-type handler that
+// Covers: spec 修正 — ack=0 不得下发 reply. For each request-type handler that
 //         gates its `_reply` on `ack == AckStatus::Yes`
 //         (property_post/event_post, file_upload, factory-metadata, ota), an
 //         ack:0 request must NOT increase the publish count; an ack:1 request
 //         for the same shape MUST increase it by exactly one.
 //
-// The core assertion per the BE-T02 contract is **publish count does not
+// The core assertion is **publish count does not
 // increase** after each ack:0 request.
 // ===========================================================================
-/// Covers: G7 spec 修正 / 设计 §5.3 ack 门控 / §1.5 决策表 / §6.1
-/// `ack_zero_never_publishes_reply`.
+/// Covers: spec 修正 — ack=0 不得下发 reply.
 #[test_context(SpecDeviationTestContext)]
 #[tokio::test]
 async fn scenario_ack_zero_never_publishes_reply(ctx: &mut SpecDeviationTestContext) {
@@ -524,9 +519,8 @@ fn route_for_topic(topic: &str) -> &'static str {
 // Scenario 3: response `data` is always an object or absent — never a string
 // and never `null`.
 //
-// Covers: G7 spec 修正 / 设计 §5.3 object data 契约 / §1.5 决策表 / §6.1
-//         `response_data_is_object_or_absent`. Asserts the three branches of
-//         the BE-D04 contract:
+// Covers: spec 修正 — response data 为 object 或缺省. Asserts the three
+//         branches of the contract:
 //         - success-with-data → `data` is an object (factory-metadata with
 //           device data).
 //         - error → `data` is `{"message": ...}` object (file upload when S3
@@ -535,8 +529,7 @@ fn route_for_topic(topic: &str) -> &'static str {
 //           data), guaranteed by `#[serde(skip_serializing_if =
 //           "Option::is_none")]` on `MqttResponse.data`.
 // ===========================================================================
-/// Covers: G7 spec 修正 / 设计 §5.3 object data 契约 / §1.5 决策表 / §6.1
-/// `response_data_is_object_or_absent`.
+/// Covers: spec 修正 — response data 为 object 或缺省.
 #[test_context(SpecDeviationTestContext)]
 #[tokio::test]
 async fn scenario_response_data_is_object_or_absent(ctx: &mut SpecDeviationTestContext) {
@@ -586,7 +579,7 @@ async fn scenario_response_data_is_object_or_absent(ctx: &mut SpecDeviationTestC
     // --- Branch C: no-data → `data` field OMITTED entirely (not null). ----
     //
     // device_id_no_data has no factory metadata at all. The handler constructs
-    // `MqttResponse { data: None, .. }`; with the BE-D04-added
+    // `MqttResponse { data: None, .. }`; with the later-added
     // `#[serde(skip_serializing_if = "Option::is_none")]`, the serialised JSON
     // must NOT contain a `data` key at all. The previous code shape would have
     // emitted `"data": null`.
@@ -661,7 +654,7 @@ async fn scenario_response_data_is_object_or_absent(ctx: &mut SpecDeviationTestC
         data_b["message"].is_string(),
         "error: data.message must be a string"
     );
-    // Negative: data must NOT be a bare JSON string (the pre-BE-D04 shape was
+    // Negative: data must NOT be a bare JSON string (the old shape was
     // `json!("do not support file upload")`).
     assert!(
         !data_b.is_string(),
@@ -825,16 +818,15 @@ impl NoS3PublishCapture {
 // Scenario 4: property report is accepted when the product has no Active
 // schema template.
 //
-// Covers: G7 spec 修正 / 设计 §5.3 模板校验 / §1.5 决策表 / §6.1
-//         `property_without_active_schema_is_accepted`.
+// Covers: spec 修正 — 无 Active 模板的属性上报放行.
 //
-// **DEGRADATION NOTE (per BE-T02 item)**: The design intent is that with the
+// **DEGRADATION NOTE**: The design intent is that with the
 // `property_schema_validator` master switch ON and the product having NO
 // Active schema template, property post is放行 (accepted, 204). The current
 // production `property_post` (handlers.rs) still returns 400 "Schema not
-// found" in that exact case — the BE-D04 dev item did NOT include the
-// property_post relaxation in its Files list, so the gap relative to design
-// §5.3 is still open. Asserting 204 with validator-on + no-template would
+// found" in that exact case — the property_post relaxation was not part of
+// that fix, so the gap is still open. Asserting 204 with validator-on +
+// no-template would
 // therefore fail against the current production code.
 //
 // Per the item's documented degradation, this scenario asserts the half of
@@ -843,13 +835,12 @@ impl NoS3PublishCapture {
 // (204). The validator-ON + no-template case is left to the accept slot to
 // cover once the production gap is closed (tracked in Handoff).
 // ===========================================================================
-/// Covers: G7 spec 修正 / 设计 §5.3 模板校验 / §1.5 决策表 / §6.1
-/// `property_without_active_schema_is_accepted`.
+/// Covers: spec 修正 — 无 Active 模板的属性上报放行.
 ///
 /// Degraded: asserts the validator-OFF + no-template half. The validator-ON +
 /// no-template half is pending a production-code change in `property_post`
 /// (currently returns 400 "Schema not found"); see the scenario doc-comment
-/// and the Handoff section of the BE-T02 item.
+/// above.
 #[test_context(TestContext)]
 #[tokio::test]
 async fn scenario_property_without_active_schema_is_accepted(ctx: &mut TestContext) {
@@ -857,8 +848,8 @@ async fn scenario_property_without_active_schema_is_accepted(ctx: &mut TestConte
     let device_id = "spec_dev_noschema_dev";
 
     // The default TestContext has `api.property_schema_validator = false` and
-    // the product has NO Active thing-schema template. The design §5.3 / §1.5
-    // contract says property post must be放行 (accepted) in this state.
+    // the product has NO Active thing-schema template. The contract says
+    // property post must be放行 (accepted) in this state.
     let property_data = json!({
         "temperature": 25.5,
         "humidity": 60.0

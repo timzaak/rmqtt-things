@@ -54,6 +54,27 @@ pub struct EventHistory {
     pub created_time: OffsetDateTime,
 }
 
+/// Numeric property key discovered from reported data. A key qualifies only
+/// when every sample in the lookback window is a JSON number; keys with any
+/// string/bool/object/array/null sample are excluded so mixed-semantics data
+/// never reaches the chart.
+#[derive(Debug, FromRow, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyChartKey {
+    pub key: String,
+    pub sample_count: i64,
+}
+
+/// One chart data point. `time` is the effective report time
+/// (`COALESCE(reported_time, created_time)`); `value` is the raw reported JSON
+/// number passed through unchanged (original precision, no cast).
+#[derive(Debug, FromRow, Serialize, ToSchema)]
+pub struct PropertySeriesPoint {
+    #[serde(with = "time::serde::rfc3339")]
+    pub time: OffsetDateTime,
+    pub value: JsonValue,
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize, ToSchema,
 )]
@@ -112,9 +133,8 @@ pub struct DeviceOperationRow {
     pub updated_time: OffsetDateTime,
 }
 
-/// Persisted one-shot action/service invocation (thing-model-extension,
-/// design §4.3.2/§5.2). Physically isolated from `PropertyCommand` per design
-/// A2 — one-shot actions (reboot / unlock / buzzer) live in their own table
+/// Persisted one-shot action/service invocation (thing-model-extension).
+/// Physically isolated from `PropertyCommand` per A2 — one-shot actions (reboot / unlock / buzzer) live in their own table
 /// and reuse the `CommandStatus` enum for state semantics. `params` is the
 /// action input document (free-form JSONB), and `service_type` is the
 /// free-form service identifier routed via the MQTT topic segment.
@@ -385,12 +405,12 @@ pub struct AlarmRecord {
     pub cleared_at: Option<OffsetDateTime>,
 }
 
-// --- Factory metadata models (support-multiple-device feature, design §5.1) ---
-// All four derive ToSchema so the BE-D03 merged-view DTO can reference them and
+// --- Factory metadata models (support-multiple-device feature) ---
+// All four derive ToSchema so the merged-view DTO can reference them and
 // OpenAPI generation stays uniform.
 
 /// Device-level factory metadata, written via `PUT /api/factory/devices/{deviceSn}`
-/// and read back into the merged view's `deviceMetadata` slot (design §4.2.1/§5.1).
+/// and read back into the merged view's `deviceMetadata` slot.
 /// `#[allow(dead_code)]` stays because `device_sn`/`created_at` are populated by
 /// `FromRow` from the SELECT/RETURNING columns but are not read by the Rust code.
 #[derive(Debug, Clone, FromRow, Serialize, ToSchema)]

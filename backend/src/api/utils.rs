@@ -7,7 +7,7 @@ use serde_json::Value as JsonValue;
 use tracing::{info, warn};
 
 // Drain and publish all Pending property commands for a device as spec
-// single-row envelopes (thing-model-extension design §5.1 / §1.4).
+// single-row envelopes (thing-model-extension).
 //
 // Each claimed row is published independently with its own
 // `command_payload("property", id, command)` envelope (`id = "property:{db_id}"`)
@@ -71,10 +71,10 @@ pub async fn send_property_command_to_device(
     Ok(())
 }
 
-/// Construct the standard service-command payload (thing-model-extension
-/// design §5.1). Refines the design's `format!("action:{id}")` hardcoding into
+/// Construct the standard service-command payload (thing-model-extension).
+/// Refines `format!("action:{id}")` hardcoding into
 /// a `prefix` parameter so the same builder serves both property
-/// (`property:{id}`, BE-D02) and action (`action:{id}`, this item) without
+/// (`property:{id}`) and action (`action:{id}`) without
 /// changing the wire protocol. Callers pass `"property"` or `"action"`.
 pub fn command_payload(prefix: &str, id: i64, params: JsonValue) -> MqttPayload {
     MqttPayload {
@@ -84,7 +84,7 @@ pub fn command_payload(prefix: &str, id: i64, params: JsonValue) -> MqttPayload 
     }
 }
 
-/// Drain and publish all Pending action invocations for a device (design §5.1).
+/// Drain and publish all Pending action invocations for a device.
 ///
 /// Each iteration atomically claims the next Pending row (Pending -> Sent) via
 /// `claim_next_pending_action` (which uses `FOR UPDATE SKIP LOCKED` so concurrent
@@ -204,7 +204,7 @@ pub fn extract_event_identifier_from_topic(topic: &str) -> Option<String> {
 /// `/{product}/{device}/thing/service/{service_type}/set_reply` (or `.../set`).
 /// Mirrors `extract_event_identifier_from_topic` but matches the service
 /// segment layout. Used by the unified `service_set_reply` webhook handler
-/// (thing-model-extension design §5.2) to dispatch by `service_type`:
+/// to dispatch by `service_type`:
 /// `property` routes to `property_command`, any other value to
 /// `action_invocation`.
 pub fn extract_service_type_from_topic(topic: &str) -> Option<String> {

@@ -1,16 +1,16 @@
 //! Scenario tests for thing-model-extension action invocations + property
-//! spec-envelope (design §6.1).
+//! spec-envelope.
 //!
 //! Covers:
 //! - Action invocation admin API (`POST/GET/DELETE /api/admin/service/command`)
-//!   and its drain-on-subscribe / online-drain semantics (BE-D01 + BE-D03).
+//!   and its drain-on-subscribe / online-drain semantics.
 //! - The unified `service_set_reply` / `service_set_subscribe` webhook handlers
-//!   introduced in BE-D02, which route by `service_type` and replace the deleted
+//!   which route by `service_type` and replace the deleted
 //!   private property batch protocol.
 //! - The property spec single-row envelope (`{id:"property:{db_id}", params, ack}`).
 //! - HTTP 2xx success boundary (`200..=299`, not `== 200`).
 //! - Wildcard rule de-duplication (the unified webhook must not double-dispatch).
-//! - `event_post` dispatch by `event_type` (BE-D02).
+//! - `event_post` dispatch by `event_type`.
 //!
 //! Test style mirrors `mqtt_device_flow_scenarios.rs`:
 //! - Default `#[test_context(TestContext)]` scenarios use HTTP + direct DB
@@ -21,9 +21,9 @@
 //!   mockito server that answers `/subscriptions` (so the subscription gate
 //!   opens) and captures every `POST /mqtt/publish` body into a `Vec`.
 //!
-//! Business rules encoded (design thing-model-extension.md §4.1 / §5.1 / §5.2):
-//! - G1 admin can invoke an action; device reply 2xx -> Success.
-//! - G2 offline actions queue (Pending); online subscribe triggers drain.
+//! Business rules encoded:
+//! - Admin can invoke an action; device reply 2xx -> Success.
+//! - Offline actions queue (Pending); online subscribe triggers drain.
 //! - G3 actions never touch desired/reported (A1 one-shot semantics).
 //! - A2 actions are physically isolated from property_command.
 //! - A4 `service_type` is free-form text validated by `[a-zA-Z0-9_-]{1,32}`.
@@ -66,7 +66,7 @@ fn encode_payload(value: &JsonValue) -> String {
 }
 
 /// `/{product}/{device}/thing/service/{service_type}/set_reply` — the unified
-/// reply topic (BE-D02). The `service_type` segment (5th) is what
+/// reply topic. The `service_type` segment (5th) is what
 /// `extract_service_type_from_topic` reads to dispatch property vs action.
 fn service_set_reply_topic(product_id: &str, device_id: &str, service_type: &str) -> String {
     format!("/{product_id}/{device_id}/thing/service/{service_type}/set_reply")
@@ -91,7 +91,7 @@ fn action_set_topic(product_id: &str, device_id: &str, service_type: &str) -> St
 }
 
 /// `/{product}/{device}/thing/event/{event_type}/post` — the unified event
-/// post topic (BE-D02 dispatches by the `{event_type}` segment).
+/// post topic (dispatches by the `{event_type}` segment).
 fn event_topic(product_id: &str, device_id: &str, event_type: &str) -> String {
     format!("/{product_id}/{device_id}/thing/event/{event_type}/post")
 }
@@ -164,8 +164,8 @@ async fn list_action_commands(
 //
 // Mirrors `mqtt_device_flow_scenarios.rs::MergeOrderTestContext` but captures
 // EVERY published `/mqtt/publish` body into a `Vec<PublishedMessage>` (not just
-// the latest), because BE-D02 single-row-ises property publishes and BE-D01
-// publishes each action row independently. Scenarios that assert "N independent
+// the latest), because property publishes are single-row and each action row
+// is published independently. Scenarios that assert "N independent
 // publishes with distinct topics/params" need the full history.
 // ===========================================================================
 
@@ -376,8 +376,7 @@ impl AsyncTestContext for ActionTestContext {
 // ===========================================================================
 // Scenario 1: action invoke on an online (subscribed) device succeeds.
 //
-// Covers: US-TME-002 场景 1 / 设计 §6.1 action_invoke_online_device_succeeds /
-//         PRD G1. The device is "subscribed" via mockito /subscriptions, so the
+// Covers: US-PA-048 场景 1. The device is "subscribed" via mockito /subscriptions, so the
 //         admin POST drains immediately (Pending -> Sent); the device then
 //         replies via the unified `service_set_reply` with code 202 -> Success.
 // ===========================================================================
@@ -464,8 +463,7 @@ async fn scenario_action_invoke_online_device_succeeds(ctx: &mut ActionTestConte
 // ===========================================================================
 // Scenario 2: offline action queues, then drains on service_set_subscribe.
 //
-// Covers: 设计 §6.1 action_invoke_offline_queued_then_delivered_on_subscribe /
-//         PRD G2. With the device NOT subscribed (default TestContext has an
+// Covers: US-PA-048 场景 2 离线排队、上线投递. With the device NOT subscribed (default TestContext has an
 //         unreachable rmqtt URL, so is_subscribed errors -> treated as offline),
 //         the invocation stays Pending. Triggering the unified subscribe hook
 //         then drains it (Pending -> Sent), and a 2xx reply flips it to Success.
@@ -542,7 +540,7 @@ async fn scenario_action_invoke_offline_queued_then_delivered_on_subscribe(ctx: 
 // ===========================================================================
 // Scenario 3: a non-2xx reply marks the action Failed.
 //
-// Covers: 设计 §6.1 action_invoke_failed_reply_marks_failed (异常). The 2xx
+// Covers: 非 2xx 回复将动作标记为失败 (异常). The 2xx
 //         boundary is `200..=299`; anything else (here 500) -> Failed.
 // ===========================================================================
 #[test_context(TestContext)]
@@ -604,7 +602,7 @@ async fn scenario_action_invoke_failed_reply_marks_failed(ctx: &mut TestContext)
 // ===========================================================================
 // Scenario 4: an action invocation must NOT touch the shadow.
 //
-// Covers: 设计 §6.1 action_does_not_touch_shadow / G3 / A1. A one-shot action
+// Covers: A1 (动作一次性语义). A one-shot action
 //         never writes desired or reported; both views are byte-identical
 //         before and after the invoke. This is the key regression assertion for
 //         the "actions are not desired" contract.
@@ -667,11 +665,11 @@ async fn scenario_action_does_not_touch_shadow(ctx: &mut TestContext) {
 // ===========================================================================
 // Scenario 5: actions are isolated from property commands.
 //
-// Covers: 设计 §6.1 action_isolated_from_property_commands / A2. Insert one
+// Covers: A2 (与属性命令语义分离). Insert one
 //         property command and one action invocation (different service_type);
 //         the property admin list must NOT contain the action, and the action
 //         admin list must NOT contain the property command. Physical table
-//         isolation (design §4.3.2) must be observable through the APIs.
+//         isolation must be observable through the APIs.
 // ===========================================================================
 #[test_context(TestContext)]
 #[tokio::test]
@@ -743,7 +741,7 @@ async fn scenario_action_isolated_from_property_commands(ctx: &mut TestContext) 
 // ===========================================================================
 // Scenario 6: service_type validation rejects invalid identifiers.
 //
-// Covers: 设计 §6.1 service_type_validation_rejects_invalid / PRD A4. The
+// Covers: A4 (服务类型可扩展). The
 //         `validate_service_type` rule is `[a-zA-Z0-9_-]{1,32}`. A `/`, a space,
 //         and a 33-char overlong value must all 400; legal identifiers must not.
 // ===========================================================================
@@ -814,10 +812,10 @@ async fn scenario_service_type_validation_rejects_invalid(ctx: &mut TestContext)
 // ===========================================================================
 // Scenario 7: each action row is dispatched to its own service topic.
 //
-// Covers: 设计 §6.1 dispatches_each_action_to_its_service_topic. Two action
+// Covers: 每个动作按自身 service_type 路由到独立 topic. Two action
 //         invocations with DIFFERENT service_types must produce TWO independent
 //         publishes — distinct topics, distinct `action:{id}` correlation ids,
-//         distinct params, never merged. Guards the BE-D01 per-row drain against
+//         distinct params, never merged. Guards the per-row action drain against
 //         any accidental batching.
 // ===========================================================================
 #[test_context(ActionTestContext)]
@@ -885,7 +883,7 @@ async fn scenario_dispatches_each_action_to_its_service_topic(ctx: &mut ActionTe
 // ===========================================================================
 // Scenario 8: property command uses the spec single-row envelope.
 //
-// Covers: 设计 §6.1 property_command_uses_spec_envelope / G6. The published
+// Covers: 属性命令下发使用规范 envelope. The published
 //         payload is `{id:"property:{db_id}", params:<business object>, ack:1}`
 //         with NO legacy `ids`/`data` batch fields. The reply correlates by the
 //         top-level string `id`, not by a `data:[id]` array.
@@ -977,7 +975,7 @@ async fn scenario_property_command_uses_spec_envelope(ctx: &mut ActionTestContex
 // ===========================================================================
 // Scenario 9: all 2xx reply codes succeed; 199/300 fail.
 //
-// Covers: 设计 §6.1 all_2xx_reply_codes_succeed / G6. The success boundary is
+// Covers: 全部 2xx 回复码均视为成功. The success boundary is
 //         the inclusive range `200..=299`, NOT `== 200`. Each code is exercised
 //         on a fresh command so the prev-status gate (Sent) is satisfied.
 // ===========================================================================
@@ -1096,8 +1094,7 @@ async fn scenario_all_2xx_reply_codes_succeed(ctx: &mut TestContext) {
 // ===========================================================================
 // Scenario 10: wildcard service hooks do not double-dispatch property.
 //
-// Covers: 设计 §6.1 wildcard_service_hooks_do_not_double_dispatch_property /
-//         §6.3 回归风险点. The unified `service_set_reply` and
+// Covers: 统一 service hooks 替换而非叠加旧属性分发，不得重复下发. The unified `service_set_reply` and
 //         `service_set_subscribe` handlers replace (not stack on top of) the
 //         deleted property-private routes. A single property reply / a single
 //         subscribe trigger must each route to exactly one handler, so the
@@ -1157,7 +1154,7 @@ async fn scenario_wildcard_service_hooks_do_not_double_dispatch_property(
 // ===========================================================================
 // Scenario 11: the unified event_post wildcard routes arbitrary event types.
 //
-// Covers: 设计 §6.1 custom_event_wildcard_routes_arbitrary_type / BE-D02. The
+// Covers: 单条 event 通配规则路由任意事件类型. The
 //         single `+/+/thing/event/+/post` rule routes every event publish to
 //         `event_post`, which dispatches by the `{event_type}` segment:
 //         `property` delegates to `property_post` (snapshot + rule trigger),

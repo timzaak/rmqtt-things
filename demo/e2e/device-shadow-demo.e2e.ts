@@ -1,7 +1,7 @@
 /**
  * Device Property Shadow Demo 测试
  *
- * 对应用户故事（Draft 来源：`.ai/user-stories/core/shadow-device-support.md`）：
+ * 对应用户故事（docs/user-stories/01-platform-admin-user-stories.md）：
  * - US-PA-042 设置设备期望状态（在线收敛 / 离线排队 / desired 不被一次性命令污染 / 空内容 400）
  * - US-PA-043 查看设备期望状态与差异（展示 desired/reported/delta / 偏离可见不自动收敛 / 下发失败期望保持）
  * - US-PA-044 在前端管理设备期望状态（设备上下文内查看 / 从界面设置 / 失败反馈）
@@ -16,7 +16,7 @@
  * 关键断言均落在持久业务状态（GET /api/admin/property/shadow 的 desired/delta，
  * GET /api/admin/property/command 的 status），不以 sonner/toast 为唯一验收依据。
  *
- * DE-D02 适配（device-detail-experience 七区信息架构）：旧 PropertyShadowSection
+ * device-detail-experience 七区信息架构适配：旧 PropertyShadowSection
  * 已删除，期望状态管理迁移到 State & Configuration 分区
  * （StateConfigurationSection.tsx）。变化点：
  * - openShadowTab → openStateConfigurationTab：点击 device-tab-state-configuration
@@ -25,7 +25,7 @@
  *   target-update-dialog / target-json-input / submit-button / cancel-button）
  * - 旧 shadow-status-${kebabKey} 行结构 → state-configuration-table 内 Property 列 +
  *   Sync 列（In sync / Out of sync / Target not set）
- * kebab 规则使用 DE-D01 集中导出的 toKebabKey（禁止内联转换实现）。
+ * kebab 规则使用集中导出的 toKebabKey（禁止内联转换实现）。
  *
  * 前置条件：系统中已有产品 "demo_product"。
  * 前置条件：RMQTT broker 运行在 MQTT_URL (默认 mqtt://127.0.0.1:1883)。
@@ -63,7 +63,7 @@ interface ShadowView {
 /**
  * 限定到 State & Configuration 分区，避免误匹配其它 section。
  *
- * DE-D02 校准：分区 heading 由旧 "Desired State (Shadow)" 改为
+ * 校准：分区 heading 由旧 "Desired State (Shadow)" 改为
  * "State & Configuration"（StateConfigurationSection.tsx:198）。
  */
 function stateConfigurationSection(page: import('@playwright/test').Page) {
@@ -75,7 +75,7 @@ function stateConfigurationSection(page: import('@playwright/test').Page) {
 /**
  * 导航到设备详情页并切换到 State & Configuration tab。
  *
- * DE-D02：设备详情页默认 activeTab='overview'，StateConfigurationSection 仅在
+ * 设备详情页默认 activeTab='overview'，StateConfigurationSection 仅在
  * activeTab==='state-configuration' 时渲染（show.$id.tsx:123-125）。Tab 由
  * data-testid `device-tab-state-configuration` 定位（优先用 testid），分区
  * heading "State & Configuration" 为持久锚点。Tab 选择器集中在
@@ -86,7 +86,7 @@ async function openStateConfigurationTab(
   deviceId: string,
 ): Promise<void> {
   // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
-  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时。
   // 后续 toBeVisible/Click 自带重试，足以保证 DOM 就绪。
   await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
     waitUntil: 'commit',
@@ -127,7 +127,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       // 初始空态：desired 为空时前端渲染该提示（StateConfigurationSection.tsx:219）
       await expect(stateConfigurationSection(page).getByText('No desired state set')).toBeVisible()
 
-      // 打开 Update Target 对话框（DE-D02：旧 Set Desired State 入口已改名）
+      // 打开 Update Target 对话框（旧 Set Desired State 入口已改名）
       await page.locator(SELECTORS.stateConfiguration.targetUpdateButton).click()
 
       // 在对话框编辑器中填入合法 JSON 对象
@@ -166,7 +166,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       // 辅助 UI 断言（非主验收）：State & Configuration 表内 brightness 行 Sync
       // 列在收敛后显示 "In sync"（StateConfigurationSection.tsx:106）。
       //
-      // DE-TR01 修复：useSetDesired 的 onSuccess 仅在 admin PUT 时失效
+      // useSetDesired 的 onSuccess 仅在 admin PUT 时失效
       // property-shadow 查询（useProperties.ts:127-132），设备后续 replyCommand +
       // postProperties 收敛不会触发前端 refetch。因此需重新加载页面拉取最新
       // shadow 视图，否则 UI 停留在 PUT 后、reported 前的 "Out of sync" 快照。
@@ -328,7 +328,7 @@ test.describe('Property Shadow (US-PA-042/043/044)', () => {
       // 可见且 Sync 列显示 "Out of sync"（reported=999 偏离 target=400，
       // StateConfigurationSection.tsx:102-104）。
       //
-      // DE-D02 校准确认：StateConfigurationSection 的 Property 列以原始 key 渲染
+      // 校准确认：StateConfigurationSection 的 Property 列以原始 key 渲染
       // （accessor: 'key'，StateConfigurationSection.tsx:154），不经过 toKebabKey；
       // toKebabKey 仅用于 data-testid（target-apply-button-${kebabKey} :180）。
       // 因此行匹配器用原始 'colorTemp'（与 Scenario A 的 'brightness' 一致）。

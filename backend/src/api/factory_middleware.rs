@@ -1,5 +1,5 @@
 //! Factory (production-line) API key middleware (support-multiple-device
-//! feature, design §5.2).
+//! feature).
 //!
 //! Backs the `/api/factory/*` write path with an authentication scheme that is
 //! fully isolated from the three existing mechanisms (Herald OAuth, HMAC device
@@ -9,10 +9,10 @@
 //! Behavioural invariants enforced here:
 //! - Empty `api_keys` (the default when `[factory]` is absent) rejects every
 //!   request with 401. The routes still exist, so an unconfigured deployment
-//!   surfaces a clear authentication failure rather than a 503 (design §5.4).
+//!   surfaces a clear authentication failure rather than a 503.
 //! - The comparison uses `constant_time_eq` to avoid timing side-channels on
 //!   the static API key list — a deliberate improvement over the existing HMAC
-//!   comparison (design §4.5).
+//!   comparison.
 //! - On success the middleware inserts a `FactoryCaller` into request
 //!   extensions so downstream handlers / future audit hooks can attribute the
 //!   write to the factory path.
@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 /// State held by `factory_auth_middleware`. `api_keys` mirrors
 /// `[factory] api_keys` from the config; an empty list means every request is
-/// rejected (design §5.4).
+/// rejected.
 #[derive(Clone)]
 pub struct FactoryAuthState {
     pub api_keys: Arc<[Box<str>]>,
@@ -111,7 +111,7 @@ mod tests {
     #[tokio::test]
     async fn empty_key_list_rejects_everything() {
         // Mirrors the `[factory]` absent deployment: routes exist but every
-        // request is 401 (design §5.4).
+        // request is 401.
         let app = factory_router(&[]);
         assert_eq!(
             app.clone()

@@ -6,7 +6,7 @@
 //! Set-Desired / Get-Delta handlers (see `admin_handlers`) and the unit tests
 //! below can exercise it directly.
 //!
-//! Conventions (design shadow-device-support.md §5.1):
+//! Conventions:
 //! - `desired` stores **bare** property values (no `{value, time}` wrapping).
 //! - `reported` follows the `property_latest.properties` shape, where each
 //!   property is wrapped as `{"value": v, "time": ts}`. The delta reads

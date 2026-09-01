@@ -35,8 +35,8 @@ const mutedMetadataStyle: React.CSSProperties = {
 }
 
 /**
- * Read-only text rendering of a component's file attachments (design §4.4.2,
- * scope-adjusted: no S3 direct links, no presigned URLs). Each attachment is
+ * Read-only text rendering of a component's file attachments
+ * (scope-adjusted: no S3 direct links, no presigned URLs). Each attachment is
  * shown as its `fileName` plus an optional `(contentType, sizeBytes)` suffix.
  *
  * Structured as a sub-component for clarity only; it renders plain text only —

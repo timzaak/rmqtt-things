@@ -1,5 +1,4 @@
-//! Factory (production-line) write handlers (support-multiple-device feature,
-//! design §4.2.2 A0/A/B + §4.2.3 DTO).
+//! Factory (production-line) write handlers (support-multiple-device feature).
 //!
 //! These handlers run behind `factory_auth_middleware` (see
 //! `factory_middleware.rs`) and share `Arc<ApiState>` with every other route —
@@ -42,7 +41,7 @@ use utoipa::ToSchema;
 /// inventing an arbitrary small ceiling.
 const MAX_FILE_KEY_LEN: usize = 1024;
 
-/// Request body for `PUT /api/factory/components/{componentSn}` (design §4.2.2 A).
+/// Request body for `PUT /api/factory/components/{componentSn}`.
 ///
 /// All fields are optional: `componentType` defaults to `"camera"` (the DB
 /// column default is `"camera"`; the handler substitutes `None` explicitly to
@@ -54,7 +53,7 @@ const MAX_FILE_KEY_LEN: usize = 1024;
 pub struct UpsertComponentRequest {
     /// Free-text component type (defaults to `"camera"` when omitted). The
     /// schema deliberately does not enumerate values so radar/sensor/etc. can
-    /// be added without a migration (design §1.4 D1).
+    /// be added without a migration.
     #[serde(rename = "componentType", default)]
     pub component_type: Option<String>,
     /// Structured metadata (calibration values, etc.). Defaults to `{}`.
@@ -62,12 +61,12 @@ pub struct UpsertComponentRequest {
     pub metadata: Option<Map<String, JsonValue>>,
     /// File-attachment references. Defaults to `[]`. Each `fileKey` must be
     /// obtained from `POST /api/factory/file/upload` first (factory API Key
-    /// authentication, NOT the admin/thing upload paths — see design §4.5).
+    /// authentication, NOT the admin/thing upload paths).
     #[serde(rename = "fileAttachments", default)]
     pub file_attachments: Option<Vec<FileAttachment>>,
 }
 
-/// Request body for `PUT /api/factory/devices/{deviceSn}` (design §4.2.2 —
+/// Request body for `PUT /api/factory/devices/{deviceSn}` —
 /// device-level write, symmetric to `UpsertComponentRequest` but **without
 /// `componentType`**, since devices have no component type).
 ///
@@ -82,35 +81,33 @@ pub struct UpsertDeviceMetadataRequest {
     pub metadata: Option<Map<String, JsonValue>>,
     /// File-attachment references. Defaults to `[]`. Each `fileKey` must be
     /// obtained from `POST /api/factory/file/upload` first (factory API Key
-    /// authentication — see design §4.5).
+    /// authentication).
     #[serde(rename = "fileAttachments", default)]
     pub file_attachments: Option<Vec<FileAttachment>>,
 }
 
-/// Request body for `PUT /api/factory/devices/{deviceSn}/components`
-/// (design §4.2.2 B).
+/// Request body for `PUT /api/factory/devices/{deviceSn}/components`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpsertAssociationsRequest {
     /// Component list — **full replace** semantics. Items not in this list are
-    /// removed; identical-content re-submissions are idempotent (design §6.1
-    /// `replace_associations_full_replace_is_idempotent`).
+    /// removed; identical-content re-submissions are idempotent.
     pub components: Vec<ComponentAssociationItem>,
 }
 
-/// Single item of `UpsertAssociationsRequest.components` (design §4.2.2 B).
+/// Single item of `UpsertAssociationsRequest.components`.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct ComponentAssociationItem {
     /// Sub-component SN. Same charset as a device SN (`validate_identifier`).
     #[serde(rename = "componentSn")]
     pub component_sn: String,
     /// Optional type hint. The metadata table's value takes precedence in the
-    /// merged view (design §4.2.2 C).
+    /// merged view.
     #[serde(rename = "componentType", default)]
     pub component_type: Option<String>,
 }
 
 /// Reference to a file attachment uploaded via
-/// `POST /api/factory/file/upload` (design §4.2.2 A).
+/// `POST /api/factory/file/upload`.
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct FileAttachment {
     /// S3 object key returned by the presigned POST. Non-empty, ≤ 1024 chars.
@@ -157,7 +154,7 @@ pub async fn factory_file_upload_handler(
     let state = &state.app;
     let Some(s3_client) = state.s3_client.as_ref() else {
         // Matches the existing `s3_client`-not-configured semantics on the
-        // admin/thing file-upload paths (design §4.2.2 A0).
+        // admin/thing file-upload paths.
         return Err(ApiError::service_unavailable("S3 client not configured"));
     };
 
@@ -193,9 +190,9 @@ pub async fn factory_file_upload_handler(
 // optional fields to their DB defaults (component_type → "camera", metadata →
 // `{}`, file_attachments → `[]`), and delegates to
 // `FactoryMetadataRepo::upsert_component` (which writes the change_log inside
-// the same tx when an overwrite happens — design §5.1, R5). The handler does
-// NOT inspect the `UpsertOutcome`: the change-log row is sufficient side-effect
-// for R5; no response body is returned (204).
+// the same tx when an overwrite happens ). The handler does
+// NOT inspect the `UpsertOutcome`: the change-log row is sufficient side-effect;
+// no response body is returned (204).
 #[utoipa::path(
     put,
     path = "/api/factory/components/{componentSn}",
@@ -253,13 +250,13 @@ pub async fn upsert_component_handler(
 // PUT /api/factory/devices/{deviceSn} — upsert device-level metadata.
 //
 // Symmetric to `upsert_component_handler` but without componentType: devices
-// have no component type (design §1.4). Validates the path SN, validates each
+// have no component type. Validates the path SN, validates each
 // file attachment's `fileKey`, normalises optionals to their DB defaults
 // (metadata → `{}`, file_attachments → `[]`), and delegates to
 // `FactoryMetadataRepo::upsert_device_metadata` (which writes the change_log
-// inside the same tx when an overwrite happens — design §5.1, R5). The handler
+// inside the same tx when an overwrite happens ). The handler
 // does NOT inspect the `UpsertOutcome`; the change-log row is sufficient
-// side-effect for R5; no response body is returned (204).
+// side-effect; no response body is returned (204).
 #[utoipa::path(
     put,
     path = "/api/factory/devices/{deviceSn}",
@@ -312,7 +309,7 @@ pub async fn upsert_device_metadata_handler(
 //
 // Validates the path device SN and each component SN, then delegates to
 // `FactoryMetadataRepo::replace_associations`. Does NOT write a change log
-// (design §4.2.2 B note; R5 scopes the log to component metadata overwrites).
+// (full-replace does not write a log; the change log is scoped to metadata overwrites).
 #[utoipa::path(
     put,
     path = "/api/factory/devices/{deviceSn}/components",
@@ -382,14 +379,14 @@ fn validate_file_attachments(items: Option<&[FileAttachment]>) -> Result<(), Api
 }
 
 // ============================================================================
-// Admin read handlers + DTOs (design §4.2.2 C/D + §4.2.3 DTO).
+// Admin read handlers + DTOs.
 //
 // These handlers run behind the shared `admin_routes` group (Herald
 // `device:read` when Herald is configured; single-tenant passthrough
 // otherwise). They read via `state.admin.db.factory_metadata()`.
 // ============================================================================
 
-/// Admin merged-view response for a device (design §4.2.2 C).
+/// Admin merged-view response for a device.
 ///
 /// `device_metadata` carries the device-level factory metadata row when present
 /// (written via `PUT /api/factory/devices/{deviceSn}`), or `null` when no
@@ -408,7 +405,7 @@ pub struct FactoryDeviceView {
     pub components: Vec<FactoryComponentView>,
 }
 
-/// Device-level factory metadata view (design §4.2.2, §5.1). Symmetric to
+/// Device-level factory metadata view. Symmetric to
 /// `FactoryComponentView` minus `componentType`/`componentSn` — devices have no
 /// component type or sub-component SN at this level. `file_attachments` is
 /// normalised from the raw JSONB to an array (Array passthrough, Null → empty,
@@ -422,7 +419,7 @@ pub struct FactoryDeviceMetadataView {
     pub updated_at: Option<OffsetDateTime>,
 }
 
-/// Single component in a `FactoryDeviceView` (design §4.2.2 C).
+/// Single component in a `FactoryDeviceView`.
 ///
 /// `component_type` prefers the metadata table's value and falls back to the
 /// association table's hint; both absent → `None`. `file_attachments` is an
@@ -440,7 +437,7 @@ pub struct FactoryComponentView {
     pub updated_at: Option<OffsetDateTime>,
 }
 
-// GET /api/admin/factory/devices/{deviceSn} — admin merged view (design §4.2.2 C).
+// GET /api/admin/factory/devices/{deviceSn} — admin merged view.
 //
 // Returns 404 when the device has neither associations nor device-level
 // metadata (strict 404 vs empty-200, so the frontend can distinguish "not
@@ -478,17 +475,17 @@ pub async fn get_factory_device_view_handler(
         })?;
 
     let Some(rows) = rows else {
-        // Strict 404 — no associations AND no device-level metadata (design §4.2.2 C).
+        // Strict 404 — no associations AND no device-level metadata.
         return Err(ApiError::not_found("Device has no factory metadata"));
     };
 
     let components: Vec<FactoryComponentView> =
         rows.into_iter().map(map_row_to_component_view).collect();
 
-    // Device-level metadata is read in a second repo call (design §5.1: keep
+    // Device-level metadata is read in a second repo call (keep
     // `get_device_view` single-responsibility). The 404 decision above is driven
     // solely by `get_device_view`; this call only reads the content — None here
-    // does NOT change the 404 outcome (design §6.3).
+    // does NOT change the 404 outcome.
     let device_metadata = state
         .admin
         .db
@@ -509,7 +506,7 @@ pub async fn get_factory_device_view_handler(
 }
 
 // GET /api/admin/factory/sn/{sn}/changes — change log
-// (design §4.2.2 D, time-descending pagination).
+// (time-descending pagination).
 #[utoipa::path(
     get,
     path = "/api/admin/factory/sn/{sn}/changes",
@@ -560,7 +557,7 @@ pub async fn query_component_changes_handler(
 /// Coerce a raw JSONB `file_attachments` value into the array the API view
 /// exposes: Array passes through, Null → empty, scalar → wrapped in a
 /// single-element array (matches the "metadata not arrived" / passthrough
-/// surface contract, design §4.2.2 C). Shared by both row→view mappers.
+/// surface contract). Shared by both row→view mappers.
 fn normalise_file_attachments(v: Option<JsonValue>) -> Vec<JsonValue> {
     v.and_then(|v| match v {
         JsonValue::Array(arr) => Some(arr),
@@ -573,7 +570,7 @@ fn normalise_file_attachments(v: Option<JsonValue>) -> Vec<JsonValue> {
 /// Map a left-join row to its API view. `meta_type` (metadata table) wins over
 /// `assoc_type` (association table); both absent → `None`. `file_attachments`
 /// falls back to `[]` when the JSON value is null or not an array (matches the
-/// "metadata not arrived" surface contract in design §4.2.2 C).
+/// "metadata not arrived" surface contract).
 fn map_row_to_component_view(row: FactoryDeviceViewRow) -> FactoryComponentView {
     let component_type = row.meta_type.or(row.assoc_type);
     let file_attachments = normalise_file_attachments(row.file_attachments);
@@ -601,7 +598,7 @@ fn map_row_to_device_metadata_view(row: FactoryDeviceMetadataRow) -> FactoryDevi
 }
 
 // ============================================================================
-// Device pull webhook handler (design §5.3).
+// Device pull webhook handler.
 //
 // RMQTT forwards a device's publish on `/{product}/{device}/thing/factory-metadata/get`
 // to this handler. The platform assembles the merged view and publishes it back
@@ -609,7 +606,7 @@ fn map_row_to_device_metadata_view(row: FactoryDeviceMetadataRow) -> FactoryDevi
 // (shared with the other webhook routes); HMAC auth is done by the broker.
 // ============================================================================
 
-// POST /api/thing/factory-metadata/get — device pull webhook (design §5.3).
+// POST /api/thing/factory-metadata/get — device pull webhook.
 #[utoipa::path(
     post,
     path = "/api/thing/factory-metadata/get",
@@ -640,7 +637,7 @@ pub async fn factory_metadata_get_handler(
     let device_id = mqtt_msg.client_id.clone();
     validate_identifier(&device_id, "device_id")?;
 
-    // device_sn == client_id this round (design §5.3 note).
+    // device_sn == client_id this round.
     let view = state
         .db
         .factory_metadata()
@@ -651,7 +648,7 @@ pub async fn factory_metadata_get_handler(
             ApiError::internal("Database operation failed")
         })?;
 
-    // Second repo call for the device-level content (design §5.1: keep
+    // Second repo call for the device-level content (keep
     // `get_device_view` single-responsibility). Fetched outside the
     // `Option::map` closure below because it is async; the closure only assembles.
     let device_metadata_row = state
@@ -695,7 +692,7 @@ pub async fn factory_metadata_get_handler(
         ApiError::internal("Failed to serialise response")
     })?;
 
-    // Ack gating (design §5.3 / §1.5): publish the `_reply` only when the
+    // Ack gating: publish the `_reply` only when the
     // device asked for one. Matches file_upload_handler and ota_handlers.
     if payload.ack == AckStatus::Yes
         && let Err(e) = state

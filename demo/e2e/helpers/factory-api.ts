@@ -1,6 +1,5 @@
 /**
- * Factory (production-line) API 鉴权薄封装 (support-multiple-device feature,
- * design §4.2.2 A/B + §5.2).
+ * Factory (production-line) API 鉴权薄封装 (support-multiple-device feature).
  *
  * 这些 helper 对接 `backend/src/api/factory_handlers.rs` 暴露的 factory 写入
  * 端点。factory 写路径运行在 `factory_auth_middleware` 之后（见
@@ -41,7 +40,7 @@ function factoryAuthHeaders(): Record<string, string> {
 }
 
 /**
- * `upsertComponent` body（设计 §4.2.2 A）。
+ * `upsertComponent` body。
  *
  * 三个字段全部可选（后端在缺省时分别替换为 `componentType="camera"`、
  * `metadata={}`、`fileAttachments=[]`）。一个完全空的请求会创建一条空占位行
@@ -65,8 +64,8 @@ export interface UpsertComponentBody {
 /**
  * PUT `/api/factory/components/{componentSn}` — upsert 子组件元数据。
  *
- * 设计 §4.2.2 A + §5.1：repo 层在 upsert 发生覆盖时于同一事务内写一条
- * `factory_metadata_change_log`（R5）。后端响应为 **204 No Content**（无 body）；
+ * repo 层在 upsert 发生覆盖时于同一事务内写一条
+ * `factory_metadata_change_log`。后端响应为 **204 No Content**（无 body）；
  * 调用方应直接断言 `response.status() === 204`。
  *
  * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin
@@ -90,16 +89,15 @@ export async function upsertComponent(
 export interface ComponentAssociationItem {
   /** 子组件 SN（与设备 SN 同字符集）。 */
   componentSn: string
-  /** 可选类型提示；合并视图里元数据表的值优先（设计 §4.2.2 C）。 */
+  /** 可选类型提示；合并视图里元数据表的值优先。 */
   componentType?: string
 }
 
 /**
  * PUT `/api/factory/devices/{deviceSn}/components` — 全量替换设备的子组件关联。
  *
- * 设计 §4.2.2 B：**full-replace** 语义——未出现在 `components` 列表里的关联会被
- * 删除；内容完全相同的重复提交是幂等的（设计 §6.1
- * `replace_associations_full_replace_is_idempotent`）。该端点 **不**写 change log
+ * **full-replace** 语义——未出现在 `components` 列表里的关联会被
+ * 删除；内容完全相同的重复提交是幂等的。该端点 **不**写 change log
  * （R5 将日志范围限定在子组件元数据覆盖上）。后端响应为 **204 No Content**。
  *
  * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin
@@ -120,10 +118,10 @@ export async function replaceAssociations(
 }
 
 /**
- * `upsertDeviceMetadata` body（设计 §4.2.2 + §5.1，对称 `UpsertComponentBody`）。
+ * `upsertDeviceMetadata` body（对称 `UpsertComponentBody`）。
  *
  * **关键差异：无 `componentType`**——设备级元数据是整机维度，没有子组件类型
- * 概念（设计 §5.1 DTO 注释「与 FactoryComponentView 对称，无
+ * 概念（「与 FactoryComponentView 对称，无
  * componentType/componentSn」）。两字段均可选：后端在缺省时分别回落为 `{}` 与
  * `[]`（与 `upsertComponent` 的缺省行为一致）。
  */
@@ -142,14 +140,14 @@ export interface UpsertDeviceMetadataBody {
 /**
  * PUT `/api/factory/devices/{deviceSn}` — upsert 设备级（整机）元数据。
  *
- * 设计 §4.2.2 + §5.1 + BE-D02：repo 层在 upsert 发生覆盖时于同一事务内写一条
+ * repo 层在 upsert 发生覆盖时于同一事务内写一条
  * `factory_metadata_change_log`（`sn = deviceSn`，actor `'factory'`，after 快照
  * 结构为 `{ metadata, file_attachments, updated_at }`，**无 `component_type`**，
  * 与子组件级关键差异）。后端响应为 **204 No Content**（无 body）；调用方应直接
  * 断言 `response.status() === 204`。
  *
  * 与 `upsertComponent` 对称：返回原始 `APIResponse`，由测试侧断言状态码以保留
- * 失败归因精确性（设备级 HTTP 失败归因 backend BE-D02，见 factory-metadata-demo
+ * 失败归因精确性（设备级 HTTP 失败归因 backend，见 factory-metadata-demo
  * 文件头注释）。
  *
  * @param request Playwright `APIRequestContext`。factory 写仅凭 Bearer 鉴权，与 admin

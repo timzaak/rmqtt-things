@@ -1,14 +1,14 @@
 /**
  * Action Invocation Demo 测试
  *
- * 对应用户故事（Draft 来源：`.ai/user-stories/core/thing-model-extension.md`）：
- * - US-TME-002 调用设备动作 / 服务（场景 1 在线回环 / 场景 2 离线排队上线投递 /
+ * 对应用户故事（docs/user-stories/01-platform-admin-user-stories.md）：
+ * - US-PA-048 调用设备动作 / 服务（场景 1 在线回环 / 场景 2 离线排队上线投递 /
  *   场景 3 不污染影子）
- * - US-TME-003 在前端区分动作调用与属性下发（独立动作 Tab + 历史）
+ * - US-PA-049 在前端区分动作调用与属性下发（独立动作 Tab + 历史）
  *
  * 传输层复用故事：US-PA-016（下发命令）、US-DV-009（离线命令排队与上线投递）。
  *
- * 协议契约（thing-model-extension 设计 §5.1 / §5.2）：
+ * 协议契约：
  * - 平台下发：`{id: "action:{db_id}", params, ack: 1}`，topic
  *   `{productId}/{deviceId}/thing/service/{serviceType}/set`。
  * - 设备回复：`{id, data?, code}`，topic `.../set_reply`；任意 2xx 为 Success。
@@ -17,7 +17,7 @@
  * GET /api/admin/property/shadow 的 desired/reported、动作历史表行），
  * 不以 sonner/toast 为唯一验收依据。
  *
- * DE-D02 适配（device-detail-experience 七区信息架构）：旧 ActionInvocationsSection
+ * device-detail-experience 七区信息架构适配：旧 ActionInvocationsSection
  * 已删除，动作调用历史汇入统一 Operations 表（DeviceOperationsSection.tsx），
  * 调用入口收敛到 Operations tab 的 Run Action 按钮（ActionInvokeDialog.tsx）。
  * 变化点：
@@ -72,7 +72,7 @@ interface ShadowView {
 /**
  * 导航到设备详情页并切换到 Operations tab。
  *
- * DE-D02：设备详情页默认 activeTab='overview'，DeviceOperationsSection 仅在
+ * 设备详情页默认 activeTab='overview'，DeviceOperationsSection 仅在
  * activeTab==='operations' 时渲染（show.$id.tsx:126-128）。Tab 由 data-testid
  * `device-tab-operations` 定位（优先用 testid），分区 heading "Operations" 为
  * 持久锚点。Tab 选择器集中在 SELECTORS.deviceTabs.operationsTab。
@@ -82,7 +82,7 @@ async function openOperationsTab(
   deviceId: string,
 ): Promise<void> {
   // waitUntil:'commit' 在收到响应头即返回，避免 Vite dev server 下
-  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时（DE-TR01 复现）。
+  // 'load'/'domcontentloaded' 偶发不触发导致 30s 超时。
   await page.goto(`${FRONTEND_URL}/devices/show/${deviceId}`, {
     waitUntil: 'commit',
   })
@@ -91,15 +91,15 @@ async function openOperationsTab(
   await expect(page.getByRole('heading', { name: 'Operations' })).toBeVisible()
 }
 
-test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
+test.describe('Action Invocation (US-PA-048 / US-PA-049)', () => {
   test.beforeAll(async () => {
     await verifyTestEnvironment(null)
   })
 
   // ---------------------------------------------------------------------------
-  // Scenario 1 — US-TME-002 在线设备动作回环（含非 200 的 2xx 成功语义）
+  // Scenario 1 — US-PA-048 在线设备动作回环（含非 200 的 2xx 成功语义）
   // ---------------------------------------------------------------------------
-  test('[US-TME-002 Scenario 1] online device action round-trip via UI', async ({
+  test('[US-PA-048 Scenario 1] online device action round-trip via UI', async ({
     page,
     request,
     demoLogger: _demoLogger,
@@ -120,7 +120,7 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
 
       await openOperationsTab(page, deviceId)
 
-      // 打开 Invoke Action 对话框（DE-D02：入口为 Run Action 按钮，禁止硬编码 testid）
+      // 打开 Invoke Action 对话框（入口为 Run Action 按钮，禁止硬编码 testid）
       await page.locator(SELECTORS.operations.runActionButton).click()
       const dialog = page.locator(SELECTORS.operations.actionDialog)
       await expect(dialog).toBeVisible()
@@ -140,11 +140,11 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
       // ack=1 是 spec 请求格式约定（设备必须回复 set_reply）
       expect((action.raw as { ack?: number }).ack).toBe(1)
 
-      // 回复 202（顺带覆盖非 200 的 2xx 成功语义，设计 §5.1）
+      // 回复 202（顺带覆盖非 200 的 2xx 成功语义）
       await device.replyAction(action, 202)
 
       // 主断言（持久状态）：统一 Operations 表内该动作调用 Success 行可见
-      // （DE-D02：device-operations-table 取代旧 action-invocation-table）。
+      // （device-operations-table 取代旧 action-invocation-table）。
       const operationsTable = page.locator(SELECTORS.operations.table)
       await expect(operationsTable.getByText('Success', { exact: true })).toBeVisible({ timeout: POLL_TIMEOUT })
 
@@ -166,9 +166,9 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // Scenario 2 — US-TME-002 离线排队、上线投递（US-DV-009 传输层）
+  // Scenario 2 — US-PA-048 离线排队、上线投递（US-DV-009 传输层）
   // ---------------------------------------------------------------------------
-  test('[US-TME-002 Scenario 2] offline action queued, delivered on connect', async ({
+  test('[US-PA-048 Scenario 2] offline action queued, delivered on connect', async ({
     page,
     request,
     demoLogger: _demoLogger,
@@ -189,7 +189,7 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
       await device.connect()
       await device.disconnect()
 
-      // 离线状态下通过 API 创建动作调用（body camelCase，设计 §4.2.2）
+      // 离线状态下通过 API 创建动作调用（body camelCase）
       const createResponse = await request.post('/api/admin/service/command', {
         data: {
           productId: PRODUCT_ID,
@@ -222,7 +222,7 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
       // （waitForAction 只往 actionWaiters 数组 push 一个 Promise resolver，
       // 不依赖 MQTT 连接，与 mqtt-device-flow-demo US-DV-009 同样的处理。）
       //
-      // 订阅竞态修复（DE-D05 缺陷 C 方案 1）：将 serviceType 传给 connect()，
+      // 订阅竞态修复（方案 1）：将 serviceType 传给 connect()，
       // 使其返回前显式订阅 `thing/service/${serviceType}/set` 并 await SUBACK，
       // 同时记入 subscribedActionTopics。这样 broker drain 投递时设备已有确认的
       // 订阅，且 message handler 的 action 分支能正确 dispatch（否则集合为空时
@@ -265,9 +265,9 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
   })
 
   // ---------------------------------------------------------------------------
-  // Scenario 3 + US-TME-003 — 不污染影子且历史可区分
+  // Scenario 3 + US-PA-049 — 不污染影子且历史可区分
   // ---------------------------------------------------------------------------
-  test('[US-TME-002 Scenario 3 + US-TME-003] action does not pollute shadow and is isolated from property commands', async ({
+  test('[US-PA-048 Scenario 3 + US-PA-049] action does not pollute shadow and is isolated from property commands', async ({
     page,
     request,
     demoLogger: _demoLogger,
@@ -363,15 +363,15 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
         { timeout: POLL_TIMEOUT },
       ).toBe(true)
 
-      // 主断言 4（US-TME-003 前端可区分）：DE-D02 后无独立动作 Tab，故在统一
+      // 主断言 4（US-PA-049 前端可区分）：无独立动作 Tab，故在统一
       // Operations 表内按 Type 列筛选 "Action" 验证动作调用可区分：buzzer 调用
       // 作为 Action 类型行可见。属性命令区（同表内 Direct write / Target sync 类型）
-      // 不出现该动作调用（设计 §4.4.2：More ▾ → Direct property write 仍走
+      // 不出现该动作调用（More ▾ → Direct property write 仍走
       // property_command 表，与 action_invocation 物理隔离）。
       await openOperationsTab(page, deviceId)
       const operationsTable = page.locator(SELECTORS.operations.table)
 
-      // DE-TR01 修复：本场景同时产生 targetSync（desired 写入）和 actionInvocation
+      // 本场景同时产生 targetSync（desired 写入）和 actionInvocation
       // （buzzer）两类 Success 行，统一表中 getByText('Success') 会触发 strict mode
       // violation。本断言的意图是验证 buzzer 动作调用作为 Action 类型行可见且成功，
       // 因此限定到含 'buzzer' 的行，再断言其 Type=Action 与 Status=Success。
@@ -383,7 +383,7 @@ test.describe('Action Invocation (US-TME-002 / US-TME-003)', () => {
       await expect(operationsTable.getByText('buzzer')).toBeVisible()
 
       // 反向隔离：按类型筛选 Direct write，buzzer 动作行应不再出现在筛选后的表中
-      // （operation-type-filter 的 directPropertyWrite option value，设计 §5.1）。
+      // （operation-type-filter 的 directPropertyWrite option value）。
       await page.locator(SELECTORS.operations.typeFilter).selectOption('directPropertyWrite')
       await expect(operationsTable.getByText('buzzer')).toHaveCount(0)
       await expect(operationsTable.getByText('Action', { exact: true })).toHaveCount(0)

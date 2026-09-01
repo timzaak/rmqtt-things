@@ -1854,6 +1854,136 @@
         ]
       }
     },
+    "/api/admin/property/history/keys": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_property_history_keys",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lookback_days",
+            "in": "query",
+            "description": "发现窗口天数，默认 30，允许 1..=366",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Numeric property keys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyChartKeysResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
+    "/api/admin/property/history/series": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "operationId": "get_property_history_series",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "query",
+            "description": "产品ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "description": "设备ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keys",
+            "in": "query",
+            "description": "属性键列表，1..=5 个",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "起始时间（含），RFC3339",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "结束时间（含），RFC3339，必须晚于 start_time",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Property series",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertySeriesListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie_auth": []
+          }
+        ]
+      }
+    },
     "/api/admin/property/shadow": {
       "get": {
         "tags": [
@@ -2982,7 +3112,7 @@
       },
       "ActionInvocation": {
         "type": "object",
-        "description": "Persisted one-shot action/service invocation (thing-model-extension,\ndesign §4.3.2/§5.2). Physically isolated from `PropertyCommand` per design\nA2 — one-shot actions (reboot / unlock / buzzer) live in their own table\nand reuse the `CommandStatus` enum for state semantics. `params` is the\naction input document (free-form JSONB), and `service_type` is the\nfree-form service identifier routed via the MQTT topic segment.",
+        "description": "Persisted one-shot action/service invocation (thing-model-extension).\nPhysically isolated from `PropertyCommand` per A2 — one-shot actions (reboot / unlock / buzzer) live in their own table\nand reuse the `CommandStatus` enum for state semantics. `params` is the\naction input document (free-form JSONB), and `service_type` is the\nfree-form service identifier routed via the MQTT topic segment.",
         "required": [
           "id",
           "product_id",
@@ -3025,7 +3155,7 @@
       },
       "ActionInvocationView": {
         "type": "object",
-        "description": "动作调用视图。字段对齐设计 §4.2.2 GET 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
+        "description": "动作调用视图。字段对齐 GET /api/admin/service/command 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
         "required": [
           "id",
           "serviceType",
@@ -3542,7 +3672,7 @@
       },
       "ComponentAssociationItem": {
         "type": "object",
-        "description": "Single item of `UpsertAssociationsRequest.components` (design §4.2.2 B).",
+        "description": "Single item of `UpsertAssociationsRequest.components`.",
         "required": [
           "componentSn"
         ],
@@ -3556,13 +3686,13 @@
               "string",
               "null"
             ],
-            "description": "Optional type hint. The metadata table's value takes precedence in the\nmerged view (design §4.2.2 C)."
+            "description": "Optional type hint. The metadata table's value takes precedence in the\nmerged view."
           }
         }
       },
       "CreateActionCommandRequest": {
         "type": "object",
-        "description": "管理端发起动作 / 服务调用的请求体（设计 §4.2.2）。\ncamelCase 与前端 `ActionInvokeDialog` 表单字段一致。",
+        "description": "管理端发起动作 / 服务调用的请求体。\ncamelCase 与前端 `ActionInvokeDialog` 表单字段一致。",
         "required": [
           "productId",
           "deviceId",
@@ -3589,7 +3719,7 @@
       },
       "CreateActionCommandResponse": {
         "type": "object",
-        "description": "`create_service_command` 的响应（设计 §4.2.2 / §5.2）。\n`status` 反映入队后的瞬时状态：`pending`（设备未订阅/离线）或 `sent`（在线\n且已订阅，drain 已立即投递）。",
+        "description": "`create_service_command` 的响应。\n`status` 反映入队后的瞬时状态：`pending`（设备未订阅/离线）或 `sent`（在线\n且已订阅，drain 已立即投递）。",
         "required": [
           "id",
           "status"
@@ -3940,7 +4070,7 @@
       },
       "DeviceOperationQuery": {
         "type": "object",
-        "description": "统一设备操作查询入参（设计 §4.2.3）。分页沿用既有默认值\n（`page` 默认 1、`page_size` 默认 10）。",
+        "description": "统一设备操作查询入参。",
         "required": [
           "product_id"
         ],
@@ -3992,7 +4122,7 @@
       },
       "DeviceOperationType": {
         "type": "string",
-        "description": "统一操作类型（设计 §5.1）。camelCase 字面值与 SQL 投影常量一致：\n`targetSync`（property_command.source=1）/ `directPropertyWrite`（source=0）/\n`actionInvocation`（action_invocation）。",
+        "description": "统一操作类型。camelCase 字面值与 SQL 投影常量一致：\n`targetSync`（property_command.source=1）/ `directPropertyWrite`（source=0）/\n`actionInvocation`（action_invocation）。",
         "enum": [
           "targetSync",
           "directPropertyWrite",
@@ -4001,7 +4131,7 @@
       },
       "DeviceOperationView": {
         "type": "object",
-        "description": "统一设备操作视图（设计 §4.2.3 响应表 / §5.1）。`operation_id` 为稳定组合\nID（`property:{id}` / `action:{id}`），`name` 对属性命令固定为\n`Set properties` / `Sync target`，对动作取 `service_type`。",
+        "description": "统一设备操作视图。`operation_id` 为稳定组合 ID（`property:{id}` /\n`action:{id}`），`name` 对属性命令固定为 `Set properties` / `Sync target`，\n对动作取 `service_type`（前端摘要规则依赖这些字面值）。",
         "required": [
           "operationId",
           "operationType",
@@ -4272,7 +4402,7 @@
       },
       "FactoryChangeLogQuery": {
         "type": "object",
-        "description": "Query parameters for `GET /api/admin/factory/sn/{sn}/changes`\n(design §4.2.2 D). The repo has no shared `PaginationQuery`; each paginated\nendpoint carries its own query struct following the existing convention\n(`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.",
+        "description": "Query parameters for `GET /api/admin/factory/sn/{sn}/changes`\n(paginated, time-descending). The repo has no shared `PaginationQuery`; each paginated\nendpoint carries its own query struct following the existing convention\n(`PropertyCommandQuery` / `CommonQuery` / etc.). `page` is 1-based.",
         "properties": {
           "page": {
             "type": "integer",
@@ -4349,7 +4479,7 @@
       },
       "FactoryComponentView": {
         "type": "object",
-        "description": "Single component in a `FactoryDeviceView` (design §4.2.2 C).\n\n`component_type` prefers the metadata table's value and falls back to the\nassociation table's hint; both absent → `None`. `file_attachments` is an\narray (defaults to `[]` when metadata has not arrived).",
+        "description": "Single component in a `FactoryDeviceView`.\n\n`component_type` prefers the metadata table's value and falls back to the\nassociation table's hint; both absent → `None`. `file_attachments` is an\narray (defaults to `[]` when metadata has not arrived).",
         "required": [
           "componentSn",
           "fileAttachments"
@@ -4391,7 +4521,7 @@
       },
       "FactoryDeviceMetadataView": {
         "type": "object",
-        "description": "Device-level factory metadata view (design §4.2.2, §5.1). Symmetric to\n`FactoryComponentView` minus `componentType`/`componentSn` — devices have no\ncomponent type or sub-component SN at this level. `file_attachments` is\nnormalised from the raw JSONB to an array (Array passthrough, Null → empty,\nscalar → wrapped), matching `map_row_to_component_view`.",
+        "description": "Device-level factory metadata view. Symmetric to\n`FactoryComponentView` minus `componentType`/`componentSn` — devices have no\ncomponent type or sub-component SN at this level. `file_attachments` is\nnormalised from the raw JSONB to an array (Array passthrough, Null → empty,\nscalar → wrapped), matching `map_row_to_component_view`.",
         "required": [
           "fileAttachments"
         ],
@@ -4423,7 +4553,7 @@
       },
       "FactoryDeviceView": {
         "type": "object",
-        "description": "Admin merged-view response for a device (design §4.2.2 C).\n\n`device_metadata` carries the device-level factory metadata row when present\n(written via `PUT /api/factory/devices/{deviceSn}`), or `null` when no\ndevice-level metadata has been reported yet. `components` is the left-join of\nassociations with component metadata; components whose metadata has not\narrived yet surface with `metadata: null` and `file_attachments: []` (R3).",
+        "description": "Admin merged-view response for a device.\n\n`device_metadata` carries the device-level factory metadata row when present\n(written via `PUT /api/factory/devices/{deviceSn}`), or `null` when no\ndevice-level metadata has been reported yet. `components` is the left-join of\nassociations with component metadata; components whose metadata has not\narrived yet surface with `metadata: null` and `file_attachments: []` (R3).",
         "required": [
           "deviceSn",
           "components"
@@ -4493,7 +4623,7 @@
       },
       "FileAttachment": {
         "type": "object",
-        "description": "Reference to a file attachment uploaded via\n`POST /api/factory/file/upload` (design §4.2.2 A).",
+        "description": "Reference to a file attachment uploaded via\n`POST /api/factory/file/upload`.",
         "required": [
           "fileKey",
           "fileName"
@@ -4705,7 +4835,7 @@
       },
       "OtaReport": {
         "type": "object",
-        "description": "Device OTA version report (design §5.3).\n\n`version` is received as a spec `\"major.minor.patch\"` **string**\n(e.g. `\"1.2.3\"`) — the internal packed-integer storage is produced by\n`ota_handlers::ota_version_post` via `parse_version_to_int`. The DB\n`device_versions.version` column stays `i32`; only the handler/API layer\ntranslates between the wire string and the packed int.",
+        "description": "Device OTA version report.\n\n`version` is received as a spec `\"major.minor.patch\"` **string**\n(e.g. `\"1.2.3\"`) — the internal packed-integer storage is produced by\n`ota_handlers::ota_version_post` via `parse_version_to_int`. The DB\n`device_versions.version` column stays `i32`; only the handler/API layer\ntranslates between the wire string and the packed int.",
         "required": [
           "key",
           "version"
@@ -4858,7 +4988,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "description": "动作调用视图。字段对齐设计 §4.2.2 GET 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
+              "description": "动作调用视图。字段对齐 GET /api/admin/service/command 响应\n（`id / serviceType / params / status / createdTime / updatedTime`），\ncamelCase 与前端 hook 解包一致。复用既有 `ActionInvocation` 行模型并裁剪\n不暴露给前端的 `product_id` / `device_id`（已在查询参数中由调用方持有）。",
               "required": [
                 "id",
                 "serviceType",
@@ -5610,6 +5740,65 @@
           "Offline"
         ]
       },
+      "PropertyChartKey": {
+        "type": "object",
+        "description": "Numeric property key discovered from reported data. A key qualifies only\nwhen every sample in the lookback window is a JSON number; keys with any\nstring/bool/object/array/null sample are excluded so mixed-semantics data\nnever reaches the chart.",
+        "required": [
+          "key",
+          "sampleCount"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "sampleCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PropertyChartKeysQuery": {
+        "type": "object",
+        "description": "数值属性发现查询入参（`GET /api/admin/property/history/keys`）。\n图表固定单设备，故 `device_id` 必填（区别于表格端点的可选 `device_id`）。",
+        "required": [
+          "product_id",
+          "device_id"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "lookback_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "发现窗口天数，默认 30，允许 1..=366"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          }
+        }
+      },
+      "PropertyChartKeysResponse": {
+        "type": "object",
+        "description": "数值属性发现响应。设备从未上报时 `data` 为空数组（200），由前端渲染引导空态。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertyChartKey"
+            },
+            "description": "数值属性列表，按 sampleCount 降序"
+          }
+        }
+      },
       "PropertyCommand": {
         "type": "object",
         "required": [
@@ -5786,6 +5975,111 @@
           "updated_time": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PropertySeriesListResponse": {
+        "type": "object",
+        "description": "图表序列查询响应。序列顺序与请求 `keys` 一致。",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertySeriesView"
+            }
+          }
+        }
+      },
+      "PropertySeriesPoint": {
+        "type": "object",
+        "description": "One chart data point. `time` is the effective report time\n(`COALESCE(reported_time, created_time)`); `value` is the raw reported JSON\nnumber passed through unchanged (original precision, no cast).",
+        "required": [
+          "time",
+          "value"
+        ],
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Value"
+          }
+        }
+      },
+      "PropertySeriesQuery": {
+        "type": "object",
+        "description": "图表序列查询入参（`GET /api/admin/property/history/series`）。\n`keys` 以重复 query 参数传递（`keys=a&keys=b`）；`start_time` / `end_time`\n为 RFC3339，闭区间且 `end_time > start_time`。",
+        "required": [
+          "product_id",
+          "device_id",
+          "keys",
+          "start_time",
+          "end_time"
+        ],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "设备ID"
+          },
+          "end_time": {
+            "type": "string",
+            "description": "结束时间（含），RFC3339，必须晚于 start_time"
+          },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "属性键列表，1..=5 个"
+          },
+          "product_id": {
+            "type": "string",
+            "description": "产品ID"
+          },
+          "start_time": {
+            "type": "string",
+            "description": "起始时间（含），RFC3339"
+          }
+        }
+      },
+      "PropertySeriesView": {
+        "type": "object",
+        "description": "单个属性键的图表序列视图。",
+        "required": [
+          "key",
+          "totalPoints",
+          "downsampled",
+          "stride",
+          "points"
+        ],
+        "properties": {
+          "downsampled": {
+            "type": "boolean",
+            "description": "`total_points > MAX_SERIES_POINTS` 时为 true"
+          },
+          "key": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PropertySeriesPoint"
+            },
+            "description": "数据点，时间升序；每个点都来自真实上报记录"
+          },
+          "stride": {
+            "type": "integer",
+            "format": "int64",
+            "description": "抽样步长（每 stride 条真实记录取第 1 条），未降精度时为 1"
+          },
+          "totalPoints": {
+            "type": "integer",
+            "format": "int64",
+            "description": "范围内数值型匹配记录总数（count 查询结果）"
           }
         }
       },
@@ -6597,7 +6891,7 @@
       },
       "UpsertAssociationsRequest": {
         "type": "object",
-        "description": "Request body for `PUT /api/factory/devices/{deviceSn}/components`\n(design §4.2.2 B).",
+        "description": "Request body for `PUT /api/factory/devices/{deviceSn}/components`.",
         "required": [
           "components"
         ],
@@ -6607,20 +6901,20 @@
             "items": {
               "$ref": "#/components/schemas/ComponentAssociationItem"
             },
-            "description": "Component list — **full replace** semantics. Items not in this list are\nremoved; identical-content re-submissions are idempotent (design §6.1\n`replace_associations_full_replace_is_idempotent`)."
+            "description": "Component list — **full replace** semantics. Items not in this list are\nremoved; identical-content re-submissions are idempotent."
           }
         }
       },
       "UpsertComponentRequest": {
         "type": "object",
-        "description": "Request body for `PUT /api/factory/components/{componentSn}` (design §4.2.2 A).\n\nAll fields are optional: `componentType` defaults to `\"camera\"` (the DB\ncolumn default is `\"camera\"`; the handler substitutes `None` explicitly to\nkeep the behaviour visible at the API surface rather than relying on the\ncaller noticing the DB default). `metadata` and `fileAttachments` default to\n`{}` and `[]` respectively. A request with every field omitted creates an\nempty placeholder row (intentional — callers may upsert associations first).",
+        "description": "Request body for `PUT /api/factory/components/{componentSn}`.\n\nAll fields are optional: `componentType` defaults to `\"camera\"` (the DB\ncolumn default is `\"camera\"`; the handler substitutes `None` explicitly to\nkeep the behaviour visible at the API surface rather than relying on the\ncaller noticing the DB default). `metadata` and `fileAttachments` default to\n`{}` and `[]` respectively. A request with every field omitted creates an\nempty placeholder row (intentional — callers may upsert associations first).",
         "properties": {
           "componentType": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Free-text component type (defaults to `\"camera\"` when omitted). The\nschema deliberately does not enumerate values so radar/sensor/etc. can\nbe added without a migration (design §1.4 D1)."
+            "description": "Free-text component type (defaults to `\"camera\"` when omitted). The\nschema deliberately does not enumerate values so radar/sensor/etc. can\nbe added without a migration."
           },
           "fileAttachments": {
             "type": [
@@ -6630,7 +6924,7 @@
             "items": {
               "$ref": "#/components/schemas/FileAttachment"
             },
-            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication, NOT the admin/thing upload paths — see design §4.5)."
+            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication, NOT the admin/thing upload paths)."
           },
           "metadata": {
             "type": [
@@ -6649,7 +6943,7 @@
       },
       "UpsertDeviceMetadataRequest": {
         "type": "object",
-        "description": "Request body for `PUT /api/factory/devices/{deviceSn}` (design §4.2.2 —\ndevice-level write, symmetric to `UpsertComponentRequest` but **without\n`componentType`**, since devices have no component type).\n\n`metadata` and `fileAttachments` default to `{}` and `[]` respectively. A\nrequest with every field omitted creates an empty placeholder row\n(intentional — callers may upsert associations first).",
+        "description": "Request body for `PUT /api/factory/devices/{deviceSn}` —\ndevice-level write, symmetric to `UpsertComponentRequest` but **without\n`componentType`**, since devices have no component type).\n\n`metadata` and `fileAttachments` default to `{}` and `[]` respectively. A\nrequest with every field omitted creates an empty placeholder row\n(intentional — callers may upsert associations first).",
         "properties": {
           "fileAttachments": {
             "type": [
@@ -6659,7 +6953,7 @@
             "items": {
               "$ref": "#/components/schemas/FileAttachment"
             },
-            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication — see design §4.5)."
+            "description": "File-attachment references. Defaults to `[]`. Each `fileKey` must be\nobtained from `POST /api/factory/file/upload` first (factory API Key\nauthentication)."
           },
           "metadata": {
             "type": [

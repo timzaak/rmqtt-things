@@ -1,20 +1,20 @@
 //! Scenario tests for the admin generic file download presigned-URL endpoint
-//! (interface F, design §4.2.2 F / §4.5 / §5.5), built on top of the
-//! dev-delivered production code from BE-D04
+//! (interface F), built on top of the
+//! dev-delivered production code
 //! (`admin_file_download_url_handler` + `FileDownloadUrlQuery` /
 //! `FileDownloadUrlResponse` DTO + directory whitelist + path-traversal
 //! protection + 503 mapping + OpenAPI registration).
 //!
-//! Covers the 4 business scenarios from design §6.1 (`download-url` row).
+//! Covers the 4 business scenarios of the download-url interface.
 //!
-//! Test style mirrors `factory_metadata_scenarios.rs` (BE-T01, same slot, same
+//! Test style mirrors `factory_metadata_scenarios.rs` (same slot, same
 //! in-process axum `#[test_context(Ctx)]` + `#[tokio::test]` pattern) and
 //! reuses `super::simple_tests::{request, test_s3_endpoint,
 //! create_test_database, drop_test_schema}`. HTTP calls go through
 //! `ctx.service`.
 //!
-//! Query parameter / JSON field naming notes (all verified against the BE-D04
-//! production code, NOT assumed from the design doc):
+//! Query parameter / JSON field naming notes (all verified against the
+//! production code, NOT assumed):
 //! - The route is `GET /api/admin/file/download-url`.
 //! - The query parameter name is `fileKey` (camelCase). `FileDownloadUrlQuery`
 //!   (`backend/src/api/admin_handlers.rs:24`) carries
@@ -42,7 +42,7 @@
 //!   fallback ("construct a dedicated context") applies: see
 //!   `FileDownloadUrlContext` below, which whitelists `ota/*` explicitly.
 //! - The 503 scenario mirrors `factory_metadata_scenarios.rs::FactoryNoS3Context`
-//!   (BE-T01): `Config { s3: None, .. }` rebuilt router ⇒
+//!   (`Config { s3: None, .. }` rebuilt router) ⇒
 //!   `state.admin.s3_client == None` ⇒ handler returns 503.
 
 use super::simple_tests::{create_test_database, drop_test_schema, request, test_s3_endpoint};
@@ -197,7 +197,7 @@ impl AsyncTestContext for FileDownloadNoS3Context {
         let rmqtt_client = RmqttHttpClient::new(config.mqtt.clone());
         let schema_cache = SchemaCache::InMemory(Arc::new(InMemorySchemaCache::new()));
         // `s3_client` intentionally `None`: the whole point of this context is
-        // the 503 sub-case (design §4.2.2 F, §5.5).
+        // the 503 sub-case.
         let app_state = Arc::new(AppState {
             db: db_service.clone(),
             rmqtt_client: rmqtt_client.clone(),
@@ -269,7 +269,7 @@ fn download_url_uri(file_key: &str) -> String {
 //
 // User Story: US-PA-047 (admin reads file attachments in the factory-metadata
 // panel via a presigned S3 direct link).
-// Covers: design §4.2.2 F success response, §5.5.
+// Covers: success response contract.
 //
 // Asserts:
 //   - 200 OK on `GET /api/admin/file/download-url?fileKey=ota/<uuid>.bin`
@@ -282,8 +282,8 @@ fn download_url_uri(file_key: &str) -> String {
 // is the same fake/minio endpoint used by `simple_tests::TestContext`,
 // `s3_tests`, and `factory_metadata_scenarios`. `get_presigned_download_url`
 // builds the URL locally (no network round-trip), so the presigned URL is
-// returned even though no real object exists at that key (design §4.2.2 F:
-// "presign does not issue a GET"; 404 handling is delegated to S3 when the
+// returned even though no real object exists at that key ("presign does not
+// issue a GET"; 404 handling is delegated to S3 when the
 // frontend later fetches the URL).
 // ===========================================================================
 #[test_context(FileDownloadUrlContext)]
@@ -319,7 +319,7 @@ async fn scenario_admin_file_download_url_returns_presigned_url(ctx: &mut FileDo
 //
 // User Story: US-PA-047 (admin reads file attachments; malformed fileKey must
 // be rejected before any S3 interaction).
-// Covers: design §4.2.2 F 400 error response, §4.5 path-traversal protection.
+// Covers: 400 error response, path-traversal protection.
 //
 // Asserts the four 400 sub-cases implemented in
 // `admin_handlers::validate_file_key` (all share the same message
@@ -391,7 +391,7 @@ async fn scenario_admin_file_download_url_rejects_invalid_file_key(
 // the whitelist (403).
 //
 // User Story: US-PA-047 (admin must NOT be able to read arbitrary S3 keys).
-// Covers: design §4.2.2 F 403 error response, §4.5 directory whitelist
+// Covers: 403 error response, directory whitelist
 //         (prevents reading outside the configured S3 prefixes).
 //
 // Asserts:
@@ -431,14 +431,14 @@ async fn scenario_admin_file_download_url_rejects_directory_not_allowed(
 // User Story: US-PA-047 (admin reads file attachments; the S3 backend being
 // unconfigured must surface as 503, matching the existing file-upload
 // convention).
-// Covers: design §4.2.2 F 503 error response, §5.5 503 mapping.
+// Covers: 503 error response, S3-unconfigured mapping.
 //
 // Asserts:
 //   - 503 on `GET /api/admin/file/download-url?fileKey=ota/<uuid>.bin` when
 //     `state.admin.s3_client` is `None`.
 //   - Body message is exactly `"S3 client not configured"`.
 //
-// Uses `FileDownloadNoS3Context` (mirrors BE-T01 `FactoryNoS3Context`:
+// Uses `FileDownloadNoS3Context` (mirrors `FactoryNoS3Context`:
 // `Config { s3: None, .. }` rebuilt router ⇒ `admin.s3_client = None`). The
 // path-traversal validation passes (`ota/uuid.bin` is well-formed), so the
 // handler reaches the `s3_client.as_ref().ok_or_else(..)` branch and returns

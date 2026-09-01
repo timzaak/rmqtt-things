@@ -176,7 +176,7 @@ impl RmqttHttpClient {
     }
 
     /// Check whether the device is subscribed to the action/service topic for a
-    /// specific `service_type` (thing-model-extension design §5.2). Parameterizes
+    /// specific `service_type`. Parameterizes
     /// `is_subscribed_to_properties` with the `service_type` topic segment:
     /// `{product_id}/{client_id}/thing/service/{service_type}/set`. Reuses the
     /// same `get_subscriptions` + `mqtt_topic_matches` machinery (no abstraction

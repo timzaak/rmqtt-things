@@ -86,10 +86,10 @@ pub enum AckStatus {
 // 响应结构
 //
 // `data` is omitted from the serialised payload when `None` (thing-model-spec
-// §1.5 「无数据时省略 data」; design §5.3). This is a **global** effect: every
+// 「无数据时省略 data」). This is a **global** effect: every
 // `MqttResponse` serialisation site (ack_response, file_upload_handler,
 // factory_metadata_get_handler, property_post/event_post ack, etc.) stops
-// emitting `"data": null`. Per design §1.4 the system is not yet live, so no
+// emitting `"data": null`. The system is not yet live, so no
 // compatibility branch is retained.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct MqttResponse {
@@ -201,7 +201,7 @@ pub struct FileUploadResponse {
     pub fields: HashMap<String, String>,
 }
 
-/// Device OTA version report (design §5.3).
+/// Device OTA version report.
 ///
 /// `version` is received as a spec `"major.minor.patch"` **string**
 /// (e.g. `"1.2.3"`) — the internal packed-integer storage is produced by

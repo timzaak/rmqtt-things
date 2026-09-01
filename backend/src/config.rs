@@ -135,8 +135,8 @@ pub struct PropertyCommandPublishConfig {
     pub retries: u8,
 }
 
-// Service/action command publish configuration (thing-model-extension design
-// §5.2). The publish field shape is identical to the property command's, so the
+// Service/action command publish configuration (thing-model-extension).
+// The publish field shape is identical to the property command's, so the
 // inner config is a type alias rather than a redefinition — only the wrapper
 // stays distinct because its `Default` topic differs (`${service_type}/set` vs
 // `property/set`; see the `Default` impls below). The `${service_type}`
@@ -190,7 +190,7 @@ impl Default for PropertyCommandConfig {
                 qos: 2,
                 retain: false,
                 clientid: "rmqtt_things".to_string(),
-                // Unified topic-family placeholders (design §5.3): `${productId}`
+                // Unified topic-family placeholders: `${productId}`
                 // and `${clientid}`. The previous default had a duplicated
                 // `thing/` prefix AND mixed `$clientid` with `${clientid}`.
                 topic: "${productId}/${clientid}/thing/service/property/set".to_string(),
@@ -207,7 +207,7 @@ impl Default for ServiceCommandConfig {
                 qos: 2,
                 retain: false,
                 clientid: "rmqtt_things".to_string(),
-                // Three full placeholders per design §5.2/§5.3 — `${productId}`,
+                // Three full placeholders — `${productId}`,
                 // `${clientid}`, `${service_type}`. Each action row replaces all
                 // three with its own values before publishing.
                 topic: "${productId}/${clientid}/thing/service/${service_type}/set".to_string(),
@@ -314,7 +314,7 @@ impl Default for AlarmConfig {
 }
 
 /// Production-line (factory) API key configuration (support-multiple-device
-/// feature, design §4.5). Keys are compared in constant time by
+/// feature). Keys are compared in constant time by
 /// `factory_auth_middleware`. Empty list (the default when `[factory]` is
 /// absent) means the middleware rejects every request with 401; rotation
 /// requires a restart.

@@ -20,7 +20,7 @@ struct OtaReportParams {
 }
 
 /// Parse a spec `"major.minor.patch"` semver string into the internal packed
-/// `i32` storage (design §5.3). Encodes as `major*100_000 + minor*1_000 +
+/// `i32` storage. Encodes as `major*100_000 + minor*1_000 +
 /// patch`, matching `OtaRepo::parse_version_to_int` so device-side reports and
 /// admin-side `ota_versions.version`/`min_version`/`max_version` share the same
 /// collation space. Bounds match `validate_version_format` (major/minor <= 99,
@@ -67,7 +67,7 @@ fn parse_semver_to_int(version: &str) -> Result<i32, ApiError> {
 }
 
 /// Inverse of `parse_semver_to_int`: decode the packed `i32` storage back to
-/// the spec `"major.minor.patch"` string (design §5.3). The OTA upgrade push
+/// the spec `"major.minor.patch"` string. The OTA upgrade push
 /// publishes versions that were originally created as semver strings on the
 /// admin side, so the wire form must round-trip as a string, not the raw int
 /// encoding. Same `major*100_000 + minor*1_000 + patch` encoding/bounds.
@@ -109,7 +109,7 @@ pub async fn ota_version_post(
     let mut updates = Vec::new();
     for report in ota_report_params.params {
         // Spec contract: `version` arrives as a `"major.minor.patch"` string
-        // (design §5.3). Parse to the internal packed int that the DB layer
+        // Parse to the internal packed int that the DB layer
         // shares with admin-side `ota_versions` rows. Validation failure → 400.
         let version_int = parse_semver_to_int(&report.version)?;
 
@@ -147,7 +147,7 @@ pub async fn ota_version_post(
     }
 
     if !updates.is_empty() {
-        // Spec contract (design §5.3): the upgrade payload carries the S3
+        // Spec contract: the upgrade payload carries the S3
         // **object key** (`ota_versions.file_key`), NOT a presigned download
         // URL — the device is responsible for fetching the binary through its
         // own authorised channel (e.g. a subsequent file/download request).
@@ -155,7 +155,7 @@ pub async fn ota_version_post(
         // device must not ack this push.
         let mut params = Vec::new();
         for ota_version in updates {
-            // Spec contract (design §5.3): `version` on the wire is the
+            // Spec contract: `version` on the wire is the
             // `"major.minor.patch"` semver string, matching the admin-side
             // creation form. `ota_version.version` is the packed i32 storage,
             // so decode it back before serialising (do NOT emit the raw int).

@@ -8,7 +8,7 @@
 
 | 文件 | 角色 | 故事数量 |
 |------|------|----------|
-| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 49 |
+| [01-platform-admin-user-stories.md](01-platform-admin-user-stories.md) | Platform Admin | 52 |
 | [02-iot-device-user-stories.md](02-iot-device-user-stories.md) | IoT Device | 10 |
 | [03-demo-e2e-user-stories.md](03-demo-e2e-user-stories.md) | Demo E2E | 25 |
 
@@ -67,6 +67,9 @@
 | US-PA-047 | 管理员查询设备出厂元数据与子组件清单 | P0 | 01-platform-admin-user-stories.md |
 | US-PA-048 | 调用设备动作 / 服务 | P1 | 01-platform-admin-user-stories.md |
 | US-PA-049 | 在前端区分动作调用与属性下发 | P2 | 01-platform-admin-user-stories.md |
+| US-PA-050 | 按业务意图理解设备详情 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-051 | 区分目标同步、直接属性写入和动作调用 | P1 | 01-platform-admin-user-stories.md |
+| US-PA-052 | 以折线图查看设备属性历史趋势 | P1 | 01-platform-admin-user-stories.md |
 
 ### Demo E2E (DEMO-xxx)
 

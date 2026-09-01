@@ -15,8 +15,8 @@ export interface PropertyCommandMessage {
 }
 
 /**
- * Action / service invocation message envelope (thing-model-extension design
- * §5.1 / §5.2). Mirrors `PropertyCommandMessage`: the platform publishes the
+ * Action / service invocation message envelope (thing-model-extension).
+ * Mirrors `PropertyCommandMessage`: the platform publishes the
  * standard request `{id: "action:{db_id}", params, ack: 1}` and devices reply
  * with `{id, code, data?}` on the `.../set_reply` topic. `raw` keeps the full
  * decoded document for protocol assertions beyond `id` / `params`.
@@ -146,7 +146,7 @@ export class DemoMqttDevice {
    * Connect the device and establish the subscriptions required to receive
    * property / action commands before returning.
    *
-   * 离线投递竞态修复（DE-D05 缺陷 C，方案 1）：
+   * 离线投递竞态修复（方案 1）：
    *
    * RMQTT auto-subscription（`+/${clientid}/thing/service/+/set`）在 connect
    * 握手期间触发 `client_subscribe` webhook -> `service_set_subscribe` handler
@@ -160,10 +160,10 @@ export class DemoMqttDevice {
    * 确认就绪，broker 排空投递时即有匹配订阅者。同时把 service topic 记入
    * `subscribedActionTopics`，确保即使消息在 subscribeAction() 调用前到达，
    * message handler 的 action 分支也能正确 dispatch（否则 handler 因集合为空而
-   * 丢弃消息——DE-D04 的 waitForAction 解决了 waiter 注册，但没解决 dispatch 与
+   * 丢弃消息——waitForAction 解决了 waiter 注册，但没解决 dispatch 与
    * 订阅本身的竞态）。
    *
-   * 不回退 DE-D01 协议迁移（.params）与 DE-D02 action API；不破坏在线场景
+   * 不回退协议迁移（.params）与 action API；不破坏在线场景
    * （Scen1/Scen3 与其它在线用例的既有订阅顺序）：在线场景的命令由 UI/API 触发
    * 排空，此时 connect() 已返回、订阅已就绪，pre-subscribe 仅是更早建立同样的
    * 订阅，无副作用。
@@ -184,7 +184,7 @@ export class DemoMqttDevice {
         }
       } else if (this.subscribedActionTopics.has(topic)) {
         // Action / service invocation set topic
-        // (thing-model-extension design §4.1 / §5.2). Same standard envelope
+        // Same standard envelope
         // shape as property commands; parsed identically.
         const action = this.parseAction(payload.toString())
         const waiters = this.actionWaiters.splice(0)
@@ -341,7 +341,7 @@ export class DemoMqttDevice {
   }
 
   // -------------------------------------------------------------------------
-  // Action / service invocation support (thing-model-extension design §4.1/§5.2)
+  // Action / service invocation support (thing-model-extension)
   //
   // Mirrors the property methods but parameterised by `serviceType`. The action
   // set topic is `{productId}/{deviceId}/thing/service/{serviceType}/set` and
@@ -364,7 +364,7 @@ export class DemoMqttDevice {
    * Subscribe to the action set topic for `serviceType`. Must be called before
    * the platform invokes the action so the broker's subscribe hook triggers
    * delivery of any queued invocations (drain is triggered by the subscribe
-   * webhook, not by connect — design §3.1 / §5.3).
+   * webhook, not by connect).
    */
   async subscribeAction(serviceType: string): Promise<void> {
     const topic = this.actionSetTopicFor(serviceType)
@@ -398,7 +398,7 @@ export class DemoMqttDevice {
    * reply topic derived from the message topic (or, when the raw envelope lacks
    * a topic, the known subscribed topic).
    *
-   * Any 2xx `code` is treated as success by the backend (design §5.1).
+   * Any 2xx `code` is treated as success by the backend.
    */
   async replyAction(
     message: ActionCommandMessage,

@@ -92,7 +92,7 @@ impl AsyncTestContext for MqttTestContext {
                     },
                 },
                 // thing-model-extension: service/action command publish config
-                // (design §5.2). Uses the same three placeholders as production
+                // Uses the same three placeholders as production
                 // (`${productId}` / `${clientid}` / `${service_type}`) so the
                 // scenario tests for action invocations publish to the right
                 // topic segment per service_type.
