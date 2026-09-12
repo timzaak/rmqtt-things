@@ -24,4 +24,4 @@ RMQTT Things 把 MQTT 设备接到管理后台。设备通过 RMQTT Broker 上�
 - [配置](configuration.md) — 配置项说明
 - [认证与权限](auth.md) — 管理端 Herald SSO 认证和设备端 HMAC 认证
 - [部署](deployment.md) — 生产环境部署步骤
-- [用 Claude Code 二次开发](ai-development.md) — AI 开发流水线的具体操作步骤
+- [用 AI 二次开发](ai-development.md) — web-dev-skills 开发流水线的具体操作步骤

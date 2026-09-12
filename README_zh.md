@@ -51,9 +51,9 @@ MQTTX 连接：Host `152.32.249.178`，Port `1883`（明文 TCP），Client ID =
 
 这个项目不是又一个 IoT 平台。它的重点是：**展示如何用 AI 完整开发一个生产级项目，并且让后续迭代也能用 AI 完成。**
 
-项目内置了一套 skill 系统（`.claude/` 目录），把需求、设计、编码、测试串成完整流水线。配合 Claude Code 或 AidCode + 国产大模型，clone 下来就能用 AI 做二开。你只需要描述需求，AI 帮你走完剩下的流程。
+开发工作流基于 [web-dev-skills](https://github.com/timzaak/web-dev-skills)——一套独立的 AI 开发插件，把需求、设计、编码、测试串成完整流水线。把它加载到你的 AI 编程 agent（Claude Code、ZCode、Codex 等任何支持 skill 的 agent）里，clone 本项目即可开始二开：你只需要描述需求，AI 帮你走完剩下的流程。
 
-Skill 配置也是独立的：[web-dev-skills](https://github.com/timzaak/web-dev-skills)，可以套到其他 Rust + React 项目上。
+web-dev-skills 与具体项目无关，还覆盖小程序、Flutter、Chrome 扩展等技术栈，安装方式与完整命令列表见其 README。
 
 选 Rust + React 是有考量的：编译器和类型系统是 AI 编码最好的质检员，OpenAPI-to-TypeScript 代码生成保持前后端 API 同步。
 
@@ -61,21 +61,38 @@ Skill 配置也是独立的：[web-dev-skills](https://github.com/timzaak/web-de
 
 设备走 MQTT 上报数据，Rust 后端接 WebHook 写 PostgreSQL，React 前端做管理界面。
 
-- 设备生命周期管理：上下线跟踪、属性上报、事件历史
-- 命令下发与 OTA 固件升级
-- TLS 证书签发（内置 CA）
+- 设备生命周期管理：上下线跟踪、自动注册、属性上报、事件历史
+- 设备影子（期望值 + 增量下发）与属性历史图表
+- 命令下发（属性设置、服务/动作调用）与 OTA 固件升级
+- 告警规则与规则引擎（Webhook 通知）、事件校验模板
+- 设备文件上传（S3 兼容对象存储）
+- TLS 证书签发（外部 CA：`--generate-ca` 生成或自带 CA）
+- Herald SSO 登录与基于角色的权限（可选；无 Herald 时为单租户模式）
 
-技术栈：Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack
+技术栈：Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack / Redis（可选）/ S3
 
 ## 快速开始
 
 前置条件：Docker、Rust 工具链、Node.js。完整步骤见[入门指南](docs/tutorials/getting-started.md)。
 
 ```shell
-docker run postgres:18-alpine
-docker run rmqtt/rmqtt:0.23.0
-cd backend && cargo run
-cd frontend && npm install && npm run dev
+# PostgreSQL
+docker run --rm --name postgres \
+  -e POSTGRES_DB=rmqtt_things -e POSTGRES_USER=rmqtt_user -e POSTGRES_PASSWORD=rmqtt_pass \
+  -p 5432:5432 postgres:18-alpine
+
+# RMQTT broker（项目根目录执行）
+docker run --rm --name rmqtt -p 1883:1883 -p 6060:6060 \
+  -v ${PWD}/conf:/app/rmqtt/conf rmqtt/rmqtt:0.23.0 -f conf/rmqtt.toml
+
+# 后端
+cd backend
+cp config.example.toml config.toml
+cargo run -- --generate-ca   # 首次运行前一次性生成 CA
+cargo run
+
+# 前端
+cd ../frontend && npm install && npm run dev
 ```
 
 ## 文档

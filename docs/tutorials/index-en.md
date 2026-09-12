@@ -24,4 +24,4 @@ Backend engineers who need to deploy or extend this system. Assumes experience w
 - [Configuration](configuration-en.md) — Configuration options explained
 - [Authentication & Authorization](auth-en.md) — Herald SSO for admin, HMAC for devices
 - [Deployment](deployment-en.md) — Production deployment steps
-- [Developing with Claude Code](ai-development-en.md) — AI workflow commands and practical steps
+- [Developing with AI](ai-development-en.md) — web-dev-skills workflow commands and practical steps

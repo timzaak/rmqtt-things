@@ -51,9 +51,9 @@ Full topic spec and other-language password code: [Thing model spec](docs/tutori
 
 This isn't just another IoT platform. The point is: **a production-grade project fully built by AI, with a workflow that lets AI handle ongoing development.**
 
-The `.claude/` directory contains a complete skill system that chains requirements, design, implementation, and testing into a single pipeline. With Claude Code or AidCode + domestic LLMs, you can clone and start iterating — just describe what you want, AI does the rest.
+Development runs on [web-dev-skills](https://github.com/timzaak/web-dev-skills), a standalone AI-development plugin that chains requirements, design, implementation, and testing into a single pipeline. Load it into your AI coding agent — Claude Code, ZCode, Codex, or any agent that supports skills — clone this repo, and start iterating: describe what you want, AI does the rest.
 
-The skill config is also available standalone: [web-dev-skills](https://github.com/timzaak/web-dev-skills) — applicable to any Rust + React project.
+web-dev-skills is project-agnostic and also covers miniapp, Flutter, and Chrome-extension stacks — see its README for installation and the full command list.
 
 The Rust + React stack was chosen for AI coding: the compiler and type system are the best QA for AI-generated code, and OpenAPI-to-TypeScript codegen keeps the frontend in sync with backend APIs.
 
@@ -61,21 +61,38 @@ The Rust + React stack was chosen for AI coding: the compiler and type system ar
 
 Devices report over MQTT, a Rust backend receives data via WebHook and persists to PostgreSQL, a React frontend provides the management UI.
 
-- Device lifecycle: connect/disconnect tracking, property reporting, event history
-- Command delivery and OTA firmware updates
-- TLS certificate issuance (built-in CA)
+- Device lifecycle: connect/disconnect tracking, auto-provisioning, property reporting, event history
+- Property shadow (desired state + delta) and property history charts
+- Command delivery (property set, service/action invocation) and OTA firmware updates
+- Alarm rules with a rule engine (webhook notifications) and event validation templates
+- Device file upload to S3-compatible object storage
+- TLS certificate issuance (external CA: generate with `--generate-ca` or bring your own)
+- Herald SSO login with role-based permissions (optional; single-tenant mode without it)
 
-Tech stack: Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack
+Tech stack: Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack / Redis (optional) / S3
 
 ## Quick start
 
 Prerequisites: Docker, Rust toolchain, Node.js. See [getting started](docs/tutorials/getting-started-en.md) for full instructions.
 
 ```shell
-docker run postgres:18-alpine
-docker run rmqtt/rmqtt:0.23.0
-cd backend && cargo run
-cd frontend && npm install && npm run dev
+# PostgreSQL
+docker run --rm --name postgres \
+  -e POSTGRES_DB=rmqtt_things -e POSTGRES_USER=rmqtt_user -e POSTGRES_PASSWORD=rmqtt_pass \
+  -p 5432:5432 postgres:18-alpine
+
+# RMQTT broker (from the project root)
+docker run --rm --name rmqtt -p 1883:1883 -p 6060:6060 \
+  -v ${PWD}/conf:/app/rmqtt/conf rmqtt/rmqtt:0.23.0 -f conf/rmqtt.toml
+
+# Backend
+cd backend
+cp config.example.toml config.toml
+cargo run -- --generate-ca   # one-time: create the CA required at runtime
+cargo run
+
+# Frontend
+cd ../frontend && npm install && npm run dev
 ```
 
 ## Documentation
