@@ -2,8 +2,6 @@
 ## rmqtt-web-hook
 ##--------------------------------------------------------------------
 
-# Set the number of worker threads for the webhook's Tokio runtime.
-worker_threads = 4
 # Maximum number of tasks that can be queued before new tasks are rejected.
 queue_capacity = 300_000
 # Maximum number of tasks that can be executed concurrently.

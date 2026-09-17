@@ -244,7 +244,6 @@ node.busy.cpuloadavg = 90.0
 node.busy.handshaking = 0
 
 rpc.server_addr = "0.0.0.0:5363"
-rpc.server_workers = 4
 
 log.to = "console"
 log.level = "warn"
@@ -312,7 +311,7 @@ max_row_limit = 10_000
         f"""http_timeout = "5s"
 http_headers.accept = "*/*"
 http_headers.Cache-Control = "no-cache"
-http_headers.User-Agent = "RMQTT/0.23.0"
+http_headers.User-Agent = "RMQTT/0.23.1"
 http_headers.Connection = "keep-alive"
 disconnect_if_pub_rejected = true
 disconnect_if_expiry = false
@@ -335,8 +334,7 @@ http_acl_req.params = {{ access = "%A", username = "%u", client_id = "%c", ip = 
 
     # rmqtt-web-hook.toml - point to test backend
     (plugins_dir / "rmqtt-web-hook.toml").write_text(
-        f"""worker_threads = 4
-queue_capacity = 300_000
+        f"""queue_capacity = 300_000
 concurrency_limit = 128
 http_timeout = "8s"
 retry_max_elapsed_time = "60s"
@@ -526,7 +524,7 @@ def _start_rmqtt() -> bool:
             f"{RMQTT_MQTT_PORT}:1883",
             "-p",
             f"{RMQTT_HTTP_PORT}:6060",
-            "rmqtt/rmqtt:0.23.0",
+            "rmqtt/rmqtt:0.23.1",
             "-f",
             "conf/rmqtt.toml",
         ]

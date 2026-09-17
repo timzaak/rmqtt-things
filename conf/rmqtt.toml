@@ -37,8 +37,6 @@ node.busy.handshaking = 0
 ##--------------------------------------------------------------------
 #gRPC listening address
 rpc.server_addr = "0.0.0.0:5363"
-#Number of worker threads
-rpc.server_workers = 4
 
 ##--------------------------------------------------------------------
 ## Log

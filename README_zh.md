@@ -83,7 +83,7 @@ docker run --rm --name postgres \
 
 # RMQTT broker（项目根目录执行）
 docker run --rm --name rmqtt -p 1883:1883 -p 6060:6060 \
-  -v ${PWD}/conf:/app/rmqtt/conf rmqtt/rmqtt:0.23.0 -f conf/rmqtt.toml
+  -v ${PWD}/conf:/app/rmqtt/conf rmqtt/rmqtt:0.23.1 -f conf/rmqtt.toml
 
 # 后端
 cd backend
