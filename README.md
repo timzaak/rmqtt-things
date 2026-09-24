@@ -47,16 +47,6 @@ Commands arrive on `test-1/mqttx_demo_001/thing/service/property/set` (auto-subs
 
 Full topic spec and other-language password code: [Thing model spec](docs/tutorials/thing-model-spec-en.md), [Device integration guide](docs/tutorials/device-integration-en.md).
 
-## Why this project matters
-
-This isn't just another IoT platform. The point is: **a production-grade project fully built by AI, with a workflow that lets AI handle ongoing development.**
-
-Development runs on [web-dev-skills](https://github.com/timzaak/web-dev-skills), a standalone AI-development plugin that chains requirements, design, implementation, and testing into a single pipeline. Load it into your AI coding agent — Claude Code, ZCode, Codex, or any agent that supports skills — clone this repo, and start iterating: describe what you want, AI does the rest.
-
-web-dev-skills is project-agnostic and also covers miniapp, Flutter, and Chrome-extension stacks — see its README for installation and the full command list.
-
-The Rust + React stack was chosen for AI coding: the compiler and type system are the best QA for AI-generated code, and OpenAPI-to-TypeScript codegen keeps the frontend in sync with backend APIs.
-
 ## Features
 
 Devices report over MQTT, a Rust backend receives data via WebHook and persists to PostgreSQL, a React frontend provides the management UI.
@@ -67,7 +57,7 @@ Devices report over MQTT, a Rust backend receives data via WebHook and persists 
 - Alarm rules with a rule engine (webhook notifications) and event validation templates
 - Device file upload to S3-compatible object storage
 - TLS certificate issuance (external CA: generate with `--generate-ca` or bring your own)
-- Herald SSO login with role-based permissions (optional; single-tenant mode without it)
+- Herald SSO login with role-based permissions (optional; without it the admin API is unauthenticated — keep it on a trusted network)
 
 Tech stack: Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack / Redis (optional) / S3
 

@@ -47,16 +47,6 @@ MQTTX 连接：Host `152.32.249.178`，Port `1883`（明文 TCP），Client ID =
 
 完整 topic 规范与多语言密码生成代码见[物模型规范](docs/tutorials/thing-model-spec.md)与[设备接入指南](docs/tutorials/device-integration.md)。
 
-## 为什么关注这个项目
-
-这个项目不是又一个 IoT 平台。它的重点是：**展示如何用 AI 完整开发一个生产级项目，并且让后续迭代也能用 AI 完成。**
-
-开发工作流基于 [web-dev-skills](https://github.com/timzaak/web-dev-skills)——一套独立的 AI 开发插件，把需求、设计、编码、测试串成完整流水线。把它加载到你的 AI 编程 agent（Claude Code、ZCode、Codex 等任何支持 skill 的 agent）里，clone 本项目即可开始二开：你只需要描述需求，AI 帮你走完剩下的流程。
-
-web-dev-skills 与具体项目无关，还覆盖小程序、Flutter、Chrome 扩展等技术栈，安装方式与完整命令列表见其 README。
-
-选 Rust + React 是有考量的：编译器和类型系统是 AI 编码最好的质检员，OpenAPI-to-TypeScript 代码生成保持前后端 API 同步。
-
 ## 功能
 
 设备走 MQTT 上报数据，Rust 后端接 WebHook 写 PostgreSQL，React 前端做管理界面。
@@ -67,7 +57,7 @@ web-dev-skills 与具体项目无关，还覆盖小程序、Flutter、Chrome 扩
 - 告警规则与规则引擎（Webhook 通知）、事件校验模板
 - 设备文件上传（S3 兼容对象存储）
 - TLS 证书签发（外部 CA：`--generate-ca` 生成或自带 CA）
-- Herald SSO 登录与基于角色的权限（可选；无 Herald 时为单租户模式）
+- Herald SSO 登录与基于角色的权限（可选；未配置时管理 API 无认证，需置于可信网络）
 
 技术栈：Rust / Axum / SQLx / PostgreSQL / React 19 / TanStack / Redis（可选）/ S3
 
