@@ -10,7 +10,6 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct HeraldAuthState {
     pub herald_sdk: Arc<Client>,
-    pub client_id: Arc<str>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,8 +34,7 @@ pub async fn herald_auth_middleware(
         .herald_sdk
         .check_permission(PermissionCheckRequest {
             access_token: token,
-            rules: Some(vec![rule]),
-            client_id: auth_state.client_id.to_string(),
+            rules: vec![rule],
         })
         .await;
 
@@ -358,7 +356,6 @@ mod tests {
                 "test-api-key".to_string(),
                 Some(Duration::from_secs(1)),
             )),
-            client_id: Arc::from("admin-web-console"),
         };
 
         Router::new()
