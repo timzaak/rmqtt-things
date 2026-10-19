@@ -256,12 +256,10 @@ pub fn create_router(
         );
 
     let admin_routes = match (config.herald.as_ref(), herald_client) {
-        (Some(_), Some(herald_sdk)) => {
-            admin_routes.layer(axum::middleware::from_fn_with_state(
-                HeraldAuthState { herald_sdk },
-                herald_auth_middleware,
-            ))
-        }
+        (Some(_), Some(herald_sdk)) => admin_routes.layer(axum::middleware::from_fn_with_state(
+            HeraldAuthState { herald_sdk },
+            herald_auth_middleware,
+        )),
         (_, _) => admin_routes,
     };
 
